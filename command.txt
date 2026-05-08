@@ -1,1 +1,0 @@
-gemini -p "Analyze this paper using the instructions and template in GEMINI.md." ./sources/paper_name.pdf > ./wiki/paper_name.md
