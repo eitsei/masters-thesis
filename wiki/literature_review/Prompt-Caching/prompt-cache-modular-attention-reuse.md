@@ -3,28 +3,32 @@
 **Category:** Prompt Caching
 
 ### 📝 Abstract & Relevance Summary
-Prompt Cache is a modular attention reuse framework designed to accelerate LLM inference by precomputing and caching the attention states (KVCache) of frequently used prompt segments (e.g., system messages, templates, and reference documents). By reusing these states, the system avoids redundant quadratic self-attention computations for the prompt's prefill stage. This research is vital for RQ1 and RQ2 as it demonstrates TTFT reductions of up to 8× on GPUs and 60× on CPUs for long-context tasks. It establishes that attention states can be reused even with discontinuous position IDs, enabling a "lego-like" assembly of prompts from cached modules.
+Prompt Cache accelerates Large Language Model (LLM) inference by reusing attention states across different prompts. The core problem addressed is the redundant computation of overlapping text segments common in RAG pipelines, such as system prompts, templates, and retrieved contexts. By introducing a schema-based approach to precompute and store these "prompt modules," the system achieves substantial latency reduction. This is highly relevant to optimizing operational efficiency in enterprise systems, as it drastically cuts down processing time without compromising the quality of the generated output.
 
-### 🚀 Efficiency Metrics (Literature Review / Empirical)
-- **RQ1 - Latency (TTFT):** Achieves **1.5× to 10×** reduction for GPU inference and **20× to 70×** for CPU inference. TTFT for a 3K context on an RTX 4090 dropped from **900ms to 90ms**.
-- **RQ2 - Token Efficiency:** Reuses precomputed attention states for the majority of the prompt; computation is only required for the new user query and non-cached segments.
-- **RQ3 - Platform Context:** Evaluation covers **NVIDIA RTX 4090, A40, A100** and high-end CPUs (Intel i9-13900K). Explores host-to-device memory copy trade-offs.
-- **Implementation Note:** Requires approximately 20 lines of additional code per LLM to support discontinuous position IDs, making it highly portable to Java/Spring AI-based inference servers.
+### 🚀 Efficiency & Cost Metrics (RQ1 & RQ2)
+- **Latency Impact:** Time-to-first-token (TTFT) latency is reduced by 1.5× to 10× for GPU-based inference (when prompt modules are in GPU memory) and from 20× up to 70× for CPU-based inference.
+- **Token Usage:** While it does not explicitly reduce the number of tokens sent to the API, it significantly reduces the FLOPs and computation time for those tokens by bypassing attention computation for cached text segments.
+- **Throughput:** By reducing the memory footprint of precomputed attention states and allowing sharing across concurrent requests, Prompt Cache can enable larger batch sizes, thereby improving overall throughput in production environments.
 
-### 📊 Evaluation Data & Bias Note
-- **Datasets Used:** LongBench suite (NarrativeQA, 2WikiMultiHopQA, MuSiQue, TriviaQA, etc.) with contexts from 4K to 10K tokens.
-- **AI-Evaluation:** Deterministic sampling used to ensure accuracy is comparable to baseline Full Attention.
-- **Bias Assessment:** Identifies "Attention Masking" as a beneficial inductive bias that can filter irrelevant noise from context documents, potentially improving output faithfulness.
+### 🏆 Quality & Accuracy Metrics (RQ3)
+- **Quality Metrics:** The paper evaluates output quality using deterministic sampling and standard metrics like F1 Score, ROUGE-L, and Accuracy. Results confirm negligible quality degradation compared to baseline non-cached inference.
+- **Benchmark Data:** Evaluated on the LongBench suite (comprising 21 datasets across 6 categories, including multi-document QA, summarization, and code completion) with context lengths ranging from 4K to 10K.
+- **Judge Setup:** Standard quantitative metrics (F1, ROUGE) were used; an LLM-as-a-judge was not specifically highlighted in this context.
+
+### ⚖️ The Trade-off Analysis
+- **Efficiency-Quality Equilibrium:** The approach yields massive latency reductions (up to 70x TTFT improvement on CPU) while maintaining accuracy fully comparable to baseline models, indicating a near-perfect efficiency-quality equilibrium.
+- **Chunking Strategy:** Context is organized into "prompt modules" via a Prompt Markup Language (PML), allowing specific chunks (e.g., individual documents in RAG) to be independently cached and reused.
+- **Enterprise Suitability:** Highly suitable for enterprise scale. It leverages abundant CPU memory (host DRAM) to store terabytes of precomputed states, making it viable for large-scale, resource-constrained, or cloud server deployments.
+
+### 📊 Methodology & Bias Note
+- **Evaluation Framework:** Extensive evaluation using Llama2 (7B, 13B), MPT 7B, and Falcon 7B on the LongBench benchmark.
+- **Bias Detection:** The evaluation relied on established open-source benchmarks with fixed metrics, reducing the risk of self-preference bias.
+
+### 🔍 Technical Implementation
+- **Portability:** The optimization is implemented at the lower-level KV cache/attention computation layer (e.g., modifying HuggingFace Transformers in PyTorch). It is not directly portable to a pure Java/Spring AI stack unless the backend inference engine (like vLLM or a custom model server) explicitly supports this level of attention caching.
+- **Key References:** 
+  - Pope et al., 2022 (Efficiently scaling transformer inference)
+  - Kwon et al., 2023 (PagedAttention)
 
 ### 💡 Key Takeaway for Thesis
-Prompt Cache proves that the "Quadratic Bottleneck" of self-attention can be bypassed by treating prompt context as a collection of modular, reusable precomputed states, which is essential for high-throughput, low-latency RAG (RQ1).
-
-### 🔗 BibTeX Reference (Target: /bib)
-```bibtex
-@inproceedings{gim2024prompt,
-  title={Prompt Cache: Modular Attention Reuse for Low-Latency Inference},
-  author={Gim, In and Chen, Guojun and Lee, Seung-seob and Sarda, Nikhil and Khandelwal, Anurag and Zhong, Lin},
-  booktitle={Proceedings of the 5th MLSys Conference},
-  year={2024}
-}
-```
+Prompt Cache proves that modular, structural reuse of attention states in the KV cache can drastically slash time-to-first-token latency for repetitive RAG contexts, serving as a critical foundational optimization for high-efficiency enterprise deployments.

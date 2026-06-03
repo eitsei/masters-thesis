@@ -3,28 +3,32 @@
 **Category:** Small-to-Big
 
 ### 📝 Abstract & Relevance Summary
-QPaug (Question and Passage Augmentation) is a dual-augmentation framework designed to enhance Open-Domain Question Answering (ODQA) by combining parametric and non-parametric knowledge. The method involves: (1) **Question Augmentation**, which uses zero-shot Chain-of-Thought (CoT) to decompose complex queries into detailed plans, making retrieval more specific; and (2) **Passage Augmentation**, where the LLM self-generates a passage to complement potentially noisy or incomplete retrieved context. This research is highly relevant to RQ1 and RQ2 as it demonstrates up to a **30% improvement** in retrieval recall and significant performance gains on multi-hop benchmarks using a compact set of passages ($K=10$), effectively optimizing information density per token.
+QPaug (Question and Passage Augmentation) leverages the parametric knowledge of LLMs to enhance the retrieval process for complex open-domain queries. The framework decomposes original questions into fine-grained sub-questions (Qaug) and self-generates relevant passages (Pgen) prior to or alongside the standard retrieval step. This approach harmonizes parametric memory with non-parametric retrieval to overcome ambiguous queries and noisy contexts. While it trades off some operational efficiency by requiring upfront LLM calls, it drastically improves context precision and final output quality.
 
-### 🚀 Efficiency Metrics (Literature Review / Empirical)
-- **RQ1 - Latency (TTFT):** By improving retrieval recall by **30%**, QPaug reduces the "miss" rate that often triggers expensive multi-step retrieval loops in iterative RAG.
-- **RQ2 - Token Efficiency:** Demonstrates that a single high-quality LLM-generated passage, when combined with only **9** retrieved passages, outperforms baseline RAG using **10** retrieved passages, supporting more concise context windows.
-- **RQ3 - Platform Context:** Evaluation included proprietary models (GPT-4, GPT-3.5) and open-source models (**Llama-2-7b/70b**).
-- **Implementation Note:** Implemented via **LangChain**; the logic is highly portable to Spring AI using specialized prompts for query planning and "Internal Knowledge" synthesis.
+### 🚀 Efficiency & Cost Metrics (RQ1 & RQ2)
+- **Latency Impact:** Increases TTFT and overall latency due to the multi-step nature of the pipeline (LLM Question Augmentation $\rightarrow$ Retrieval $\rightarrow$ LLM Passage Generation $\rightarrow$ Final Generation).
+- **Token Usage:** Consumes higher prompt and completion tokens upfront to expand the question and synthesize passages. 
+- **Throughput:** Due to the chained LLM dependencies, raw query throughput is lower compared to standard single-shot RAG.
 
-### 📊 Evaluation Data & Bias Note
-- **Datasets Used:** Natural Questions (NQ), 2wiki hop questions, and HotpotQA.
-- **AI-Evaluation:** Employs "LLM-as-a-generator" for both query expansion and context augmentation.
-- **Bias Assessment:** To prevent hallucinations, the model is explicitly instructed to generate **[NONE]** if knowledge is missing. Self-generated context is labeled "Your Knowledge:" to mitigate its bias against external retrieved facts.
+### 🏆 Quality & Accuracy Metrics (RQ3)
+- **Quality Metrics:** Exact Match (EM), F1 Score, and ROUGE-L.
+- **Benchmark Data:** Evaluated on multi-hop and single-hop open-domain QA tasks: Natural Questions (NQ), 2WikiHop (2wiki), and HotpotQA.
+- **Judge Setup:** Standard lexical overlap metrics (ROUGE-L and F1).
+
+### ⚖️ The Trade-off Analysis
+- **Efficiency-Quality Equilibrium:** QPaug explicitly trades operational efficiency (increased latency and token cost from extra LLM calls) for massive leaps in output quality (e.g., up to 34.2% performance gain on HotpotQA). It is an optimization geared heavily towards context precision over speed.
+- **Chunking Strategy:** Tested retrieval limits spanning $K=10$ to $K=100$ passages derived from 100-word Wikipedia chunks. Augmentation showed the most significant gains at larger $K$ sizes (50-100).
+- **Enterprise Suitability:** Best suited for complex, high-stakes enterprise queries where simple retrieval fails. To optimize costs in production, it would be best deployed conditionally (e.g., routed only when a query is determined to be ambiguous or multi-hop).
+
+### 📊 Methodology & Bias Note
+- **Evaluation Framework:** Extensive ablation studies combining multiple retrievers (SBERT, ANCE, Contriever) with varied LLMs (GPT-4, GPT-3.5, LLaMA-2).
+- **Bias Detection:** Addressed the risk of LLM hallucination in self-generated passages by explicitly prompting the model to output `[NONE]` if it lacked factual certainty, ensuring false parametric data did not corrupt the retrieved context.
+
+### 🔍 Technical Implementation
+- **Portability:** The methodology is fully prompt-based (utilizing zero-shot Chain-of-Thought prompting), meaning it is entirely model- and language-agnostic. It can be effortlessly orchestrated using Spring AI's chat clients and prompt templates.
+- **Key References:** 
+  - Kojima et al., 2022 (Chain-of-Thoughts)
+  - Asai et al., 2023 (Self-RAG)
 
 ### 💡 Key Takeaway for Thesis
-QPaug proves that "Small-to-Big" transitions—expanding a query into a detailed plan and augmenting context with synthesized knowledge—can dramatically improve RAG precision while keeping the context window (and token costs) manageable (RQ2).
-
-### 🔗 BibTeX Reference (Target: /bib)
-```bibtex
-@article{kim2024qpaug,
-  title={QPaug: Question and Passage Augmentation for Open-Domain Question Answering of LLMs},
-  author={Kim, Minsang and Park, Cheoneum and Baek, Seungjun},
-  journal={arXiv preprint arXiv:2406.14277},
-  year={2024}
-}
-```
+QPaug demonstrates that strategically front-loading token expenditure and latency to augment questions and passages via LLMs yields massive dividends in context precision and output quality for complex RAG tasks.
