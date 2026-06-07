@@ -1,6 +1,6 @@
 # Collab-RAG: Boosting Retrieval-Augmented Generation for Complex Question Answering via White-Box and Black-Box LLM Collaboration
 **Authors:** Ran Xu, Wenqi Shi, Yuchen Zhuang, et al. | **Year:** 2025
-**Category:** Small-to-Big
+**Category:** Routing
 
 ### 📝 Abstract & Relevance Summary
 Collab-RAG addresses the challenge of multi-hop question answering by fostering collaboration between a white-box Small Language Model (SLM) and a black-box Large Language Model (LLM). The SLM serves as an optimized query decomposer, breaking complex queries into atomic sub-questions to enhance retrieval precision, while the LLM acts as a reader for intermediate answers and final synthesis. This framework balances **Operational Efficiency** by delegating expensive planning and decomposition to small, fine-tuned models (e.g., 3B or 8B) and **Output Quality** by leveraging the robust extraction and reasoning of larger proprietary models on focused sub-contexts.

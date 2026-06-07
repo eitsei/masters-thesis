@@ -3,13 +3,13 @@
 Your primary objective is to process academic papers to extract technical data regarding RAG optimization. You must maintain a strictly balanced focus between **operational efficiency** (latency and costs) and **output quality**, as the core of this research is to identify the optimal equilibrium for enterprise-grade systems.
 
 ## 📂 File Handling & Workflow:
-1. **Input:** Recursively process all documents in `/sources/background`, `/sources/surveys`, and `/sources/literature_review`.
+1. **Input:** Recursively process all documents in `/LLM wiki/sources/background`, `/LLM wiki/sources/surveys`, and `/LLM wiki/sources/literature_review`.
 2. **File Renaming:** Generate a descriptive, slugified filename based on the **Full Paper Title**.
-3. **Wiki Output:** Save summaries to the corresponding `/wiki` sub-directory:
-    - `/wiki/background/`
-    - `/wiki/surveys/`
-    - `/wiki/literature_review/` (Sub-folders: Small-to-Big, Semantic Re-ranking, Prompt Caching)
-4. **BibTeX Output:** Save entries to `/bib/references.bib`.
+3. **Wiki Output:** Save summaries to the corresponding `/LLM wiki/wiki` sub-directory:
+    - `/LLM wiki/wiki/background/`
+    - `/LLM wiki/wiki/surveys/`
+    - `/LLM wiki/wiki/literature_review/` (Sub-folders: Small-to-Big, Semantic Re-ranking, Prompt Caching)
+4. **BibTeX Output:** Save entries to `/LLM wiki/bib/references.bib`.
 
 ## 🛠 Instructions:
 1. **Balanced Analysis (Efficiency vs. Quality):**
@@ -27,7 +27,7 @@ Your primary objective is to process academic papers to extract technical data r
 
 ---
 
-## Output Markdown Template (Target: /wiki):
+## Output Markdown Template (Target: /LLM wiki/wiki):
 
 # [Full Paper Title]
 **Authors:** [Author Names] | **Year:** [Year]
@@ -62,6 +62,6 @@ Your primary objective is to process academic papers to extract technical data r
 ### 💡 Key Takeaway for Thesis
 - [One or two sentences on how this paper supports the optimization vs. quality balance for enterprise systems.]
 
-### 🔗 BibTeX Reference (Target: /bib)
+### 🔗 BibTeX Reference (Target: /LLM wiki/bib)
 ```bibtex
 [Generate the correct BibTeX entry]

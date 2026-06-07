@@ -1,6 +1,6 @@
 # DeepSieve: Information Sieving via LLM-as-a-Knowledge-Router
 **Authors:** Minghao Guo, Qingcheng Zeng, Xujiang Zhao, et al. | **Year:** 2026
-**Category:** Small-to-Big
+**Category:** Routing
 
 ### 📝 Abstract & Relevance Summary
 DeepSieve introduces a modular RAG framework designed for multi-stage information sieving across both query and source spaces. It utilizes an LLM as a "knowledge router" to dynamically decompose complex queries into a sub-query Directed Acyclic Graph (DAG) and dispatch them to heterogeneous sources (e.g., SQL databases, RAG corpora, web APIs). It features a recursive reflexion loop to correct retrieval failures. This paper is foundational for **Operational Efficiency** by optimizing source selection to avoid token waste and **Output Quality** by preventing "context pollution" in heterogeneous knowledge environments.

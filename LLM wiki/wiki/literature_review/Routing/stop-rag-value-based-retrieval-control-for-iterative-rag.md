@@ -1,6 +1,6 @@
 # Stop-RAG: Value-Based Retrieval Control for Iterative RAG
 **Authors:** Jaewan Park, Solbee Cho, Jay-Yoon Lee | **Year:** 2025
-**Category:** Small-to-Big
+**Category:** Routing
 
 ### 📝 Abstract & Relevance Summary
 Iterative RAG systems incrementally gather evidence but often suffer from inefficiency due to fixed retrieval iterations or myopic confidence scores, driving up costs and latency. Stop-RAG formulates iterative retrieval as a finite-horizon Markov Decision Process (MDP) and trains a value-based controller (Q-network) to adaptively decide when to stop retrieving. By evaluating forward-looking estimates of whether continued retrieval will improve answer quality, Stop-RAG prevents wasteful LLM calls. This perfectly targets the operational efficiency vs. quality balance by dynamically optimizing token consumption and latency per-query.

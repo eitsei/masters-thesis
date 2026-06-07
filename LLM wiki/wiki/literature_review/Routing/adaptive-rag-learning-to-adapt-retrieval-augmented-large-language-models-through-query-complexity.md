@@ -1,6 +1,6 @@
 # Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity
 **Authors:** Soyeong Jeong, Jinheon Baek, Sukmin Cho, Sung Ju Hwang, Jong C. Park | **Year:** 2024
-**Category:** Small-to-Big
+**Category:** Routing
 
 ### 📝 Abstract & Relevance Summary
 Adaptive-RAG is a framework that dynamically selects the most suitable RAG strategy (from no retrieval to single-step or multi-step) based on the detected complexity of an incoming query. It uses a small language model as a classifier to route queries, avoiding the computational overhead of complex multi-step reasoning for simple questions while ensuring sufficient depth for difficult ones. This is a primary optimization for **Operational Efficiency** (by reducing average Time-per-Query) and **Output Quality** (by matching retrieval depth to the question's reasoning requirements).
