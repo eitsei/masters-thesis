@@ -1,0 +1,185 @@
+\documentclass[12pt,a4paper,english,oneside]{article}
+
+% Valitse 'input encoding':
+%\usepackage[latin1]{inputenc} % merkistökoodaus, jos ISO-LATIN-1:tä.
+\usepackage[utf8]{inputenc}   % merkistökoodaus, jos käytetään UTF8:a
+% Valitse 'output/font encoding':
+%\usepackage[T1]{fontenc}      % korjaa ääkkösten tavutusta, bittikarttana
+\usepackage{ae,aecompl}       % ed. lis. vektorigrafiikkana bittikartan sijasta
+% Kieli- ja tavutuspaketit:
+\usepackage[english]{babel}
+% Muita paketteja:
+% \usepackage{amsmath}   % matematiikkaa
+\usepackage{url}       % \url{...}
+\usepackage{natbib}
+% Kappaleiden erottaminen ja sisennys
+\parskip 1ex
+\parindent 0pt
+\evensidemargin 0mm
+\oddsidemargin 0mm
+\textwidth 159.2mm
+\topmargin 0mm
+\headheight 0mm
+\headsep 0mm
+\textheight 246.2mm
+
+\pagestyle{plain}
+
+% ---------------------------------------------------------------------
+
+\begin{document}
+
+% Otsikkotiedot: muokkaa tähän omat tietosi
+
+\title{Research plan:\\[5mm]
+Context is king - Optimizing Retrieval-augmented Generation for enterprise-grade systems}
+
+\author{Antti-Jussi Asunmaa\\
+Aalto-yliopisto\\
+\url{antti-jussi.t.asunmaa@aalto.fi}}
+
+\date{\today}
+
+\maketitle
+
+% ---------------------------------------------------------------------
+
+\vspace{10mm}
+
+% MUOKKAA TÄHÄN. Jos tarvitset tähän viitteitä, käytä
+% tässä dokumentissa numeroviitejärjestelmää komennolla \cite{kahva}.
+%
+% Paljon kandidaatintöitä ohjanneen Vesa Hirvisalon tarjoama 
+% sabluuna. Kursivoidut osat \emph{...} ovat kurssin henkilökunnan
+% lisäämiä. 
+
+\textbf{Name of the work:} Context is king - Optimizing Retrieval-augmented Generation for enterprise-grade systems
+
+\textbf{Creator of the work:} Antti-Jussi Asunmaa
+
+\textbf{Advisor:} Lauri Salminen, Msc
+
+\textbf{Supervisor:} Petri Vuorimaa, Professor
+
+
+\section{Abstract}
+
+Enterprise-grade AI systems must tackle one of the greatest weaknesses of modern large-language models (LLMs): hallucination, a feature where the LLM provides probable but factually incorrect information. Techniques have been introduced to provide more information for the LLM that is not included in its training data. One of the most used methods is Retrieval-augmented generation (RAG), which is based on retrieving data from external sources to provide additional context for the LLM. This retrieval process increases the computational complexity of the answer generation process, which, on the other hand, increases the latency and the costs of the systems. This thesis aims to study state-of-the-art methods to increase the computational and economic efficiency of the RAG architecture, while maintaining the quality of the output. Methods included in this study are small-to-big retrieval, semantic re-ranking, and prompt caching.
+
+\section{Research objectives and viewpoints}
+
+The main contribution of this thesis is to study state-of-the-art methods for increasing the efficiency of the RAG architecture, while maintaining the quality of the output. The methods chosen for the thesis are small-to-big retrieval, semantic re-ranking, and prompt caching. Each of these methods takes a different viewpoint on the RAG process. Small-to-big retrieval is a method for optimizing the query phase of the pipeline, whereas semantic re-ranking is used to re-rank the query results to optimize the final prompt passed to the LLM. Prompt caching, on the other hand, is a method to store results in a cache so that similar questions can receive answers directly, without driving the whole computationally heavy RAG pipeline.
+
+\begin{table}[h!]
+\centering
+\caption{Research Questions}
+\label{table:research_questions}
+\begin{tabular}{|l|p{0.8\textwidth}|}
+\hline
+\textbf{No.} & \textbf{Research Question} \\ \hline
+RQ1 & To what extent (in percentage) do small-to-big retrieval, semantic re-ranking, and prompt caching decrease the Time to First Token (TTFT) to improve latency? \\ \hline
+RQ2 & To what extent (in percentage) do small-to-big retrieval, semantic re-ranking, and prompt caching decrease the number of tokens spent per LLM call to reduce costs? \\ \hline
+RQ3 & To what extent do small-to-big retrieval, semantic re-ranking, and prompt caching affect the quality of the output (measured via, for example, Faithfulness, Answer Relevance, and/or Context Precision) versus the base case? \\ \hline
+RQ4 & (Optional) Are there observable differences in efficiency between the platforms of different cloud providers? \\ \hline
+\end{tabular}
+\end{table}
+
+Operational efficiency of each method is taken as the viewpoint of this thesis. In addition, quality aspects will be considered. The final set of quality aspects will be decided during the literature review to match the standards of the literature. Each of the studied methods is implemented and tested against a simple naive RAG. Technical implementation is mostly addressed in the implementation phase, whereas in the literature review, operational efficiency and quality are given more weight than technical details. 
+
+The specific evaluation metrics and benchmarks used for RQ1–RQ3 will be finalized based on the findings of the literature review to ensure alignment with current state-of-the-art research standards.
+
+
+\section{Research material and methods}
+\label{section:research}
+
+\subsection{Technical background and literature review}
+
+The theoretical background is mostly based on the course books on the topic and the research articles that introduced the technology. \citep{lewis2020rag} is the research article that introduced RAG, so it will be one of the foundational articles in the background chapter.
+
+I will use research articles as my main source of information for the technical background and literature review. RAG is a widely researched topic, so there is a great amount of material available. For example, a search on Google Scholar, which will be the main source of the research articles, with "RAG AND LLM" shows that the number of publications has grown to thousands of articles in recent years.
+
+As the research field of the topic is moving fast, the findings of older articles will be outdated in a reasonably short time. Snowballing (see \cite{guidelines}) is a well-suited methodology for a software-related thesis. Its core idea is to use some well-known articles as the source of other articles. One can either use sources of these articles (backward snowballing) or use cited-by tools to see articles that cite these articles (forward snowballing). For backward snowballing, the survey articles are a valuable source; thus, those will be used as the main source of the articles. Surveys will be found from Google Scholar with search words "RAG AND survey" and "Retrieval-augmented generation AND survey."
+
+In addition to snowballing, criterion-based exclusion is used to select the final set of articles. The main criteria used in the literature review of this thesis are: 1) published in 2024 or after, 2) have a clear empirical section, where latency and/or costs are considered, and 3) are related to optimization methods that are studied in this thesis. The information from these selected references is organized by identifying key metrics and methods, which are then synthesized into the literature review and used to support the empirical part of the work.
+
+The literature review also serves as a foundational phase for defining the empirical framework. One of its primary goals is to identify standardized evaluation metrics and benchmarking datasets (e.g., RAGAS, SQuAD, or similar) that are currently used to assess enterprise-grade RAG systems. By deriving the evaluation criteria directly from the literature, the empirical results of this thesis will remain comparable with other contemporary studies in the field.
+
+\subsection{Empirical research}
+
+The empirical part of this thesis is conducted in collaboration with a partner organization, hereafter referred to as the Case Company.
+
+To keep all research materials public, the case company's internal customer data cannot be used. Thus, the main test data for testing different optimization methods are AI-generated to mimic real-world production data as closely as possible. To generalize the results, other public datasets (see, e.g., \cite{gan2025rag}) will be considered as a secondary source of test data after the final viewpoint is chosen.
+
+The main difficulty in gathering research material will be evaluating the accuracy of the data and limiting the potential risk of a self-preference bias. This risk happens because AI-generated content is often evaluated using other AI models. Since these models share similar training patterns, the evaluator model may give too much weight to AI-generated data points that resemble its own logic. This can lead to biased results where the system's performance looks better than it actually is in real-world use.
+
+Even though the price of a single token has been decreasing, the high demand for AI applications and the complexity of newer models make large-scale testing expensive. This raises a concern about keeping the test sets a reasonable size. There must be a balance between the benefits of a larger test set and the additional economic and computational costs. For that reason, each test run should be optimized with a reasonable dataset size and parameters for a balanced output.
+
+After the testing architecture is built, tests will be run against the naive RAG model multiple times to ensure statistical reliability. The raw data from these test runs will be acquired through automated logging and performance monitoring tools, such as Grafana. The results will be gathered into a table and analyzed. The main interest of the thesis is latency (TTFT) and tokens spent. If some other latency or cost metrics are widely used in the literature, those could be added as well. The main cloud provider where the tests will be run is Google Cloud (GCP), following the choice of the case company. In addition, if the resources allow, efficiencies are compared against other cloud providers and also run locally. The final report will then combine the findings from the literature and the empirical results to form a comprehensive analysis of RAG optimization.
+
+\section{Challenges}
+
+In addition to the challenges mentioned in section \ref{section:research}, the main challenge will be keeping the scope of the thesis sharp enough, as there are plenty of other optimization methods available. There are also many variations of each method, which will make the work even more difficult. The main source of difficulty is the fact that RAG is a multi-step process, where each step could be optimized in multiple ways, leading to a situation where there are practically endless ways to optimize it. This is only the software part of the process; if different hardware architectures and providers were also considered, the scope would be even more scattered.
+
+In addition, to keep the developed RAG pipeline production- and enterprise-grade, it needs to be built on top of existing development frameworks using enterprise-grade technology stacks, such as Spring AI and Java. This could potentially cause some difficulties, as many of the methods mentioned in the literature research might be developed with Python or using TypeScript and Node.js.
+
+One further challenge is the non-deterministic nature of LLMs, which can make performance benchmarking difficult. Even with identical parameters, latency and output quality may vary between test runs due to network conditions or the internal state of the model. Ensuring that the results are reproducible and statistically significant will require careful execution of the test suite.
+
+Lastly, defining and calculating standardized evaluation metrics beyond simple latency is a known challenge in the RAG field. While TTFT and token costs are quantifiable, balancing them against the quality and relevance of the retrieved information adds a layer of complexity to the final analysis.
+
+\section{Resources and schedule}
+
+The research is conducted by Antti-Jussi Asunmaa under the supervision of Petri Vuorimaa and with advice from Lauri Salminen, a representative of the case company. The primary resources include Google Cloud Platform (GCP) for hosting the RAG pipeline and Spring AI framework for technical implementation. Since the case company’s internal data is restricted, AI-generated synthetic data and public datasets will be utilized. The funding for costs associated with LLM tokens and cloud infrastructure is to be confirmed.  
+
+The case company allows me to use 2 days per week for working on the thesis. In addition, I will dedicate weekends to the writing process. The plan is to finalize the thesis by the end of 2026, while the code implementation is expected to be completed by the end of August. As this is my fourth academic thesis, I expect the total workload to be less than the standard 800 hours. Furthermore, I will reuse relevant sections from my BSc thesis to expedite the technical background part of the work.
+
+
+%\begin{tabular}{|p{30mm}|p{120mm}|}
+%\hline
+%abcd   & qwerty qwerty \\ \hline
+%abcd   & qwerty qwerty \\ \hline
+%abcd   & qwerty qwerty \\ \hline
+%\end{tabular}
+
+
+\section{Preliminary structure of the thesis}
+\begin{enumerate}
+    \item \textbf{Introduction}
+    \item \textbf{Technical Background}
+    \begin{enumerate}
+        \item Large Language Models (LLMs)
+        \item Retrieval-Augmented Generation (RAG)
+    \end{enumerate}
+    \item \textbf{Literature Review}
+    \begin{enumerate}
+        \item Methodology and Survey of Existing Research
+        \item Small-to-Big Retrieval
+        \item Semantic Re-ranking
+        \item Prompt Caching
+    \end{enumerate}
+    \item \textbf{Research Setup and Methodology}
+    \item \textbf{Empirical Research and Results}
+    \item \textbf{Discussion}
+    \item \textbf{Conclusion}
+\end{enumerate}
+
+% ---------------------------------------------------------------------
+%
+% ÄLÄ MUUTA MITÄÄN TÄÄLTÄ LOPUSTA
+
+% Tässä on käytetty siis numeroviittausjärjestelmää. 
+% Toinen hyvin yleinen malli on nimi-vuosi-viittaus.
+
+\bibliographystyle{plainnat}
+% \bibliographystyle{finplain}  % suomi
+% \bibliographystyle{plain}    % englanti
+% Lisää mm. http://amath.colorado.edu/documentation/LaTeX/reference/faq/bibstyles.pdf
+
+% Muutetaan otsikko "Kirjallisuutta" -> "Lähteet"
+% \renewcommand{\refname}{Lähteet}  % article-tyyppisen
+
+% Määritä bib-tiedoston nimi tähän (eli lahteet.bib ilman bib)
+\bibliography{references/ai}
+
+% ---------------------------------------------------------------------
+
+\end{document}
