@@ -8,18 +8,21 @@ Your primary objective is to process academic papers to extract technical data r
 3. **Wiki Output:** Save summaries to the corresponding `/LLM wiki/wiki` sub-directory:
     - `/LLM wiki/wiki/background/`
     - `/LLM wiki/wiki/surveys/`
-    - `/LLM wiki/wiki/literature_review/` (Sub-folders: Small-to-Big, Semantic Re-ranking, Prompt Caching)
+    - `/LLM wiki/wiki/literature_review/` (Sub-folders: Small-to-Big, Semantic-Re-ranking, Prompt-Caching, Routing)
 4. **BibTeX Output:** Save entries to `/LLM wiki/bib/references.bib`.
 
 ## 🛠 Instructions:
 1. **Balanced Analysis (Efficiency vs. Quality):**
     - Treat **Latency/Cost** and **Output Quality** as equal priorities. The goal is to find how much efficiency can be gained without compromising quality, or vice versa.
 2. **Target Metrics (The Research Questions):**
-    - **RQ1 (Latency):** TTFT and overall latency reduction (%). Note P95 latency if mentioned.
-    - **RQ2 (Costs):** Token consumption reduction and impact on operational costs.
-    - **RQ3 (Quality):** Faithfulness, Answer Relevance, and Context Precision (The RAG Triad). Identify specific metrics used.
+    - **RQ1 (Latency):** Latency profile reduction, specifically Time to First Token (TTFT) and overall end-to-end execution latency. Note P95 latency if mentioned.
+    - **RQ2 (Costs):** Operational cost reduction ($) taking into account token pricing tiers, prompt caching discounts, and model cascading. Note token consumption reduction.
+    - **RQ3 (Quality):** Faithfulness, Answer Relevance, Context Precision, and Context Recall (the RAG evaluation metrics).
+    - **RQ4 (Combinations):** Interaction between optimization methods when combined, and the resulting cost-latency-quality trade-offs (Pareto frontier).
 3. **Optimization Specifics:**
     - **Chunking/Windowing:** For Small-to-Big, extract specific sizes (e.g., child chunk 128, parent context 512-1024).
+    - **Routing/Cascading:** For Model Cascading and Query Routing, extract routing logic (hybrid, LLM-based, heuristics) and decision paths (RAG vs. No-RAG, model tier routing).
+    - **Caching:** For Prompt Caching, distinguish between application-level semantic completion caching and model-level context caching (GCP Gemini Context Caching).
     - **Deployment Context:** Prioritize mentions of "Production-grade", "Enterprise", or "Real-world scale" environments.
 4. **Benchmarking & Tooling:**
     - Identify used datasets (SQuAD, HotpotQA, etc.) and evaluation frameworks (RAGAS, DeepEval, etc.).
@@ -31,14 +34,14 @@ Your primary objective is to process academic papers to extract technical data r
 
 # [Full Paper Title]
 **Authors:** [Author Names] | **Year:** [Year]
-**Category:** [Background / Survey / Small-to-Big / Semantic Re-ranking / Prompt Caching]
+**Category:** [Background / Survey / Small-to-Big / Semantic-Re-ranking / Prompt-Caching / Routing]
 
 ### 📝 Abstract & Relevance Summary
 [4-6 sentences explaining the core problem and solution. Explicitly state the relevance to both **Operational Efficiency** and **Output Quality**.]
 
 ### 🚀 Efficiency & Cost Metrics (RQ1 & RQ2)
-- **Latency Impact:** [Specific ms or % reduction in TTFT/End-to-end latency]
-- **Token Usage:** [Specific reduction in prompt/completion tokens or cost savings]
+- **Latency Impact:** [Specific ms or % reduction in TTFT/End-to-end latency, including routing/re-ranking overhead]
+- **Cost & Token Usage:** [Specific reduction in prompt/completion tokens, cache hit rates, model tier savings, and overall dollar cost reductions]
 - **Throughput:** [Any mentions of Tokens Per Second (TPS) or concurrent request handling]
 
 ### 🏆 Quality & Accuracy Metrics (RQ3)
@@ -48,7 +51,8 @@ Your primary objective is to process academic papers to extract technical data r
 
 ### ⚖️ The Trade-off Analysis
 - **Efficiency-Quality Equilibrium:** [How did the optimization affect the balance? e.g., "50% faster with a 2% drop in accuracy"]
-- **Chunking Strategy:** [Details on window sizes or retrieval-to-generation ratios]
+- **Pareto Frontier & Combinations:** [How do these optimization methods interact when combined? e.g., combining re-ranking with prompt caching]
+- **Chunking/Routing Strategy:** [Details on window sizes, routing rules, or retrieval-to-generation ratios]
 - **Enterprise Suitability:** [Notes on reliability and consistency for production use]
 
 ### 📊 Methodology & Bias Note

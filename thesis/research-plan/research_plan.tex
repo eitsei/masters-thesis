@@ -65,10 +65,14 @@ Aalto-yliopisto\\
 \section{Abstract}
 
 Enterprise-grade AI systems must tackle one of the greatest weaknesses of modern large-language models (LLMs): hallucination, a feature where the LLM provides probable but factually incorrect information. Techniques have been introduced to provide more information for the LLM that is not included in its training data. One of the most used methods is Retrieval-augmented generation (RAG), which is based on retrieving data from external sources to provide additional context for the LLM. This retrieval process increases the computational complexity of the answer generation process, which, on the other hand, increases the latency and the costs of the systems. This thesis aims to study state-of-the-art methods to increase the computational and economic efficiency of the RAG architecture, while maintaining the quality of the output. Methods included in this study are small-to-big retrieval, semantic re-ranking, and prompt caching.
+% [APPROVED PLAN EXTRAS - COMMENTED OUT FOR PDF COMPILE]
+% Methods included in this study are small-to-big retrieval, semantic re-ranking, prompt caching, and model cascading.
 
 \section{Research objectives and viewpoints}
 
 The main contribution of this thesis is to study state-of-the-art methods for increasing the efficiency of the RAG architecture, while maintaining the quality of the output. The methods chosen for the thesis are small-to-big retrieval, semantic re-ranking, and prompt caching. Each of these methods takes a different viewpoint on the RAG process. Small-to-big retrieval is a method for optimizing the query phase of the pipeline, whereas semantic re-ranking is used to re-rank the query results to optimize the final prompt passed to the LLM. Prompt caching, on the other hand, is a method to store results in a cache so that similar questions can receive answers directly, without driving the whole computationally heavy RAG pipeline.
+% [APPROVED PLAN EXTRAS - COMMENTED OUT FOR PDF COMPILE]
+% The main contribution of this thesis is to study state-of-the-art methods for increasing the efficiency of the RAG architecture, while maintaining the quality of the output. The methods chosen for the thesis are small-to-big retrieval, semantic re-ranking, prompt caching, and model cascading. Each of these methods takes a different viewpoint on the RAG process. Small-to-big retrieval is a method for optimizing the query phase of the pipeline, whereas semantic re-ranking is used to re-rank the query results to optimize the final prompt passed to the LLM. Prompt caching is a method to store results in an application-level semantic cache or cache context at the model level to reduce repetitive token processing. Model cascading (or query routing) dynamically routes user queries to the most cost-effective model or skips retrieval entirely when not required.
 
 \begin{table}[h!]
 \centering
@@ -83,6 +87,27 @@ RQ3 & To what extent do small-to-big retrieval, semantic re-ranking, and prompt 
 RQ4 & (Optional) Are there observable differences in efficiency between the platforms of different cloud providers? \\ \hline
 \end{tabular}
 \end{table}
+% [APPROVED PLAN EXTRAS - COMMENTED OUT FOR PDF COMPILE]
+%
+% --- Ehdotus 1 (Yksinkertainen laajennus 4 menetelmälle):
+% \begin{tabular}{|l|p{0.8\textwidth}|}
+% \hline
+% \textbf{No.} & \textbf{Research Question} \\ \hline
+% RQ1 & To what extent (in percentage) do small-to-big retrieval, semantic re-ranking, prompt caching, and model cascading decrease the Time to First Token (TTFT) to improve latency? \\ \hline
+% RQ2 & To what extent (in percentage) do small-to-big retrieval, semantic re-ranking, prompt caching, and model cascading decrease the number of tokens spent per LLM call to reduce costs? \\ \hline
+% RQ3 & To what extent do small-to-big retrieval, semantic re-ranking, prompt caching, and model cascading affect the quality of the output (measured via, for example, Faithfulness, Answer Relevance, and/or Context Precision) versus the base case? \\ \hline
+% RQ4 & (Optional) Are there observable differences in efficiency between the platforms of different cloud providers? \\ \hline
+% \end{tabular}
+%
+% --- Ehdotus 2 (Kriittisesti parannellut ja suositellut tutkimuskysymykset):
+% \begin{tabular}{|l|p{0.8\textwidth}|}
+% \hline
+% \textbf{No.} & \textbf{Research Question} \\ \hline
+% RQ1 & How do small-to-big retrieval, semantic re-ranking, prompt caching, and model cascading affect the latency profile (Time to First Token [TTFT] and overall end-to-end latency) of a RAG system? \\ \hline
+% RQ2 & To what extent do these optimization methods reduce the operational cost of the system, accounting for token pricing tiers, prompt caching discounts, and model cascading? \\ \hline
+% RQ3 & How do these optimizations impact the retrieval and generation quality (measured by Context Precision, Context Recall, Faithfulness, and Answer Relevance) compared to a naive RAG baseline? \\ \hline
+% RQ4 & How do these optimization methods interact when combined, and what is the optimal equilibrium (Pareto frontier) between latency, cost, and quality in an enterprise customer support system? \\ \hline
+% \end{tabular}
 
 Operational efficiency of each method is taken as the viewpoint of this thesis. In addition, quality aspects will be considered. The final set of quality aspects will be decided during the literature review to match the standards of the literature. Each of the studied methods is implemented and tested against a simple naive RAG. Technical implementation is mostly addressed in the implementation phase, whereas in the literature review, operational efficiency and quality are given more weight than technical details. 
 
@@ -155,6 +180,7 @@ The case company allows me to use 2 days per week for working on the thesis. In 
         \item Small-to-Big Retrieval
         \item Semantic Re-ranking
         \item Prompt Caching
+%        \item Model Cascading and Query Routing [EHDOTUS / SUUNNITELTU LISÄYS]
     \end{enumerate}
     \item \textbf{Research Setup and Methodology}
     \item \textbf{Empirical Research and Results}
