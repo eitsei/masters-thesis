@@ -1,10 +1,10 @@
-# Masters Thesis & LLM Wiki
+# Masters Thesis & LLM_Wiki
 
 Tämä repositorio sisältää diplomityöprosessin tutkimuksen, koodit ja itse diplomityön dokumentaation.
 
 ## 📂 Projektirakenne
 
-*   **`LLM wiki/`**: LLM-tutkimukseen liittyvät lähdeartikkelit (`sources/`), markdown-muotoinen wiki (`wiki/`), BibTeX-viitteet (`bib/`) sekä Java/Spring AI -testauskoodi (`code/`).
+*   **`LLM_wiki/`**: LLM-tutkimukseen liittyvät lähdeartikkelit (`sources/`), markdown-muotoinen wiki (`wiki/`), BibTeX-viitteet (`bib/`) sekä Java/Spring AI -testauskoodi (`code/`).
 *   **`thesis/`**: Overleaf-projektin Git Subtree -alikansio, joka sisältää diplomityön LaTeX-tiedostot.
 *   **`GEMINI.md`**: Työnkulun säännöt, ohjeet ja valitut tutkimuskysymykset kirjallisuuskatsauksen tekoon.
 
