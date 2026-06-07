@@ -1,3 +1,100 @@
+% =========================================================================
+% DRAFT NOTES: Research Questions, Critique, and Refined Proposals
+% This block is commented out using % so it won't affect PDF compilation.
+% You can read it here, discuss with your advisor, and write your introduction.
+% =========================================================================
+%
+% -------------------------------------------------------------------------
+% 1. ALKUPERÄINEN SUUNNITELMA (Approved Research Plan RQs - 3 menetelmää)
+% -------------------------------------------------------------------------
+% RQ1: To what extent (in percentage) do small-to-big retrieval, semantic 
+%      re-ranking, and prompt caching decrease the Time to First Token (TTFT) 
+%      to improve latency?
+% RQ2: To what extent (in percentage) do small-to-big retrieval, semantic 
+%      re-ranking, and prompt caching decrease the number of tokens spent 
+%      per LLM call to reduce costs?
+% RQ3: To what extent do small-to-big retrieval, semantic re-ranking, and 
+%      prompt caching affect the quality of the output (measured via, for 
+%      example, Faithfulness, Answer Relevance, and/or Context Precision) 
+%      versus the base case?
+% RQ4: (Optional) Are there observable differences in efficiency between 
+%      the platforms of different cloud providers?
+%
+% -------------------------------------------------------------------------
+% 2. KRITIIKKI JA HUOMIOT (Critique of the Current RQs)
+% -------------------------------------------------------------------------
+% * RQ1 (Latenssi/TTFT): 
+%   - TTFT (Time to First Token) on loistava interaktiivisuuden mittari, mutta 
+%     se ei kerro koko totuutta.
+%   - Uudelleenjärjestely (Semantic Re-ranking) ja reititys (Model Cascading) 
+%     vaativat erillisiä laskentavaiheita ennen vastaamisen aloitusta (overhead). 
+%     Tämä voi *kasvattaa* TTFT:tä naiveen RAG:iin verrattuna, vaikka kokonaistehokkuus 
+%     parantuisi.
+%   - Pitäisi mitata latenssiprofiilia laajemmin: sekä TTFT:tä että kokonaislatenssia 
+%     (End-to-End Latency).
+%
+% * RQ2 (Kustannukset/Tokenit):
+%   - Tokeneiden määrän mittaaminen prosentteina on harhaanjohtavaa, koska:
+%     1. Prompt Caching (kontekstin välimuisti mallitasolla) ei vähennä token-määrää, 
+%        vaan antaa alennuksen (esim. -50% - -75%) tallennetuille tokeneille. 
+%        Pelkkä token-määrän arviointi piilottaa tämän säästön.
+%     2. Model Cascading (reititys halvemmalle mallille, esim. Gemini Flash) 
+%        ei välttämättä vähennä tokeneita, mutta hinta per token on moninkertaisesti 
+%        halvempi (esim. Gemini Flash vs Pro hintaero).
+%   - Mittarin tulee mitata todellisia operatiivisia kustannuksia (Operational Cost / $) 
+%     pelkän token-määrän sijaan.
+%
+% * RQ3 (Laatu/Triadi):
+%   - RAG-triadi (Faithfulness, Answer Relevance, Context Precision) on standardi.
+%   - Reititys (Cascading) tuo uuden riskin: jos reititin ohjaa kyselyn No-RAG -polulle 
+%     tai liian pienelle mallille virheellisesti, laatu heikkenee huomattavasti. 
+%     Miten optimointi vaikuttaa eri laatu-ulottuvuuksiin erikseen (esim. re-ranking 
+%     parantaa Context Precisionia, kun taas small-to-big parantaa Context Recallia).
+%
+% * RQ4 (Pilvialustat vs. Yhteisvaikutus):
+%   - Pilvialustojen vertailu (GCP vs. muut) siirtää fokuksen pois RAG-algoritmeista 
+%     ja vaatii suuren infrastruktuurityön.
+%   - Enterprise-ympäristössä kriittisempää on tietää optimointimenetelmien 
+%     *yhteisvaikutus* (Stacking / Combinations). Esim. nollaako Semantic Re-ranking 
+%     Prompt Cachingin hyödyt muuttamalla promptia liikaa? Mikä on optimaalinen 
+%     tasapaino (Pareto-optimi) kustannusten, latenssin ja laadun välillä?
+%
+% -------------------------------------------------------------------------
+% 3. EHDOTUKSET UUSIKSI TUTKIMUSKYSYMYKSIKSI (Refined Research Questions)
+% -------------------------------------------------------------------------
+%
+% Taso A: Yksinkertainen laajennus neljälle menetelmälle (jos halutaan säilyttää
+% alkuperäisen suunnitelman rakenne ja henki):
+%
+% - RQ1: To what extent (in percentage) do small-to-big retrieval, semantic 
+%        re-ranking, prompt caching, and model cascading decrease the Time to 
+%        First Token (TTFT) to improve latency?
+% - RQ2: To what extent (in percentage) do small-to-big retrieval, semantic 
+%        re-ranking, prompt caching, and model cascading decrease the number of 
+%        tokens spent per LLM call to reduce costs?
+% - RQ3: To what extent do small-to-big retrieval, semantic re-ranking, prompt 
+%        caching, and model cascading affect the quality of the output 
+%        (measured via, for example, Faithfulness, Answer Relevance, and/or 
+%        Context Precision) versus the base case?
+% - RQ4: (Optional) Are there observable differences in efficiency between the 
+%        platforms of different cloud providers?
+%
+% Taso B (Suositeltu): Kriittisesti parannellut tutkimuskysymykset varsinaiseen työhön:
+%
+% - RQ1: How do small-to-big retrieval, semantic re-ranking, prompt caching, and 
+%        model cascading affect the latency profile (specifically Time to First 
+%        Token [TTFT] and overall end-to-end execution latency) of a RAG system?
+% - RQ2: To what extent do these optimization methods reduce the operational cost 
+%        of the system, accounting for token pricing tiers, prompt caching 
+%        discounts, and model cascading?
+% - RQ3: How do these optimizations impact retrieval and generation quality 
+%        (measured by Context Precision, Context Recall, Faithfulness, and 
+%        Answer Relevance) compared to a naive RAG baseline?
+% - RQ4: How do these optimization methods interact when combined, and what is 
+%        the optimal equilibrium (Pareto frontier) between latency, cost, and 
+%        quality in an enterprise customer support system?
+% =========================================================================
+
 1. Describe the overall context + bring several background references
 2. Show the research gap (why to do this particular research)
 3. Bring up your research question(s)
