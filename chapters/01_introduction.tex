@@ -95,14 +95,22 @@
 %        quality in an enterprise customer support system?
 % =========================================================================
 
-Modern enterprise-grade AI systems face continuously increasing resource constraints, in addition to growing operational expenditures, driven by a rapid acceleration in corporate AI integration and exponential growth in the demand for AI computing capacity \citep{StanfordAIIndex2026}. Although API providers frequently lower unit token pricing, overall costs continue to rise due to explosive token usage and the complexity of multi-step agentic workflows \citep{chen2023frugalgpt}. This highlights the critical need for optimization across all phases of enterprise AI systems to ensure that computing resources are utilized as efficiently as possible.
+Modern enterprise-grade AI systems face continuously increasing resource constraints, in addition to growing operational expenditures, driven by a rapid acceleration in corporate AI integration and exponential growth in the demand for AI computing capacity \citep{StanfordAIIndex2026}. Although API providers frequently lower unit token pricing, overall costs continue to rise due to explosive token usage and the complexity of multi-step agentic workflows that uses the latest foundational large-language models (LLMs) \citep{chen2023frugalgpt, GoogleVertexAIPricing}. This highlights the critical need for optimization across all phases of enterprise AI systems to ensure that computing resources are utilized as efficiently as possible.
 
-1. Describe the overall context + bring several background references
-2. Show the research gap (why to do this particular research)
-3. Bring up your research question(s)
-4. Describe the structure of the work + mention research method
+This is especially true for retrieval-augmented generation (RAG), which is one of the most prominent solutions to one of the most fundamental drawbacks of the modern LLMs - hallucination. Due to its architecture, it increases the token, especially input, consumption as the core idea of the RAG is to provide additional context for the LLM to provide more accurate answers. However, many studies have presented optimization strategies that are tested on pre-defined data sets and are not implemented using tools that are available for industry standard tool, such as in SpringAI. 
 
-Reference example: \cite{travers1996programming}
+The aim of the thesis is to research what are the state-of-the-art optimization strategies and the main contribution is to test how does these strategies work in enterprise environments. In addition, it will provide one possible solution to implement these strategies using the enterprise frameworks. To limit the scope of the thesis, four different strategies are taken into deeper consideration. The methods chosen for the thesis are cascading, small-to-big retrieval, semantic re-ranking, and prompt caching. Each of these methods takes a different viewpoint on the RAG process. Cascading and small-to-big retrieval is a method for optimizing the query phase of the pipeline, whereas semantic re-ranking is used to re-rank the query results to optimize the final prompt passed to the LLM. Prompt caching, on the other hand, is a method to store results in a cache so that similar questions can receive answers directly, without driving the whole computationally heavy RAG pipeline.
 
-Research question: Fill this up
-Research methods: survey / literature review
+As the enterprise systems must manage costs, have low latency and answers have good quality, these factors are taken into consideration. 
+
+<table here>
+
+%% 1. Describe the overall context + bring several background references
+%% 2. Show the research gap (why to do this particular research)
+%% 3. Bring up your research question(s)
+%% 4. Describe the structure of the work + mention research method
+%% 
+%% Reference example: \cite{travers1996programming}
+%% 
+%% Research question: Fill this up
+%% Research methods: survey / literature review
