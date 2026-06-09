@@ -103,10 +103,9 @@ The primary objective of this thesis is to investigate state-of-the-art optimiza
 
 Each of these methods addresses a distinct phase of the RAG pipeline. Model cascading and small-to-big retrieval optimize the query and retrieval stages, whereas semantic re-ranking refines the retrieved results to minimize prompt size and maximize contextual relevance. Prompt caching, on the other hand, serves to store previous responses in a cache so that subsequent, similar queries can be resolved immediately, thereby bypassing the computationally intensive retrieval and generation pipeline.
 
-Given that enterprise systems must strictly manage operational costs, minimize response latency, and maintain high output quality, these three performance dimensions are evaluated as the primary metrics in this study. These metrics has been used for describing the research questions defined in the table \ref{tab:research_questions}.
+Given that enterprise systems must strictly manage operational costs, minimize response latency, and maintain high output quality, these three performance dimensions are evaluated as the primary metrics in this study. These metrics have been used for describing the research questions defined in the table \ref{tab:research_questions}.
 
 \begin{table}[htbp]
-\centering
 \caption{Research questions, their focus dimensions, and descriptions.}
 \label{tab:research_questions}
 \begin{tabularx}{\textwidth}{l l X}
