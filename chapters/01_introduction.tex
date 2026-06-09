@@ -103,26 +103,14 @@ The primary objective of this thesis is to investigate state-of-the-art optimiza
 
 Each of these methods addresses a distinct phase of the RAG pipeline. Model cascading and small-to-big retrieval optimize the query and retrieval stages, whereas semantic re-ranking refines the retrieved results to minimize prompt size and maximize contextual relevance. Prompt caching, on the other hand, serves to store previous responses in a cache so that subsequent, similar queries can be resolved immediately, thereby bypassing the computationally intensive retrieval and generation pipeline.
 
-Given that enterprise systems must strictly manage operational costs, minimize response latency, and maintain high output quality, these three performance dimensions are evaluated as the primary metrics in this study. These metrics have been used for describing the research questions defined in the table \ref{tab:research_questions}.
+Given that enterprise systems must strictly manage operational costs, minimize response latency, and maintain high output quality, these three performance dimensions are evaluated as the primary metrics in this study. To guide this investigation, this study addresses four primary research questions:
 
-\begin{table}[htbp]
-\centering
-\caption{Research questions, their focus dimensions, and descriptions.}
-\label{tab:research_questions}
-\begin{tabularx}{\textwidth}{l l X}
-\toprule
-\textbf{ID} & \textbf{Focus Dimension} & \textbf{Research Question} \\
-\midrule
-RQ1 & Latency & How do small-to-big retrieval, semantic re-ranking, prompt caching, and model cascading affect the latency profile (specifically Time to First Token [TTFT] and overall end-to-end execution latency) of a RAG system? \\
-\addlinespace
-RQ2 & Cost & To what extent do these optimization methods reduce the operational cost of the system, accounting for token pricing tiers, prompt caching discounts, and model cascading? \\
-\addlinespace
-RQ3 & Quality & How do these optimizations impact retrieval and generation quality (measured by Context Precision, Context Recall, Faithfulness, and Answer Relevance) compared to a naive RAG baseline? \\
-\addlinespace
-RQ4 & Interaction & How do these optimization methods interact when combined, and what is the optimal equilibrium (Pareto frontier) between latency, cost, and quality in an enterprise customer support system? \\
-\bottomrule
-\end{tabularx}
-\end{table}
+\begin{enumerate}
+    \item \textbf{RQ1: Latency} - How do small-to-big retrieval, semantic re-ranking, prompt caching, and model cascading affect the latency profile (specifically Time to First Token [TTFT] and overall end-to-end execution latency) of a RAG system?
+    \item \textbf{RQ2: Cost} - To what extent do these optimization methods reduce the operational cost of the system, accounting for token pricing tiers, prompt caching discounts, and model cascading?
+    \item \textbf{RQ3: Quality} - How do these optimizations impact retrieval and generation quality (measured by Context Precision, Context Recall, Faithfulness, and Answer Relevance) compared to a naive RAG baseline?
+    \item \textbf{RQ4: Interaction} - How do these optimization methods interact when combined, and what is the optimal equilibrium (Pareto frontier) between latency, cost, and quality in an enterprise customer support system?
+\end{enumerate}
 %% 1. Describe the overall context + bring several background references
 %% 2. Show the research gap (why to do this particular research)
 %% 3. Bring up your research question(s)
