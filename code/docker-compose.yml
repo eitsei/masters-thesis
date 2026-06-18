@@ -7,23 +7,25 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./:/home/eitsei/dippa/code
+      - ../:/home/eitsei/dippa
     environment:
-      - SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434
+      - SPRING_AI_OLLAMA_BASE_URL=http://host.docker.internal:11434
       - SPRING_AI_VECTORSTORE_QDRANT_HOST=qdrant
     depends_on:
-      - ollama
+      # - ollama
       - qdrant
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: always
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: always
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   restart: always
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -56,5 +58,5 @@ services:
     restart: always
 
 volumes:
-  ollama_data:
+  # ollama_data:
   qdrant_data:

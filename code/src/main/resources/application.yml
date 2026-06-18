@@ -3,16 +3,16 @@ spring:
     name: rag-baseline
   ai:
     ollama:
-      base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://ollama:11434}
+      base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}
       chat:
         options:
-          model: gemma4:e4b
+          model: gemma4:12b
       embedding:
         options:
           model: nomic-embed-text
     vectorstore:
       qdrant:
-        host: ${SPRING_AI_VECTORSTORE_QDRANT_HOST:qdrant}
+        host: ${SPRING_AI_VECTORSTORE_QDRANT_HOST:localhost}
         port: 6334 # Spring AI defaults to gRPC port for Qdrant (6334)
         collection-name: banking-knowledge
         initialize-schema: true
