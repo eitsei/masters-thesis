@@ -4,18 +4,12 @@ services:
   spring-app:
     build: .
     container_name: spring-app
-    ports:
-      - "8080:8080"
+    network_mode: "host"
     volumes:
       - ../:/home/eitsei/dippa
     environment:
-      - SPRING_AI_OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - SPRING_AI_VECTORSTORE_QDRANT_HOST=qdrant
-    depends_on:
-      # - ollama
-      - qdrant
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - SPRING_AI_OLLAMA_BASE_URL=http://127.0.0.1:11434
+      - SPRING_AI_VECTORSTORE_QDRANT_HOST=127.0.0.1
     restart: always
 
   # ollama:

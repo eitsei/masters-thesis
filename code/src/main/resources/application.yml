@@ -1,12 +1,15 @@
+server:
+  port: 8081
+
 spring:
   application:
     name: rag-baseline
   ai:
     ollama:
-      base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}
+      base-url: http://${OLLAMA_HOST:localhost:11434}
       chat:
         options:
-          model: gemma4:12b
+          model: gemma4:e2b
       embedding:
         options:
           model: nomic-embed-text
