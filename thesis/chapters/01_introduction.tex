@@ -93,11 +93,31 @@
 % - RQ4: How do these optimization methods interact when combined, and what is 
 %        the optimal equilibrium (Pareto frontier) between latency, cost, and 
 %        quality in an enterprise customer support system?
+%
+% -------------------------------------------------------------------------
+% 4. JATKOKEHITYS JA HUOMIOT (Future Work & Notes)
+% -------------------------------------------------------------------------
+% 1) Monikielinen tuki (Cross-language support): Miten RAG toimii, jos esim.
+%    tietokanta (knowledge base) on tanskaksi (DK), mutta vastaus halutaan
+%    norjaksi (NO) tai englanniksi?
+% 2) Tarkemmat noutotilastot (Retrieval statistics): Mitataanko pelkästään
+%    lopullisen vastauksen oikeellisuutta, vai tarkistetaanko myös se,
+%    löytääkö järjestelmä todellisuudessa oikeat chunkit (retrieval precision/recall)?
+% 3) Vektoritietokantojen vertailu: Nykyinen PostgreSQL (pgvector) + Qdrant
+%    verrattuna pilvialustan omaan ratkaisuun (esim. Google Vertex AI Vector Search)?
+% 4) Mallien ja infran täsmennys: Tarvitaanko introssa maininta siitä, että
+%    tutkimus toteutetaan nimenomaan Googlen malleilla (Gemini) ja Googlen infralla?
+% 5) Baseline-vertailu ilman RAGia: Pitäisikö verrata tuloksia tilanteeseen,
+%    jossa ei käytetä RAGia lainkaan, vaan koko dokumenttikonteksti syötetään
+%    kerralla LLM:n pitkään konteksti-ikkunaan (long-context window)?
+% 6) Tietokannan ja chunkkauksen optimointi: Miten chunk-koko määritellään
+%    (esim. dynaaminen chunkkaus LLM:llä vs. staattinen)? Muistettava myös
+%    lähdedokumenttien (knowledge base) optimointi ennen chunkkausta.
 % =========================================================================
 
 Modern enterprise-grade AI systems face continuously increasing resource constraints, in addition to growing operational expenditures driven by a rapid acceleration in corporate AI integration and exponential growth in the demand for AI computing capacity \citep{StanfordAIIndex2026}. Although API providers frequently lower unit token pricing, overall costs continue to rise due to explosive token usage and the complexity of multi-step agentic workflows that use the latest foundational large language models (LLMs) \citep{chen2023frugalgpt, GoogleVertexAIPricing}. This highlights the critical need for optimization across all phases of enterprise AI systems to ensure that computing resources are utilized as efficiently as possible.
 
-This is especially true for Retrieval-Augmented Generation (RAG), which serves as a primary solution to mitigate one of the most critical limitations of modern large language models (LLMs): hallucination \citep{lewis2020rag}. By design, RAG inherently increases token consumption, particularly input tokens, as the core concept relies on prepending retrieved document context to user queries to generate more grounded responses. While various optimization strategies have been proposed in contemporary literature \citep{zhao2024ragandbeyond, wu2024ragnlp}, they are typically evaluated on static benchmarks and lack direct integration with industry-standard, production-grade languages and frameworks such as Java and Spring AI. 
+This is especially true for Retrieval-Augmented Generation (RAG), which serves as a primary solution to mitigate one of the most critical limitations of modern large language models (LLMs): hallucination \citep{lewis2020rag}. By design, RAG inherently increases token consumption, particularly input tokens, as the core concept relies on prepending retrieved document context to user queries to generate more grounded responses. While various optimization strategies have been proposed in contemporary literature \citep{zhao2024ragandbeyond, wu2024ragnlp}, they are typically evaluated on static benchmarks and lack direct integration with industry-standard, production-grade languages and frameworks such as Java and Spring AI \citep{springai}. 
 
 The primary objective of this thesis is to investigate state-of-the-art optimization strategies for RAG systems, and the main contribution is to evaluate how these strategies perform within enterprise environments. Furthermore, this work proposes a concrete architectural solution to implement these optimization strategies utilizing enterprise frameworks. To establish a focused scope, four specific optimization strategies are analyzed in detail: model cascading \citep{chen2023frugalgpt}, small-to-big retrieval \citep{lumer2025rethinking}, semantic re-ranking \citep{yu2024rankrag}, and prompt caching \citep{gim2024promptcache}. 
 
