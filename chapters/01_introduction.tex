@@ -103,7 +103,7 @@ The primary objective of this thesis is to investigate state-of-the-art optimiza
 
 Each of these methods addresses a distinct phase of the RAG pipeline. Model cascading and small-to-big retrieval optimize the query and retrieval stages, whereas semantic re-ranking refines the retrieved results to minimize prompt size and maximize contextual relevance. Prompt caching, on the other hand, serves to store previous responses in a cache so that subsequent, similar queries can be resolved immediately, thereby bypassing the computationally intensive retrieval and generation pipeline.
 
-Given that enterprise systems must strictly manage operational costs, minimize response latency, and maintain high output quality, these three performance dimensions are evaluated as the primary metrics in this study. To guide this investigation, this study addresses four primary research questions:
+Given that enterprise systems must strictly manage operational costs, minimize response latency, and maintain high output quality, these three performance dimensions are evaluated as the primary metrics in this thesis. To guide this investigation, this study addresses four primary research questions:
 
 \begin{enumerate}
     \item \textbf{RQ1: Latency} - How do small-to-big retrieval, semantic re-ranking, prompt caching, and model cascading affect the latency profile (specifically Time to First Token [TTFT] and overall end-to-end execution latency) of a RAG system?
@@ -111,6 +111,8 @@ Given that enterprise systems must strictly manage operational costs, minimize r
     \item \textbf{RQ3: Quality} - How do these optimizations impact retrieval and generation quality (measured by Context Precision, Context Recall, Faithfulness, and Answer Relevance) compared to a naive RAG baseline?
     \item \textbf{RQ4: Interaction} - How do these optimization methods interact when combined, and what is the optimal equilibrium (Pareto frontier) between latency, cost, and quality in an enterprise customer support system?
 \end{enumerate}
+
+The rest of the thesis is constructed in a following way, chapter \section{sec:technical_background} briefly explains what the LLMs and RAG are, while chapter \section{sec:literature_review} examines the current literature of the RAG optimization methods. Research methods are introduced in the chapter \section{sec:research_methods} and the results are discussed in the chapter \section{sec:results}. Finally, discussion is in the \section{sec:discusstion} and concluding words in \section{sec:conclusion}.
 %% 1. Describe the overall context + bring several background references
 %% 2. Show the research gap (why to do this particular research)
 %% 3. Bring up your research question(s)
