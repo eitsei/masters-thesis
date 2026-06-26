@@ -9,7 +9,7 @@ spring:
       base-url: http://${OLLAMA_HOST:localhost:11434}
       chat:
         options:
-          model: gemma4:e2b
+          model: gemma4:12b
       embedding:
         options:
           model: nomic-embed-text
@@ -25,3 +25,21 @@ management:
     web:
       exposure:
         include: prometheus, health, info, metrics
+
+# Custom configuration for RAG properties and pricing
+rag:
+  collections:
+    simple: banking-knowledge
+    small-to-big: banking-small-to-big
+  pricing:
+    models:
+      "gemma4:e2b":
+        input-cost-per-million: 0.10
+        output-cost-per-million: 0.20
+        cached-input-cost-per-million: 0.05
+      "gemma4:12b":
+        input-cost-per-million: 0.10
+        output-cost-per-million: 0.20
+        cached-input-cost-per-million: 0.05
+
+

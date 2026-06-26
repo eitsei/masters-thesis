@@ -1,11 +1,9 @@
 package com.example.rag.service;
 
+import com.example.rag.ingest.DocumentIngester;
+import com.example.rag.ingest.IngestionStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.document.Document;
-import org.springframework.ai.reader.TextReader;
-import org.springframework.ai.transformer.splitter.TokenTextSplitter;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
@@ -16,32 +14,20 @@ public class IngestionService {
 
     private static final Logger logger = LoggerFactory.getLogger(IngestionService.class);
 
-    private final VectorStore vectorStore;
+    private final List<DocumentIngester> ingesters;
 
-    public IngestionService(VectorStore vectorStore) {
-        this.vectorStore = vectorStore;
+    public IngestionService(List<DocumentIngester> ingesters) {
+        this.ingesters = ingesters;
     }
 
-    public void ingestDocument(Resource resource) {
-        logger.info("Starting ingestion of document: '{}'", resource.getFilename());
+    public void ingestDocument(Resource resource, IngestionStrategy strategy) {
+        logger.info("Routing ingestion of document: '{}' with strategy: {}", resource.getFilename(), strategy);
         
-        // 1. Read the document (assuming text for simplicity)
-        logger.info("Reading document content...");
-        TextReader textReader = new TextReader(resource);
-        textReader.getCustomMetadata().put("filename", resource.getFilename());
-        List<Document> documents = textReader.get();
-        logger.info("Successfully read document. Initial document count: {}", documents.size());
-
-        // 2. Split the document into chunks
-        logger.info("Splitting document into token-based chunks...");
-        TokenTextSplitter splitter = new TokenTextSplitter();
-        List<Document> splitDocuments = splitter.apply(documents);
-        logger.info("Document split completed. Total chunks generated: {}", splitDocuments.size());
-
-        // 3. Store the chunks in Qdrant Vector Store
-        logger.info("Sending chunks to Qdrant vector store...");
-        vectorStore.accept(splitDocuments);
-        
-        logger.info("Ingested {} chunks from '{}' successfully into Qdrant", splitDocuments.size(), resource.getFilename());
+        DocumentIngester ingester = ingesters.stream()
+                .filter(i -> i.supports(strategy))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unsupported ingestion strategy: " + strategy));
+                
+        ingester.ingest(resource);
     }
 }
