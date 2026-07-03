@@ -11,32 +11,18 @@ While providing both operational cost and latency benefits, query routing has a 
 \subsection{Small-to-Big retrieval}
 \label{lit:retrieval}
 
-% SUUNNITELMA: Small-to-Big retrieval (Parent-Document / Window-based Expansion)
-% 
-% 1. KÄSITE JA MOTIVAATIO (haku- ja generointiyksiköiden erottaminen):
-% - Perinteisessä RAG-pilkkomisessa (chunking) on ristiriita haun tarkkuuden ja generoinnin kontekstin laadun välillä. Pienet palaset ovat hyviä hakuun (korkea Intrachunk Cohesion, ICC), mutta niistä puuttuu ympäröivä konteksti (matala Document Contextual Coherence, DCC). Suuret palaset tarjoavat kontekstin, mutta heikentävät vektorihakun tarkkuutta \cite{demourajunior2026adaptive}.
-% - Small-to-big retrieval (tai parent-document retrieval) ratkaisee tämän erottamalla haettavan yksikön (pieni chunk, tiivistelmä tai kysymys) generointiin annettavasta yksiköstä (isompi parent-chunk, naapuripalaset tai hierarkkinen tiivistelmä) \cite{lumer2025rethinking, li2026bridgerag}.
-% - Hierarkkiset rakenteet: Deterministiset puurakenteet (Bridge-RAG) linkittävät ylätason tiivistelmät (bridge nodes) tarkempiin alateksteihin \cite{li2026bridgerag}. Dynaamiset graafipäättelyt (LogicRAG) hajottavat kysymykset dynaamisesti riippuvuusgraafeiksi (DAG) kyselyhetkellä ilman staattisia indeksejä \cite{chen2026logicrag}.
-%
-% 2. VAIKUTUS LAATUUN JA TARKKUUTEEN (RQ3):
-% - Kontekstin laajennus naapuripalasiin (esim. `idx-1` ja `idx+1`) parantaa vastausten kattavuutta (65 % win-rate verrattuna pelkän yksittäisen chunkin käyttöön) \cite{lumer2025rethinking}.
-% - Dynaaminen pilkkominen (Adaptive Chunking) dokumentin rakenteen mukaan nostaa vastausten oikeellisuutta 72 %:iin (vs. 62-64 % staattisilla menetelmillä) ilman malli- tai kehotemuutoksia \cite{demourajunior2026adaptive}.
-% - Bridge-RAG (hierarkkinen puu) tuo jopa 44 % parannuksen BLEU-pisteissä monimutkaisissa tehtävissä \cite{li2026bridgerag}.
-% - Kyselyn dynaaminen ositus ja augmentointi (kuten LogicRAG ja QPaug) parantavat string-tarkkuutta 14,7 % ja vastausten F1-tarkkuutta jopa 34 % \cite{chen2026logicrag, kim2024qpaug}.
-%
-% 3. VIIVE JA SUORITUSKYKY (RQ1):
-% - Sisar-solmujen asynkroninen rinnakkainen haku minimoi laajennuksen lisäviiveen (vain 0,17s vs. synkroninen 0,34s, kokonaisviive-overhead ~0,2s) \cite{lumer2025rethinking}.
-% - Bridge-RAG nopeuttaa hakuprosessia jopa 1,9-kertaisesti verrattuna GraphRAGiin hyödyntämällä O(1)-tason Cuckoo-suodattimia \cite{li2026bridgerag}.
-% - LogicRAG välttää offline-indeksoinnin kokonaan (0s valmisteluaika) siirtämällä dynaamisen graafipäättelyn kyselyhetkelle (viive 9,83s vs. VanillaRAG 4,28s) \cite{chen2026logicrag}.
-% - Ingestion-vaiheen viiveet: Monimutkaiset LLM-pohjaiset (Lumberchunker) ja layout-tietoiset (GraphSeg) pilkkojat ovat erittäin hitaita (8-30h) ja hauraita, kun taas kiinteän koon tai rekursiiviset semanttiset menetelmät suoriutuvat sekunneissa \cite{smigielski2026chunking}.
-%
-% 4. KUSTANNUKSET, TOKENTEHOKKUUS JA YHTEENSOPIVUUS (RQ2 & RQ4):
-% - Offline-vaiheessa solmujen tiivistelmien luominen on kallista ($6,12 vs. $1,19 per dokumentti) \cite{lumer2025rethinking}.
-% - Kyselyvaiheessa token-kustannuksia voidaan säästää jopa 62,2 % (esim. LogicRAG) dynaamisen graafin karsinnan ja rullaavan muistin avulla \cite{chen2026logicrag}.
-% - Chunk-kokojen regularisointi (tiny-chunk merging ja oversized-chunk splitting) estää tyhjiä/hyödyttömiä solmuja kuluttamasta hakupaikkoja \cite{demourajunior2026adaptive}.
-% - Java-stack (Spring AI): Suurin osa small-to-big logicista (kuten asynkroninen haku, deterministinen ikkunointi, Cuckoo-suodattimet) on helposti siirrettävissä Spring AI -arkkitehtuuriin \cite{lumer2025rethinking, li2026bridgerag}. Python-sidonnaiset monimutkaiset asettelupilkkojat ovat tuotannossa epävarmoja \cite{smigielski2026chunking}.
+Document chunking is a foundational phase in RAG pipelines, directly determining the granularity of the vector index. However, selecting a static chunk size introduces a fundamental trade-off between retrieval precision and contextual completeness. While smaller chunks are computationally efficient and exhibit high intrachunk cohesion (ICC), they frequently suffer from low document contextual coherence (DCC) due to semantic fragmentation \cite{demourajunior2026adaptive}. Conversely, larger chunks preserve rich contextual relationships but degrade retrieval accuracy by diluting query-relevant semantic features within dense vector representations. Small-to-big retrieval resolves this tension by decoupling the representation used for vector search from the context provided to the generator. In this architecture, dense retrieval is executed over fine-grained index nodes, while the generation phase utilizes a broader, mapped context (such as parent chunks or entire source documents) retrieved via sibling pointer mapping. Implementations of this technique range from neighboring chunk expansion, which dynamically retrieves adjacent sliding windows to restore structural continuity \cite{lumer2025rethinking}, to hierarchical abstract trees, which map granular leaf nodes to high-level thematic summaries\cite{li2026bridgerag}.
+
+Different chunking and representation methods directly increase the accuracy of RAG pipelines. For example, \citet{lumer2025rethinking} showed that expanding the context to neighboring chunks can increase the win rate to 65\% compared to using single independent chunks. In addition, the adaptive chunking method, where chunks are generated dynamically based on document structure, increases downstream answer correctness by 8--10 percentage points without requiring downstream prompt modifications \cite{demourajunior2026adaptive}. Hierarchical abstract trees like Bridge-RAG \cite{li2026bridgerag} yield up to a 44\% improvement in BLEU scores on complex reasoning tasks by tracing parent-child lineages. Similarly, dynamic reasoning frameworks like LogicRAG \cite{chen2026logicrag} and QPaug \cite{kim2024qpaug} increased string accuracy by 14.7\% absolute (compared to the next best graph baseline) and answer F1 scores by over 34\% relatively.
+
+While small-to-big strategies provide substantial benefits to answer correctness and retrieval recall, they introduce operational and computational overhead. At query time, asynchronous parallel search for neighboring chunks \cite{lumer2025rethinking} keeps latency minimal, adding a negligible $\approx 0.17$\,\text{s} overhead. However, more complex reasoning structures like LogicRAG \cite{chen2026logicrag} more than double the query latency
+compared to naive flat retrieval, increasing it from 4.28\,\text{s} to 9.83\,\text{s}. Furthermore, advanced chunking and indexing methods are highly time-consuming during the ingestion phase. The slowest model-driven and layout-aware chunking methods can run for tens of hours, whereas fixed-size chunking completes in under a second \cite{smigielski2026chunking}. In hierarchical structures, generating node summaries and index trees also increases offline preprocessing costs (e.g., scaling from \$1.19 to \$6.12 per average filing in financial domains) \cite{lumer2025rethinking}. Nonetheless, this preprocessing latency is typically acceptable in enterprise environments, as chunking and indexing are offline processes that occur only during initial document ingestion.
 
 \subsection{Semantic Re-ranking}
 \label{lit:re_rank}
+
+
 \subsection{Prompt Caching}
 \label{lit:caching}
+
+
