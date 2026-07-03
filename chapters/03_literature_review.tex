@@ -11,7 +11,18 @@ While providing both operational cost and latency benefits, query routing has a 
 \subsection{Small-to-Big retrieval}
 \label{lit:retrieval}
 
+ Document chunking is a foundational phase in RAG pipelines, directly determining the granularity of the vector index. However, selecting a static chunk size introduces a fundamental trade-off between retrieval precision and contextual completeness. While smaller chunks are computationally efficient and exhibit high intrachunk cohesion (ICC), they frequently suffer from low document contextual coherence (DCC) due to semantic fragmentation \cite{demourajunior2026adaptive}. Conversely, larger chunks preserve rich contextual relationships but degrade retrieval accuracy by diluting query-relevant semantic features within dense vector representations. Small-to-big retrieval resolves this tension by decoupling the representation used for vector search from the context provided to the generator. In this architecture, dense retrieval is executed over fine-grained index nodes, while the generation phase utilizes a broader, mapped context (such as parent chunks or entire source documents) retrieved via sibling pointer mapping. Implementations of this technique range from neighboring chunk expansion, which dynamically retrieves adjacent sliding windows to restore structural continuity \cite{lumer2025rethinking}, to hierarchical abstract trees, which map granular leaf nodes to high-level thematic summaries\cite{li2026bridgerag}.
+
+Different chunking and representation methods directly increase the accuracy of RAG pipelines. For example, \citet{lumer2025rethinking} showed that expanding the context to neighboring chunks can increase the win rate to 65\% compared to using single independent chunks. In addition, the adaptive chunking method, where chunks are generated dynamically based on document structure, increases downstream answer correctness by 8--10 percentage points without requiring downstream prompt modifications \cite{demourajunior2026adaptive}. Hierarchical abstract trees like Bridge-RAG \cite{li2026bridgerag} yield up to a 44\% improvement in BLEU scores on complex reasoning tasks by tracing parent-child lineages. Similarly, dynamic reasoning frameworks like LogicRAG \cite{chen2026logicrag} and QPaug \cite{kim2024qpaug} increased string accuracy by 14.7\% absolute (compared to the next best graph baseline) and answer F1 scores by over 34\% relatively.
+
+While small-to-big strategies provide substantial benefits to answer correctness and retrieval recall, they introduce operational and computational overhead. At query time, asynchronous parallel search for neighboring chunks \cite{lumer2025rethinking} keeps latency minimal, adding a negligible $\approx 0.17$\,\text{s} overhead. However, more complex reasoning structures like LogicRAG \cite{chen2026logicrag} more than double the query latency
+compared to naive flat retrieval, increasing it from 4.28\,\text{s} to 9.83\,\text{s}. Furthermore, advanced chunking and indexing methods are highly time-consuming during the ingestion phase. The slowest model-driven and layout-aware chunking methods can run for tens of hours, whereas fixed-size chunking completes in under a second \cite{smigielski2026chunking}. In hierarchical structures, generating node summaries and index trees also increases offline preprocessing costs (e.g., scaling from \$1.19 to \$6.12 per average filing in financial domains) \cite{lumer2025rethinking}. Nonetheless, this preprocessing latency is typically acceptable in enterprise environments, as chunking and indexing are offline processes that occur only during initial document ingestion.
+
 \subsection{Semantic Re-ranking}
 \label{lit:re_rank}
+
+
 \subsection{Prompt Caching}
 \label{lit:caching}
+
+
