@@ -1,3 +1,5 @@
+This chapter reviews the current literature on the four selected optimization techniques, focusing on the performance benefits each method provides in relation to the research questions. Relevant publications were identified on Google Scholar using keyword combinations of the optimization method and ``RAG'' or ``retrieval-augmented generation''. In addition, snowballing \cite{guidelines}, starting from comprehensive surveys (e.g., \cite{gan2025rag, gao2023retrieval, wu2025ragnlp}), was used to discover further relevant studies. Due to the rapid pace of development in this research area, the selected literature consists primarily of articles published after 2023. The remainder of this chapter is structured as follows: Section~\ref{lit:cascading} reviews model cascading and routing, Section~\ref{lit:retrieval} examines small-to-big retrieval, Section~\ref{lit:re_rank} covers semantic re-ranking, and Section~\ref{lit:caching} discusses prompt caching.
+
 \subsection{Cascading}
 \label{lit:cascading}
 Modern RAG systems encounter diverse workloads, ranging from simple informational queries to highly complex analytical tasks. In production-grade enterprise environments — where high availability, low latency, and cost efficiency are critical constraints — a "one-size-fits-all" architecture is fundamentally sub-optimal \cite{jeong2024adaptive, chen2023frugalgpt}. It over-allocates expensive computational resources for trivial questions, yet may lack the retrieval depth and reasoning capacity required for complex queries. To mitigate this, model cascading or query routing can be employed to dynamically direct inputs to an appropriately scaled configuration of the RAG pipeline \cite{ong2025routellm}. For instance, a simple query can bypass the full pipeline and utilize a lightweight LLM with minimal context. Conversely, a complex query requiring synthesis across multiple enterprise knowledge bases can trigger an augmented pipeline with extended retrieval top-k parameters and a more capable foundation model. 
@@ -11,7 +13,7 @@ While providing both operational cost and latency benefits, query routing has a 
 \subsection{Small-to-Big retrieval}
 \label{lit:retrieval}
 
- Document chunking is a foundational phase in RAG pipelines, directly determining the granularity of the vector index. However, selecting a static chunk size introduces a fundamental trade-off between retrieval precision and contextual completeness. While smaller chunks are computationally efficient and exhibit high intrachunk cohesion (ICC), they frequently suffer from low document contextual coherence (DCC) due to semantic fragmentation \cite{demourajunior2026adaptive}. Conversely, larger chunks preserve rich contextual relationships but degrade retrieval accuracy by diluting query-relevant semantic features within dense vector representations. Small-to-big retrieval resolves this tension by decoupling the representation used for vector search from the context provided to the generator. In this architecture, dense retrieval is executed over fine-grained index nodes, while the generation phase utilizes a broader, mapped context (such as parent chunks or entire source documents) retrieved via sibling pointer mapping. Implementations of this technique range from neighboring chunk expansion, which dynamically retrieves adjacent sliding windows to restore structural continuity \cite{lumer2025rethinking}, to hierarchical abstract trees, which map granular leaf nodes to high-level thematic summaries\cite{li2026bridgerag}.
+Document chunking is a foundational phase in RAG pipelines, directly determining the granularity of the vector index. However, selecting a static chunk size introduces a fundamental trade-off between retrieval precision and contextual completeness. While smaller chunks are computationally efficient and exhibit high intrachunk cohesion (ICC), they frequently suffer from low document contextual coherence (DCC) due to semantic fragmentation \cite{demourajunior2026adaptive}. Conversely, larger chunks preserve rich contextual relationships but degrade retrieval accuracy by diluting query-relevant semantic features within dense vector representations. Small-to-big retrieval resolves this tension by decoupling the representation used for vector search from the context provided to the generator. In this architecture, dense retrieval is executed over fine-grained index nodes, while the generation phase utilizes a broader, mapped context (such as parent chunks or entire source documents) retrieved via sibling pointer mapping. Implementations of this technique range from neighboring chunk expansion, which dynamically retrieves adjacent sliding windows to restore structural continuity \cite{lumer2025rethinking}, to hierarchical abstract trees, which map granular leaf nodes to high-level thematic summaries\cite{li2026bridgerag}.
 
 Different chunking and representation methods directly increase the accuracy of RAG pipelines. For example, \citet{lumer2025rethinking} showed that expanding the context to neighboring chunks can increase the win rate to 65\% compared to using single independent chunks. In addition, the adaptive chunking method, where chunks are generated dynamically based on document structure, increases downstream answer correctness by 8--10 percentage points without requiring downstream prompt modifications \cite{demourajunior2026adaptive}. Hierarchical abstract trees like Bridge-RAG \cite{li2026bridgerag} yield up to a 44\% improvement in BLEU scores on complex reasoning tasks by tracing parent-child lineages. Similarly, dynamic reasoning frameworks like LogicRAG \cite{chen2026logicrag} and QPaug \cite{kim2024qpaug} increased string accuracy by 14.7\% absolute (compared to the next best graph baseline) and answer F1 scores by over 34\% relatively.
 
@@ -20,6 +22,38 @@ compared to naive flat retrieval, increasing it from 4.28\,\text{s} to 9.83\,\te
 
 \subsection{Semantic Re-ranking}
 \label{lit:re_rank}
+% =========================================================================
+% PLAN FOR SEMANTIC RE-RANKING CHAPTER
+% =========================================================================
+%
+% 1. Introductory Paragraph (Concept & Mechanism)
+%    - Define semantic reranking as a multi-stage retrieval technique designed to refine query-relevant document ordering.
+%    - Explain the core issue: first-stage retrieval (dense vector embeddings or sparse BM25) optimizes for recall, but results in noise and context dilution.
+%    - Describe the solution: multi-stage pipelines where a fast first-stage retriever fetches candidates (e.g., top-50/100), and a powerful, computationally intensive cross-encoder or neural reranker refines the top results before generation \citep{moreira2024enhancing, cheng2026enhancing}.
+%
+% 2. Latency Impact (RQ1 - Latency Profile & Overhead)
+%    - First-stage query embedding latency: 5.1\,ms for NV-EmbedQA-E5-v5 (335M parameters) and 19.8\,ms for Mistral-7B-v2 (7.2B parameters) \citep{moreira2024enhancing}.
+%    - First-stage bi-encoder retrieval: DPR bi-encoder query embedding is fast (~20\,ms) and FAISS-based retrieval completes in milliseconds (995.0 QPS per thread) \citep{karpukhin2020dense}.
+%    - Second-stage reranking latency: NV-RerankQA-Mistral-4B-v3 adds ~266\,ms of latency on average to score 64 candidate passages of 512 tokens \citep{moreira2024enhancing}.
+%    - Contrast with agentic RAG: single-pass reranking models like InfoGain-RAG avoid the multiple, slow iterative LLM inference calls of systems like Self-RAG and CRAG, which double query latency from 4.28\,s to 9.83\,s \citep{wang2025infogain, cheng2026enhancing}.
+%
+% 3. Cost & Token Usage (RQ2 - Operational Cost & Token Reduction)
+%    - Model parameter pruning: Pruning a Mistral 7B decoder backbone to 16 layers (creating a 4B parameter model) yields a 50% parameter reduction, reducing GPU memory and serving cost by half, with only a 1% NDCG@10 accuracy penalty \citep{moreira2024enhancing}.
+%    - Token compression via context filtering: InfoGain-RAG uses Document Information Gain (DIG) scores to filter out low-value documents before the generation stage, directly reducing the input token size and cost \citep{wang2025infogain}.
+%    - Stop-threshold strategies: In financial RAG, document ingestion is stopped once the cumulative probability mass of the cross-encoder reaches 55% (retaining less than 45% of retrieved text), saving token usage by omitting the remaining low-value chunks \citep{cheng2026enhancing}.
+%
+% 4. Quality & Accuracy Metrics (RQ3 - Retrieval & Generation Quality)
+%    - Normalized Discounted Cumulative Gain (NDCG@10): NV-RerankQA-Mistral-4B-v3 achieves a 14% absolute increase in average NDCG@10 across BEIR Q&A datasets (NQ, HotpotQA, FiQA) compared to the second-best reranker (BGE-Reranker-v2-M3) \citep{moreira2024enhancing}.
+%    - Exact Match (EM) accuracy: InfoGain-RAG improves Qwen2.5-72B's accuracy on NaturalQA by 17.8% and PopQA by 17.4% over naive RAG. On TriviaQA, LLaMA2-13B reaches 76.2% accuracy, outperforming Self-RAG (69.3%) and CRAG (74.5%) \citep{wang2025infogain}.
+%    - Correctness scoring: On the FinDER financial benchmark, cross-encoder reranking raises the correctness rate (scores >= 8 out of 10) from 33.5% to 49.0% (a 15.5 percentage point absolute or 46.3% relative improvement) and reduces completely incorrect answers (score = 1) from 35.3% to 22.5% \citep{cheng2026enhancing}.
+%    - Enterprise-wide impact: Systematic survey of 63 studies shows that RAG-augmented enterprise systems achieve up to 87% EM on QA tasks, reducing manual editing time by 30%–50% in field trials \citep{karakurt2025retrieval}.
+%
+% 5. The Trade-off & Pareto Frontier (RQ4 / Stacking)
+%    - Analyze the efficiency-quality equilibrium: reranking shifts the Pareto frontier by providing large quality improvements (+14% to +17.8% accuracy) at the cost of modest execution latency (~266\,ms).
+%    - Detail the interaction when stacked: combining hybrid sparse-dense retrieval (e.g., SQLite FTS5 + FAISS vector) with neural reranking delivers optimal results for complex domains (like S&P 500 10-K filings) \citep{cheng2026enhancing}.
+%    - Evaluate enterprise compatibility: highlight the importance of commercially licensed models (avoiding research-only MS-MARCO) and the high portability of cross-encoders (onnx exportable) to Java/Spring AI stacks.
+%
+% =========================================================================
 
 
 \subsection{Prompt Caching}
