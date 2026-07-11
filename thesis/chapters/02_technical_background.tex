@@ -26,13 +26,15 @@ To address the limitations detailed in the previous section, Retrieval-Augmented
 
 The retrieval-augmentation process requires both the source knowledge and the user query to be preprocessed. Preprocessing of the knowledge base contains three phases: chunking, vectorizing, and indexing. During this data preparation phase, source documents — such as PDF files — are chunked into smaller, more manageable segments\footnote{Early architectures like \citet{lewis2020rag} utilized fixed-length segments of 100 words, while modern architectures optimize segment lengths \citep{demourajunior2026adaptive}.}. These chunks are converted into numerical vectors using an embedding model so that their semantic meanings can be mathematically calculated, and they are subsequently stored in an indexed vector database \citep{gao2023retrieval}. During runtime inference, the user's initial prompt is vectorized using the same embedding model. The system then calculates the mathematical distance (e.g., cosine similarity) between the prompt vector and the stored vectors, retrieving a pre-defined number of the most relevant chunks — denoted as the top-$k$ — from the database to augment the initial prompt \citep{johnson2019billion}.
 
-Formally, let $q$ represent the user query, and let $D = \{d_1, d_2, \ldots, d_N\}$ be the external knowledge database consisting of $N$ document chunks. An embedding model $E(\cdot)$ maps text segments to dense vectors. The retriever $R_k(q, D)$ retrieves the top-$k$ most semantically similar chunks based on a similarity metric $\operatorname{sim}(\cdot, \cdot)$ (typically cosine similarity):
+To formalize this two-phase pipeline, the retrieval-augmentation process can be represented mathematically. In the first phase, a document corpus is split into $N$ smaller text chunks, forming the external knowledge base $D = \{d_1, d_2, \ldots, d_N\}$. These chunks are then mapped into a vector database using an embedding function $E(\cdot)$, which yields the vector representation $\mathbf{v}_i = E(d_i)$ for each chunk $d_i \in D$.
+
+In the second phase, the user's query $q$ is embedded into a vector form using the same embedding function $E(q)$, subsequently, after which the top $k$ most relevant chunks $R_q$ are fetched based on their cosine similarity score using the retrieval function $\text{Ret}_k$:
 \begin{equation}
-R_k(q, D) = \operatorname{arg\,top-k}_{d \in D} \operatorname{sim}(E(q), E(d))
+    \text{Ret}_k(q, D) = R_q.
 \end{equation}
-The language model $M(q, C)$ generates the final answer $a$ by conditioning on the query $q$ augmented with the retrieved context chunks $C = R_k(q, D)$:
+Finally, the query $q$ and the retrieved chunks $R_q$ are fed to the generator model $G(\cdot)$ to produce the final answer $a$, denoted as
 \begin{equation}
-a = M(q, R_k(q, D))
+    G(q, R_q) = a.
 \end{equation}
 
 The primary advantage of the RAG architecture lies in its reliance on an external knowledge base. When properly prompted, this mechanism significantly mitigates hallucinations by forcing the LLM to ground its output exclusively on the retrieved context \citep{shuster2021retrieval}. Furthermore, maintaining an external data repository is substantially more cost-effective and computationally practical than continuously retraining or fine-tuning the underlying model \citep{gao2023retrieval}, allowing enterprise systems to remain up-to-date in real time. From a data governance perspective, an external knowledge base ensures that sensitive corporate data remains secure and under internal control \citep{ni2025towards}. Lastly, by selectively retrieving only the most relevant documents, RAG compresses the required input context, thereby reducing API transaction costs and inference latency compared to naive long-context processing.

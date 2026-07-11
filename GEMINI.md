@@ -27,6 +27,9 @@ Your primary objective is to process academic papers to extract technical data r
 4. **Benchmarking & Tooling:**
     - Identify used datasets (SQuAD, HotpotQA, etc.) and evaluation frameworks (RAGAS, DeepEval, etc.).
 5. **Java/Spring AI Compatibility:** Evaluate if the logic is language-agnostic or relies on Python-specific libraries (e.g., LlamaIndex/LangChain features not yet in Spring AI).
+6. **Git Conflict Resolution & Safety (CRITICAL):**
+    - **Never** resolve git merge conflicts or execute automatic conflict resolutions (like choosing one side automatically) on your own.
+    - If a merge conflict occurs during `git subtree pull`, `git merge`, or any other git operation, you **must** stop, present the conflicting diff to the user, and ask them explicitly how they want the conflict to be resolved.
 
 ---
 
