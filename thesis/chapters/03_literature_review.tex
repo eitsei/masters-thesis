@@ -60,21 +60,51 @@ Increased quality in semantic re-ranking comes with the explicit cost of increas
 \subsection{Prompt Caching}
 \label{lit:caching}
 
-Formally, prompt caching can be implemented as either context-level KV-caching or semantic completion caching.
+% NOTE: Conceptual & Enterprise Motivation Paragraph
+% - High TTFT (Time to First Token) and computational cost in RAG pipelines are caused by repeated processing of long prompts (system prompts, prompt templates, and retrieved context chunks).
+% - Prompt caching bypasses redundant prefill computation by storing and reusing precomputed Key-Value (KV) attention states across requests or serving pre-generated answers.
+% - Caching strategies broadly divide into:
+%     1. Context-level / Prefix KV caching: precomputing and storing intermediate attention KV states for static prompt prefixes or retrieved document chunks.
+%     2. Semantic completion caching: caching historical (query, response) pairs and skipping retrieval/generation entirely when incoming queries match cached ones semantically above a similarity threshold.
+% - Highly relevant for enterprise production systems with static knowledge bases, shared multi-tenant templates, or frequent high-volume querying.
 
-In context-level caching, the constructed prompt $P(q, C)$ is partitioned into a static prefix $P_{\text{static}}$ (e.g., system instructions, few-shot examples, or pre-retrieved context) and a dynamic query-specific suffix $P_{\text{dynamic}}(q)$:
+To model this process systematically, prompt caching is formalized through two distinct paradigms: context-level key-value (KV) attention caching and semantic completion caching. In context-level KV caching, the constructed prompt $P(q, R_q)$ is partitioned into a static prefix $P_{\text{static}}$ (e.g., system instructions, static prompt templates, or pre-retrieved context chunks) and a dynamic query-specific suffix $P_{\text{dynamic}}(q)$:
 \begin{equation}
-P(q, C) = [P_{\text{static}}, P_{\text{dynamic}}(q)]
+P(q, R_q) = [P_{\text{static}}, P_{\text{dynamic}}(q)].
 \end{equation}
-When $P_{\text{static}}$ has been pre-computed, its key-value attention states are retrieved from the cache $KV(P_{\text{static}})$, allowing the model to only compute generation over the suffix:
+When $P_{\text{static}}$ has been pre-computed, its key-value attention states $KV(P_{\text{static}})$ are retrieved directly from cache, allowing the generator model $G(\cdot)$ to evaluate attention only over the dynamic suffix:
 \begin{equation}
-a = M(P_{\text{dynamic}}(q) \mid KV(P_{\text{static}}))
+G(P_{\text{dynamic}}(q) \mid KV(P_{\text{static}})) = a.
 \end{equation}
+In semantic completion caching, a database of past query-answer pairs $\text{Cache} = \{(q_i, a_i)\}$ is maintained. Given an input query $q$ and embedding function $E(\cdot)$, the final answer $a$ is determined by:
+\begin{equation}
+a = \begin{cases} a_i & \text{if } \exists (q_i, a_i) \in \text{Cache} \text{ s.t. } \operatorname{sim}(E(q), E(q_i)) \ge \tau, \\ G(q, R_k(q, D)) & \text{otherwise,} \end{cases}
+\end{equation}
+where $\tau$ is a pre-defined similarity threshold and $R_k(q, D)$ represents the retrieved context chunks upon a cache miss.
 
-In semantic caching, a database of past queries and answers $Cache = \{(q_i, a_i)\}$ is maintained. The final answer is determined by:
-\begin{equation}
-a = \begin{cases} a_i & \text{if } \exists (q_i, a_i) \in Cache \text{ s.t. } \operatorname{sim}(E(q), E(q_i)) \ge \tau \\ M(q, R_k(q, D)) & \text{otherwise} \end{cases}
-\end{equation}
-where $\tau$ is a similarity threshold.
+% NOTE: Efficiency, Latency & Cost Impact (RQ1 & RQ2)
+% - Latency Reduction (TTFT):
+%     * Prompt Cache (Gim et al., 2024): 1.5x-10x TTFT reduction on GPU (e.g., 900 ms -> 90 ms on Llama-7B, 3K tokens); up to 20x-70x on CPU architectures.
+%     * RAGCache (Jin et al., 2025): Up to 4.0x TTFT reduction over vLLM+Faiss and 2.1x throughput speedup via multi-tier host-GPU knowledge tree caching.
+%     * TurboRAG (Lu et al., 2025): 8.6x average TTFT speedup (1,165 ms -> 134 ms) across LongBench using precomputed chunk KV caches and RoPE reordering; peak 9.4x on MuSiQue.
+%     * CacheBlend (Yao et al., 2025): 2.2x-3.3x TTFT reduction and up to 5x serving throughput increase via selective cross-attention recomputation.
+%     * FusionRAG (Wang et al., 2026): 2.66x-3.94x TTFT speedup at 15% recomputation ratio; up to 5.22x-9.39x under full KV reuse (0% recomputation).
+% - Cost & Memory Scaling:
+%     * Memory scaling is linear with context size (e.g., Llama-70B requires 2.5 GB RAM per 1K tokens cached).
+%     * Tiered memory architectures (RAGCache, CacheBlend) offload cold/warm KV blocks to host DRAM/NVMe SSD, dramatically lowering GPU VRAM costs.
+%     * Recomputing only critical tokens (<15% in FusionRAG, 15-20% in CacheBlend) eliminates >80% of prefill FLOPs while maintaining high cache hit rates (e.g., 77.9% in FusionRAG).
+
+% NOTE: Quality & Trade-off Analysis (RQ3 & RQ4)
+% - Output Quality & Positional Deviation:
+%     * Static prefix KV caching (Prompt Cache) & multi-tier system caching (RAGCache): Zero quality loss / exact match equivalence.
+%     * Challenge in RAG: Uncaptured cross-chunk attention and positional displacement in variable document orderings degrade accuracy under naive full KV reuse (0.15-0.35 drop in F1/ROUGE-L).
+% - Solution Mechanisms & Quality Restoration:
+%     * CacheBlend selectively recomputes cross-attention for top 15-20% sensitive tokens, restoring quality within 0.01-0.03 of full prefill.
+%     * TurboRAG uses independent attention masking with RoPE reordering; post-SFT accuracy matches naive RAG (<1% difference).
+%     * FusionRAG combines offline similarity-guided preprocessing with online query-guided attention selection (top 15% tokens), recovering 99% of Full Attention quality.
+% - Trade-off Equilibrium & System Considerations:
+%     * Prefill FLOP savings vs. memory bandwidth / host-to-GPU transfer latencies (mitigated by asynchronous pipelining in RAGCache and FusionRAG).
+%     * Offline preprocessing/fine-tuning overhead (e.g., TurboRAG SFT or FusionRAG offline chunk grouping) is easily amortized across frequent online read queries in enterprise production environments.
+
 
 
