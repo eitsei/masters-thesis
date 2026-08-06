@@ -64,29 +64,21 @@ Increased quality in semantic re-ranking comes with the explicit cost of increas
 \subsection{Prompt Caching}
 \label{lit:caching}
 
-RAG pipelines are prone to high TTFT and computational costs due to their architecture; their inputs for the LLM are augmented with the data provided from the knowledge base. A great portion of these augmented prompts are repeated knowledge, such as system prompts, prompt templates, and retrieved chunks of similar questions. In many cases, most of the full prompt can be reused to decrease the need for a full computationally heavy pipeline and can be served from shared memory. This is where prompt caching provides a potential solution to save repeated pieces of the answers into key-value (KV) attention states in caches. There are two approaches to implement caching. First, it can be prefix KV-caching, where KV states for static prompt prefixes or document chunks are stored and reused from the cache to bypass redundant prefill computations. Second, semantic completion caching is the solution, where historical query-answer pairs are stored in the cache, and when the new query is above a certain semantic similarity threshold, the answer is served directly from the cache.
+RAG pipelines incur substantial TTFT latency and computational overhead because queries are continuously augmented with extensive retrieved context. However, much of this content is static or repetitive—such as system instructions, templates, and recurring document chunks. Prompt caching avoids redundant prefill passes by persisting intermediate key-value (KV) attention states in memory for reuse across requests. Modern architectures primarily use two paradigms: model-level prefix KV caching and application-level semantic completion caching. Prefix KV caching stores attention tensors for static prefixes or document blocks to bypass redundant prefill computation. Conversely, semantic completion caching stores historical query–response pairs, directly returning pre-computed answers when a query exceeds a semantic similarity threshold.
 
-For the sake of simplicity, only a formal presentation of context-level KV caching is provided. In context-level KV caching, the constructed prompt $P(q, R_q)$ is partitioned into a static prefix $P_{\text{static}}$ and a dynamic query-specific suffix $P_{\text{dynamic}}(q)$:
+To formalize context-level KV caching systematically, the constructed prompt $P(q, R_q)$ is partitioned into a static prefix $P_{\text{static}}$ and a dynamic, query-specific suffix $P_{\text{dynamic}}(q)$:
 \begin{equation}
 P(q, R_q) = [P_{\text{static}}, P_{\text{dynamic}}(q)].
 \end{equation}
-When $P_{\text{static}}$ has been pre-computed, its key-value attention states $KV(P_{\text{static}})$ are retrieved directly from cache, allowing the generator model $G(\cdot)$ to evaluate attention only over the dynamic suffix:
+Once $P_{\text{static}}$ has been pre-computed, its key-value attention states $KV(P_{\text{static}})$ are retrieved directly from the cache, allowing the generator model $G(\cdot)$ to evaluate self-attention exclusively over the dynamic suffix and produce the final answer:
 \begin{equation}
 G(P_{\text{dynamic}}(q) \mid KV(P_{\text{static}})) = a.
 \end{equation}
 
+Prompt caching has been shown to yield substantial TTFT reductions across diverse RAG architectures. For instance, \citet{gim2024promptcache} reported a 1.5$\times$ to 10$\times$ TTFT reduction on GPUs—slashing latency from 900\,ms to 90\,ms on Llama-7B with 3K tokens—and up to 70$\times$ on CPU architectures. Similarly, \citet{jin2025ragcache} achieved up to a 4.0$\times$ TTFT reduction over vLLM+Faiss alongside a 2.1$\times$ throughput speedup via multi-tier host-GPU knowledge tree caching. Broader evaluations in TurboRAG \citep{lu2025turborag}, CacheBlend \citep{yao2025cacheblend}, and FusionRAG \citep{wang2026fusionrag} confirm TTFT speedups ranging from 2.2$\times$ to 9.39$\times$, depending on the caching strategy and recomputation ratio. Although linear memory scaling presents a key trade-off (e.g., 2.5\,GB RAM per 1K tokens for Llama-70B), tiered memory architectures mitigate VRAM constraints by offloading inactive KV blocks to host DRAM or NVMe SSDs. Furthermore, by selectively recomputing only critical tokens (15--20\%), frameworks like FusionRAG \citep{wang2026fusionrag} and CacheBlend \citep{yao2025cacheblend} eliminate over 80\% of prefill FLOPs while sustaining cache hit rates as high as 77.9\%.
 
-% NOTE: Efficiency, Latency & Cost Impact (RQ1 & RQ2)
-% - Latency Reduction (TTFT):
-%     * Prompt Cache (Gim et al., 2024): 1.5x-10x TTFT reduction on GPU (e.g., 900 ms -> 90 ms on Llama-7B, 3K tokens); up to 20x-70x on CPU architectures.
-%     * RAGCache (Jin et al., 2025): Up to 4.0x TTFT reduction over vLLM+Faiss and 2.1x throughput speedup via multi-tier host-GPU knowledge tree caching.
-%     * TurboRAG (Lu et al., 2025): 8.6x average TTFT speedup (1,165 ms -> 134 ms) across LongBench using precomputed chunk KV caches and RoPE reordering; peak 9.4x on MuSiQue.
-%     * CacheBlend (Yao et al., 2025): 2.2x-3.3x TTFT reduction and up to 5x serving throughput increase via selective cross-attention recomputation.
-%     * FusionRAG (Wang et al., 2026): 2.66x-3.94x TTFT speedup at 15% recomputation ratio; up to 5.22x-9.39x under full KV reuse (0% recomputation).
-% - Cost & Memory Scaling:
-%     * Memory scaling is linear with context size (e.g., Llama-70B requires 2.5 GB RAM per 1K tokens cached).
-%     * Tiered memory architectures (RAGCache, CacheBlend) offload cold/warm KV blocks to host DRAM/NVMe SSD, dramatically lowering GPU VRAM costs.
-%     * Recomputing only critical tokens (<15% in FusionRAG, 15-20% in CacheBlend) eliminates >80% of prefill FLOPs while maintaining high cache hit rates (e.g., 77.9% in FusionRAG).
+Beyond latency reductions, prompt caching maintains generation quality comparable to full prefill passes, with architectures like RAGCache \citep{jin2025ragcache} demonstrating zero quality loss across standard benchmarks. The primary challenge of prompt caching lies in uncaptured cross-chunk semantics and positional displacements, where identical context blocks exhibit varying semantics or positional shifts across queries, leading to cache misses and potential accuracy degradation. To overcome these limitations, recent approaches introduce selective recomputation strategies. For example, CacheBlend \citep{yao2025cacheblend} selectively recomputes cross-attention for the top 15--20\% most sensitive tokens, restoring quality to within 0.01--0.03 of full prefill. Similarly, FusionRAG \citep{wang2026fusionrag} pairs offline similarity-guided preprocessing with online query-guided attention selection—recomputing under 15\% of tokens—to recover approximately 99\% of the full attention quality.
+
 
 % NOTE: Quality & Trade-off Analysis (RQ3 & RQ4)
 % - Output Quality & Positional Deviation:
