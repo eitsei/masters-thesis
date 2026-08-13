@@ -1,8 +1,47 @@
-\subsection{Architecture of research program}
-\subsection{Research methodology}
+This chapter establishes the experimental framework and software architecture used to empirically evaluate the performance, operational cost, and output quality of Retrieval-Augmented Generation (RAG) optimization techniques. To address the research questions formulated in Chapter~\ref{sec:introduction}, this study implements a quantitative benchmarking suite built upon an enterprise-ready Java and Spring AI infrastructure connected to Google Cloud Platform (GCP) services. The remainder of this chapter is structured as follows: Section~\ref{subsec:res_methodology} details the overall research approach and experimental design, while Section~\ref{subsec:sys_implementation} describes the software architecture and cloud infrastructure. Section~\ref{subsec:opt_pipeline} outlines the specific optimization strategies evaluated. Finally, Section~\ref{subsec:bench_datasets} introduces the target datasets and Section~\ref{subsec:eval_metrics} specifies the quantitative evaluation metrics and measurement instrumentation.
 
-Oisko tästä datasetiksi https://arxiv.org/pdf/2403.12031?
+\subsection{Research Methodology}
+\label{subsec:res_methodology}
 
-Thinking effort routing yhdeksi?! 
-https://arxiv.org/pdf/2603.07915#page=13.85
-https://openreview.net/pdf?id=W34UyCRQel
+% DRAFT NOTES:
+% - Experimental quantitative benchmarking approach.
+% - Addressing RQ1 (Latency/TTFT), RQ2 (Cost $), RQ3 (Quality/RAGAS), RQ4 (Pareto Equilibrium).
+% - Multi-iteration execution (5 iterations per configuration) to mitigate network jitter and cold-start bias.
+
+\subsection{System Implementation}
+\label{subsec:sys_implementation}
+
+% DRAFT NOTES:
+% - SUT Stack: Java 21, Spring Boot 3.x, Spring AI (spring-ai-bom).
+% - Database: PostgreSQL with pgvector extension (local Docker runner / Cloud SQL deployment path).
+% - Infrastructure & APIs: GCP Vertex AI (Gemini 2.5/3 Flash & Pro, text-embedding-004), Cross-Encoder Reranker.
+% - Instrumentation: Spring Boot Actuator with Micrometer export for latency and token tracking.
+
+\subsection{Optimization Pipeline}
+\label{subsec:opt_pipeline}
+
+% DRAFT NOTES:
+% - Baseline (M0): Naive flat RAG (fixed 512-token chunks, bi-encoder top-5, no caching).
+% - Module 1 (M1): Small-to-Big Retrieval (128-token child chunks expanding to 512-1024 parent windows).
+% - Module 2 (M2): Two-Stage Semantic Re-ranking (Bi-encoder top-30 candidates pruned to top-5 via Cross-Encoder).
+% - Module 3 (M3): Prompt Caching (GCP Context Caching / KV-cache reuse for static prompts & context).
+% - Module 4 (M4): Model Cascading & Complexity Routing (Intent/complexity classifier routing between Gemini Flash and Pro).
+% - Extension: Thinking Effort Routing / Reasoning Budget Control (e.g. arXiv:2603.07915, OpenReview:W34UyCRQel).
+
+\subsection{Benchmark Datasets}
+\label{subsec:bench_datasets}
+
+% DRAFT NOTES:
+% - Main Academic Benchmark: MuSiQue dataset (Trivedi et al., 2022) - sampled 100 queries (35% 2-hop, 65% 3-hop/4-hop).
+% - Why MuSiQue: Eliminates single-hop reasoning shortcuts present in HotpotQA; 20 paragraphs/query (~2.5k-4k tokens) ideal for testing M1 (Small-to-Big), M2 (Re-ranking), and M3 (Prompt Caching).
+% - Hop-count difficulty tiers (2-hop vs 3/4-hop) natively replace RouterBench for M4 (Model Cascading: Gemini Flash vs Pro routing).
+% - Secondary Domain Corpus: Enterprise IT Customer Support Knowledge Base (500+ KB chunks) + 200 synthetic QA pairs (40% single-hop, 40% multi-hop, 20% out-of-domain bypass).
+
+
+\subsection{Evaluation Setup \& Metrics}
+\label{subsec:eval_metrics}
+
+% DRAFT NOTES:
+% - RQ1 & RQ2 Efficiency Metrics: Time to First Token (TTFT in ms), End-to-End Latency (ms), GCP Token Cost Model ($).
+% - RQ3 Quality Metrics: Offline RAGAS framework (Context Precision, Context Recall, Faithfulness, Answer Relevance).
+% - RQ4 Equilibrium Modeling: Multi-objective Pareto frontier scoring balancing quality against latency and financial expenditure.
