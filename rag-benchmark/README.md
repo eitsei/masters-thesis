@@ -130,10 +130,29 @@ of both the HTTP layer and the concrete model/vector-store providers:
   return. Depends on Spring AI's `VectorStore`/`ChatModel` abstractions, not on any
   specific provider (Ollama vs. Gemini is an application.yml concern).
 - `infrastructure` — concrete adapters for the domain ports (e.g. `NoOpReranker`,
-  the current M2 stand-in).
+  the current M2 stand-in) and cross-cutting config, e.g. `ModelCatalogProperties`.
 - `api` — the HTTP surface (`DocumentController`, `QueryController`), request/response
   DTOs, and `GlobalExceptionHandler` translating domain exceptions (like
   `ModuleNotImplementedException`) into HTTP status codes.
+
+### Prompts
+
+Prompt text lives under `src/main/resources/prompts/` (one file per prompt, `.st`
+extension — Spring AI's StringTemplate placeholder syntax) rather than as inline Java
+string literals, and is loaded via Spring AI's `PromptTemplate(Resource)` constructor.
+`answer-generation.st` is the only one today (M0's retrieve-then-generate prompt);
+M1-M4 will each add their own file here rather than growing this one, since they'll
+need different shapes (e.g. M3 cache markers, M1 expanded-window context).
+
+### Model catalog
+
+`ModelCatalogProperties` (`infrastructure/config`) binds `rag.models.*` in
+`application.yml` — the three Gemini tiers from the thesis's M4 design (flash-lite /
+flash / pro) and M2's two candidate re-ranking backends. This is a reference catalog
+only: nothing consumes it yet, since M2 and M4 are unimplemented (see table above).
+`spring.ai.google.genai.chat.model` (also in `application.yml`) is the one model
+Spring AI actually instantiates a bean for today — the single tier M0 uses regardless
+of which module tiers exist in the catalog.
 
 This keeps the thing being benchmarked — the pipeline and its optimization seams — as
 plain, framework-light domain/application code that can be tested and reasoned about

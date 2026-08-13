@@ -25,6 +25,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.core.io.ClassPathResource;
 
 /**
  * Plain unit tests for {@link RagQueryService} — no Spring context, no database, no real model
@@ -54,7 +55,11 @@ class RagQueryServiceTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        ragQueryService = new RagQueryService(vectorStore, chatModel, reranker, meterRegistry);
+        // No Spring context in these tests, so @Value can't inject the prompt resource -- load it
+        // the same way Spring would resolve "classpath:prompts/answer-generation.st", via a plain
+        // ClassPathResource (src/main/resources is on the test classpath by default in Maven).
+        ragQueryService = new RagQueryService(vectorStore, chatModel, reranker, meterRegistry,
+                new ClassPathResource("prompts/answer-generation.st"));
     }
 
     @Test

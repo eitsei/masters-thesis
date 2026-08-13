@@ -14,14 +14,17 @@ yet; each item is a starting point for later work, not a spec.
 - **M2 — re-ranking.** Only `NoOpReranker` (`infrastructure/NoOpReranker.java`) exists.
   A real implementation needs to call either a hosted re-ranking API (e.g. the Vertex
   AI Ranking API) or a local cross-encoder served via a TEI (Text Embeddings Inference)
-  container.
+  container. Candidate model ids are already catalogued in `rag.models.reranker`
+  (`application.yml` / `ModelCatalogProperties`) — not yet read by anything.
 - **M3 — prompt/context caching.** `PromptCache` (`domain/PromptCache.java`) is defined
   but has no implementation or bean. Needs a caching strategy and a decision on what's
   cached (raw prompts vs. assembled context vs. provider-side cached content, e.g.
   Gemini's `cached-content` support already present as chat properties).
 - **M4 — model routing / cascading.** `ModelRouter` (`domain/ModelRouter.java`) is
   defined but has no implementation or bean; there's no logic yet for routing a query
-  to a cheaper/faster model vs. a larger one, or cascading between them.
+  to a cheaper/faster model vs. a larger one, or cascading between them. The three
+  Gemini tiers it will choose between are already catalogued in `rag.models.google-genai`
+  (`application.yml` / `ModelCatalogProperties`) — not yet read by anything.
 - **RAGAS quality evaluation (RQ3).** No answer-quality evaluation harness exists yet
   (faithfulness, answer relevancy, context precision/recall, etc.).
 - **Cost accounting (RQ2).** No cost-per-query formula or tracking exists yet (token

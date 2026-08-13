@@ -15,6 +15,8 @@ import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 /**
@@ -31,30 +33,25 @@ public class RagQueryService {
     private static final int TOP_K = 5;
     private static final int SNIPPET_LENGTH = 200;
 
-    // A Spring AI PromptTemplate rather than hand-rolled String.formatted(): M1-M4 will need to
-    // vary this shape later (e.g. M3 cache markers, M1 expanded-window context), and the library
-    // already owns placeholder rendering/escaping for that.
-    private static final PromptTemplate ANSWER_PROMPT_TEMPLATE = new PromptTemplate("""
-            Answer the question using only the context provided below. \
-            If the answer cannot be found in the context, say you don't know.
-
-            Context:
-            {context}
-
-            Question: {question}
-            Answer:""");
-
     private final VectorStore vectorStore;
     private final ChatModel chatModel;
     private final Reranker reranker;
     private final MeterRegistry meterRegistry;
+    // A Spring AI PromptTemplate loaded from its own file (src/main/resources/prompts) rather
+    // than hand-rolled String.formatted() or an inline literal: M1-M4 will need to vary this
+    // shape later (e.g. M3 cache markers, M1 expanded-window context), and keeping the prompt
+    // text out of Java source lets it be reviewed/edited without touching pipeline code, and
+    // reused if a second consumer needs the same template.
+    private final PromptTemplate answerPromptTemplate;
 
     public RagQueryService(VectorStore vectorStore, ChatModel chatModel, Reranker reranker,
-            MeterRegistry meterRegistry) {
+            MeterRegistry meterRegistry,
+            @Value("classpath:prompts/answer-generation.st") Resource answerPromptResource) {
         this.vectorStore = vectorStore;
         this.chatModel = chatModel;
         this.reranker = reranker;
         this.meterRegistry = meterRegistry;
+        this.answerPromptTemplate = new PromptTemplate(answerPromptResource);
     }
 
     public RagQueryResult query(String query, Set<ModuleId> requestedModules) {
@@ -90,7 +87,7 @@ public class RagQueryService {
         String context = chunks.stream()
                 .map(Document::getText)
                 .collect(Collectors.joining("\n---\n"));
-        return ANSWER_PROMPT_TEMPLATE.render(Map.of("context", context, "question", query));
+        return answerPromptTemplate.render(Map.of("context", context, "question", query));
     }
 
     private String snippet(String text) {

@@ -4,7 +4,18 @@ spring:
   ai:
     model:
       chat: ${SPRING_AI_MODEL_CHAT:ollama}
+      # Both properties are needed, driven by the same env var. spring.ai.model.embedding
+      # gates OllamaEmbeddingAutoConfiguration; Google's is gated by the separate, more
+      # specific spring.ai.model.embedding.text (matchIfMissing=true on THAT property, so
+      # leaving it unset means the Google GenAI embedding bean is created regardless of
+      # the setting above -- confirmed by decompiling both autoconfigure classes: the two
+      # providers do not share one switch property for embeddings the way they do for
+      # chat). Without this second line, having both embedding starters on the classpath
+      # (needed to fix Gemini embeddings existing at all -- see pom.xml) makes Spring fail
+      # to start with "required a single bean, but 2 were found" regardless of which
+      # provider spring.ai.model.embedding names.
       embedding: ${SPRING_AI_MODEL_EMBEDDING:ollama}
+      embedding.text: ${SPRING_AI_MODEL_EMBEDDING:ollama}
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       chat:
@@ -33,7 +44,22 @@ spring:
           # project-id/location and the app fails to start with
           # "Google GenAI project-id must be set!" (verified against
           # spring-ai-autoconfigure-model-google-genai 2.0.0 bytecode).
-          api-key: ${GOOGLE_AI_API_KEY:}
+          #
+          # The "unset-see-application-yml" default below (not simply empty, unlike the
+          # chat api-key above) works around a real gap in Spring AI 2.0.0: the embedding
+          # connection-details bean (GoogleGenAiEmbeddingConnectionAutoConfiguration) has
+          # NO @ConditionalOnProperty at all -- only @ConditionalOnClass -- unlike the chat
+          # side, where spring.ai.model.chat=google-genai gates the whole autoconfiguration
+          # class. So once spring-ai-starter-model-google-genai-embedding is on the
+          # classpath (needed just to make Gemini embeddings exist -- see pom.xml), this
+          # bean is created eagerly at every startup, Ollama-only runs included, and its
+          # factory method unconditionally Assert.hasText-validates api-key/project-id
+          # regardless of spring.ai.model.embedding.text. A non-blank placeholder here
+          # satisfies that check for the default local (Ollama) path; it is never sent
+          # anywhere unless SPRING_AI_MODEL_EMBEDDING=google-genai is also set, at which
+          # point a real GOOGLE_AI_API_KEY is required (documented in .env.example) and
+          # this placeholder is overridden by it.
+          api-key: ${GOOGLE_AI_API_KEY:unset-see-application-yml}
           # project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
           # location: ${GOOGLE_CLOUD_LOCATION:us-central1}
           text:
@@ -75,3 +101,22 @@ management:
     web:
       exposure:
         include: health,metrics,prometheus
+
+# Reference catalog only -- bound by ModelCatalogProperties, not yet read by any bean.
+# spring.ai.google.genai.chat.model above is the one Gemini model Spring AI actually
+# instantiates a ChatModel for today (M0's single active model); the three tiers below
+# are the full set M4 (model routing/cascading) will choose between once it exists, and
+# the reranker entries are M2's two candidate backends. See thesis chapter 4 (System
+# Implementation / Optimization Pipeline) for where these come from.
+rag:
+  models:
+    google-genai:
+      flash-lite: gemini-3.5-flash-lite
+      flash: gemini-3.6-flash
+      pro: gemini-3.1-pro-preview
+    reranker:
+      vertex-default: semantic-ranker-default-004
+      vertex-fast: semantic-ranker-fast-004
+      local-fallback-options:
+        - deberta-v3-large
+        - jina-reranker-v2
