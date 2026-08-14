@@ -2,12 +2,10 @@ package com.dippa.ragbenchmark.api;
 
 import com.dippa.ragbenchmark.application.RagQueryResult;
 import com.dippa.ragbenchmark.application.RagQueryService;
-import com.dippa.ragbenchmark.domain.InvalidModuleException;
 import com.dippa.ragbenchmark.domain.ModuleId;
 import jakarta.validation.Valid;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -52,15 +50,7 @@ public class QueryController {
                 .filter(Objects::nonNull)
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
-                .map(this::toModuleId)
+                .map(ModuleId::parse)
                 .collect(Collectors.toCollection(() -> EnumSet.noneOf(ModuleId.class)));
-    }
-
-    private ModuleId toModuleId(String value) {
-        try {
-            return ModuleId.valueOf(value.toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ex) {
-            throw new InvalidModuleException(value, ex);
-        }
     }
 }

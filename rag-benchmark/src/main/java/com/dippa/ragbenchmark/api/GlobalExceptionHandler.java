@@ -2,6 +2,7 @@ package com.dippa.ragbenchmark.api;
 
 import com.dippa.ragbenchmark.domain.ChunkPersistenceException;
 import com.dippa.ragbenchmark.domain.InvalidModuleException;
+import com.dippa.ragbenchmark.domain.ModuleId;
 import com.dippa.ragbenchmark.domain.ModuleNotImplementedException;
 import java.util.List;
 import java.util.Map;
@@ -19,10 +20,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ModuleNotImplementedException.class)
     public ResponseEntity<ModuleNotImplementedResponse> handleModuleNotImplemented(
             ModuleNotImplementedException exception) {
-        List<String> modules = exception.getModules().stream()
-                .map(Enum::name)
-                .sorted()
-                .toList();
+        List<String> modules = ModuleId.sortedNames(exception.getModules());
         ModuleNotImplementedResponse body = new ModuleNotImplementedResponse(
                 "module_not_implemented",
                 modules,
