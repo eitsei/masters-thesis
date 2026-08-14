@@ -24,10 +24,8 @@ public class DocumentController {
     }
 
     @PostMapping
-    public ResponseEntity<IngestDocumentResponse> ingest(@Valid @RequestBody IngestDocumentRequest request) {
+    public ResponseEntity<IngestionResult> ingest(@Valid @RequestBody IngestDocumentRequest request) {
         IngestionResult result = documentIngestionService.ingest(request.text(), request.metadata());
-        IngestDocumentResponse response = new IngestDocumentResponse(
-                result.documentId(), result.chunkCount(), result.chunkIds());
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 }

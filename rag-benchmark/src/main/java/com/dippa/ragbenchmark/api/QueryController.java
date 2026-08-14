@@ -2,7 +2,6 @@ package com.dippa.ragbenchmark.api;
 
 import com.dippa.ragbenchmark.application.RagQueryResult;
 import com.dippa.ragbenchmark.application.RagQueryService;
-import com.dippa.ragbenchmark.application.RetrievedChunk;
 import com.dippa.ragbenchmark.domain.ModuleId;
 import jakarta.validation.Valid;
 import java.util.EnumSet;
@@ -35,19 +34,13 @@ public class QueryController {
         Set<ModuleId> modules = parseModules(request.modules());
         RagQueryResult result = ragQueryService.query(request.query(), modules);
 
-        List<RetrievedChunkDto> chunks = result.retrievedChunks().stream()
-                .map(this::toDto)
-                .toList();
         List<String> modulesApplied = result.modulesApplied().stream()
                 .map(Enum::name)
                 .toList();
         TimingsDto timings = new TimingsDto(result.retrievalMs(), result.generationMs());
 
-        return ResponseEntity.ok(new QueryResponse(result.answer(), modulesApplied, chunks, timings));
-    }
-
-    private RetrievedChunkDto toDto(RetrievedChunk chunk) {
-        return new RetrievedChunkDto(chunk.id(), chunk.snippet());
+        return ResponseEntity.ok(
+                new QueryResponse(result.answer(), modulesApplied, result.retrievedChunks(), timings));
     }
 
     private Set<ModuleId> parseModules(List<String> rawModules) {

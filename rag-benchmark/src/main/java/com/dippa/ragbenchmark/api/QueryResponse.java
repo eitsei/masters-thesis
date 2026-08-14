@@ -1,5 +1,6 @@
 package com.dippa.ragbenchmark.api;
 
+import com.dippa.ragbenchmark.application.RetrievedChunk;
 import java.util.List;
 
 /**
@@ -8,6 +9,6 @@ import java.util.List;
 public record QueryResponse(
         String answer,
         List<String> modulesApplied,
-        List<RetrievedChunkDto> retrievedChunks,
+        List<RetrievedChunk> retrievedChunks,
         TimingsDto timingsMs) {
 }
