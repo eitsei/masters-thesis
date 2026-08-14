@@ -76,6 +76,68 @@ curl -X POST http://localhost:8080/api/query \
   -d '{"query": "What is the capital of France?", "modules": ["M2"]}'
 ```
 
+### Retrieved-chunk snippet length and top-K
+
+Each entry in `POST /api/query`'s `retrievedChunks` array has a `snippet` field — a preview of
+that chunk's text, controlled by `rag.query.snippet-length-chars` in `application.yml`. It
+defaults to `2147483647` (`Integer.MAX_VALUE`), i.e. no truncation: the full chunk text is shown.
+This is display-only — retrieval and generation always use the complete chunk regardless of this
+setting. To get short previews back instead (e.g. for more compact terminal/Postman output),
+lower it:
+
+```yaml
+rag:
+  query:
+    snippet-length-chars: 200
+```
+
+`rag.query.top-k` (default `5`) controls how many chunks are retrieved from `vector_store_test`
+per query. Since the M0 baseline's `Reranker` is a no-op, this is also how many chunks reach the
+prompt and how many entries `retrievedChunks` has:
+
+```yaml
+rag:
+  query:
+    top-k: 10
+```
+
+## Local test data: Nordea site ingestion
+
+For local development you need something realistic in `vector_store_test` to query against.
+`com.dippa.ragbenchmark.ingest.nordea` is a one-off admin tool that crawls
+[nordea.fi/private-banking](https://www.nordea.fi/private-banking/) (bounded to that path prefix,
+same host), extracts text from any linked PDFs, chunks everything with the same 512-token
+splitter `DocumentIngestionService` uses for the M0 baseline, and writes the chunks into
+`vector_store_test`.
+
+It's disabled by default, so a normal `mvn spring-boot:run` never triggers a live crawl. Run it
+explicitly with:
+
+```
+mvn spring-boot:run -Dspring-boot.run.arguments=--ingest.nordea.enabled=true
+```
+
+The app starts normally, runs the crawl/ingest once on startup, logs a summary (pages crawled,
+PDFs extracted, chunks written), and then keeps running as usual — stop it with Ctrl-C once the
+summary line appears if you don't need the rest of the app up.
+
+Notes:
+
+- **Data persists across restarts already** — `vector_store_test` lives in the `postgres`
+  service's named Docker volume (`rag-benchmark-pgdata` in `docker-compose.yml`), which survives
+  `mvn spring-boot:run` being stopped/restarted. It's only gone if you explicitly run
+  `docker compose down -v` or delete the volume.
+- **Safe to re-run.** Each chunk's id is deterministic (derived from its source URL + chunk
+  index), so re-running this tool overwrites the same rows instead of duplicating them.
+- **Only extracted plain text ever touches disk.** Each page/PDF's cleaned text is staged in a
+  temp file under the OS temp dir before chunking; raw HTML/PDF bytes are never written to disk,
+  and the whole staging directory is deleted once ingestion finishes (success or failure).
+- Crawl scope, page/PDF caps, request delay, and the crawler's `User-Agent` string are all
+  configurable under `ingest.nordea.*` in `application.yml`.
+- Nordea's exact page DOM wasn't available to hand-verify ahead of time, so the nav/footer/
+  cookie-banner stripping in `NordeaCrawler` is a best-effort heuristic — spot-check a few
+  ingested chunks after a run and tune the CSS selectors there if you see leftover site chrome.
+
 ## Switching to the cloud (Gemini) path
 
 By default, both chat and embeddings run against local Ollama. To use Google Gemini

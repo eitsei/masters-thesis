@@ -1,12 +1,13 @@
 package com.dippa.ragbenchmark;
 
 import com.dippa.ragbenchmark.infrastructure.config.ModelCatalogProperties;
+import com.dippa.ragbenchmark.ingest.nordea.NordeaIngestionProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @SpringBootApplication
-@EnableConfigurationProperties(ModelCatalogProperties.class)
+@EnableConfigurationProperties({ModelCatalogProperties.class, NordeaIngestionProperties.class})
 public class RagBenchmarkApplication {
 
     public static void main(String[] args) {

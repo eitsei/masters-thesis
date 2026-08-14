@@ -19,7 +19,7 @@ spring:
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       chat:
-        model: ${OLLAMA_CHAT_MODEL:gemma4:e2b}
+        model: ${OLLAMA_CHAT_MODEL:gemma4:12b}
       embedding:
         model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
     google:
@@ -81,6 +81,9 @@ spring:
             dimensions: 768
     vectorstore:
       pgvector:
+        # Local-dev/testing table, kept distinct so later datasets (synthetic, MuSiQue)
+        # can each get their own table without colliding with this one.
+        table-name: vector_store_test
         index-type: HNSW
         distance-type: COSINE_DISTANCE
         dimensions: 768
@@ -99,6 +102,20 @@ spring:
 #    username: ragbenchmark
 #    password: ragbenchmark
 
+# One-off local test-data ingestion tool (com.dippa.ragbenchmark.ingest.nordea): crawls
+# nordea.fi/private-banking and writes chunked pages/PDFs into the vector_store_test table
+# above. Disabled by default so a normal `mvn spring-boot:run` never triggers a live crawl --
+# see README for how to run it explicitly.
+ingest:
+  nordea:
+    enabled: false
+    base-url: https://www.nordea.fi/private-banking/
+    max-pages: 150
+    max-pdfs: 50
+    max-pdf-size-bytes: 20000000
+    request-delay-millis: 400
+    user-agent: "RagBenchmarkThesisCrawler/1.0 (+mailto:aj.asunmaa@gmail.com; academic research, single crawl run)"
+
 management:
   endpoints:
     web:
@@ -113,6 +130,22 @@ management:
 # entries are M2's two candidate backends. See thesis chapter 4 (System Implementation
 # / Optimization Pipeline) for where these come from.
 rag:
+  query:
+    # Length (in characters) of the `snippet` field on each retrievedChunks entry in
+    # POST /api/query's response -- read directly by RagQueryService via @Value, not a
+    # ConfigurationProperties class (it's a single scalar, not a group). This is a display
+    # truncation only: retrieval and generation always use the full chunk text regardless of
+    # this value (see RagQueryService#buildPrompt). Chunk size is measured in *tokens* (512,
+    # see DocumentIngestionService), which doesn't map to a fixed character count, so
+    # Integer.MAX_VALUE is used here to mean "never truncate, always show the whole chunk"
+    # rather than guessing a character number that happens to be big enough. Lower this (e.g.
+    # to 200) to get short previews back instead.
+    snippet-length-chars: 2147483647
+    # Number of chunks retrieved from vector_store_test per query, before reranking (the M0
+    # baseline's Reranker is a no-op, so this is also how many chunks end up in the prompt and
+    # in retrievedChunks). Read directly by RagQueryService via @Value, same as
+    # snippet-length-chars above.
+    top-k: 5
   models:
     google-genai:
       flash-lite: gemini-3.5-flash-lite

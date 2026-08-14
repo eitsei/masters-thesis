@@ -58,7 +58,7 @@ class RagQueryServiceTest {
         // No Spring context in these tests, so @Value can't inject the prompt resource -- load it
         // the same way Spring would resolve "classpath:prompts/answer-generation.st", via a plain
         // ClassPathResource (src/main/resources is on the test classpath by default in Maven).
-        ragQueryService = new RagQueryService(vectorStore, chatModel, reranker, meterRegistry,
+        ragQueryService = new RagQueryService(vectorStore, chatModel, reranker, meterRegistry, Integer.MAX_VALUE, 5,
                 new ClassPathResource("prompts/answer-generation.st"));
     }
 

@@ -30,13 +30,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class RagQueryService {
 
-    private static final int TOP_K = 5;
-    private static final int SNIPPET_LENGTH = 200;
-
     private final VectorStore vectorStore;
     private final ChatModel chatModel;
     private final Reranker reranker;
     private final MeterRegistry meterRegistry;
+    private final int snippetLengthChars;
+    private final int topK;
     // A Spring AI PromptTemplate loaded from its own file (src/main/resources/prompts) rather
     // than hand-rolled String.formatted() or an inline literal: M1-M4 will need to vary this
     // shape later (e.g. M3 cache markers, M1 expanded-window context), and keeping the prompt
@@ -46,11 +45,15 @@ public class RagQueryService {
 
     public RagQueryService(VectorStore vectorStore, ChatModel chatModel, Reranker reranker,
             MeterRegistry meterRegistry,
+            @Value("${rag.query.snippet-length-chars}") int snippetLengthChars,
+            @Value("${rag.query.top-k}") int topK,
             @Value("classpath:prompts/answer-generation.st") Resource answerPromptResource) {
         this.vectorStore = vectorStore;
         this.chatModel = chatModel;
         this.reranker = reranker;
         this.meterRegistry = meterRegistry;
+        this.snippetLengthChars = snippetLengthChars;
+        this.topK = topK;
         this.answerPromptTemplate = new PromptTemplate(answerPromptResource);
     }
 
@@ -62,7 +65,7 @@ public class RagQueryService {
 
         Timer.Sample retrievalSample = Timer.start(meterRegistry);
         List<Document> retrieved = vectorStore.similaritySearch(
-                SearchRequest.builder().query(query).topK(TOP_K).build());
+                SearchRequest.builder().query(query).topK(topK).build());
         long retrievalNanos = retrievalSample.stop(meterRegistry.timer("rag.pipeline.retrieval"));
 
         List<Document> reranked = reranker.rerank(query, retrieved);
@@ -94,6 +97,6 @@ public class RagQueryService {
         if (text == null) {
             return "";
         }
-        return text.length() <= SNIPPET_LENGTH ? text : text.substring(0, SNIPPET_LENGTH) + "...";
+        return text.length() <= snippetLengthChars ? text : text.substring(0, snippetLengthChars) + "...";
     }
 }

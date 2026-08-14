@@ -1,1 +1,6 @@
 token.txt
+.env
+*.env
+target/
+.idea/
+*.iml

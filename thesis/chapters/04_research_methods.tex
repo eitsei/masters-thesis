@@ -7,25 +7,54 @@ This chapter establishes the experimental framework and software architecture us
 % - Experimental quantitative benchmarking approach.
 % - Addressing RQ1 (Latency/TTFT), RQ2 (Cost $), RQ3 (Quality/RAGAS), RQ4 (Pareto Equilibrium).
 % - Multi-iteration execution (5 iterations per configuration) to mitigate network jitter and cold-start bias.
+% - TWO-STAGE EXPERIMENTAL STRATEGY:
+%   1. Single-Factor Isolated Testing: Test each optimization module (M1, M2, M3, M4) separately against M0 Baseline to quantify individual impact.
+%   2. Combinatorial Stacking & Interaction Analysis: Evaluate pairwise and multi-module combinations up to full stack (M1+M2+M3+M4) to identify Pareto frontier and systemic trade-offs (RQ4).
+% - TODO: Add Factorial / Experimental Design Matrix Table here (e.g., C0: Baseline, C1: M1, C2: M2, ..., C15: M1+M2+M3+M4 full stack).
 
 \subsection{System Implementation}
 \label{subsec:sys_implementation}
 
-% DRAFT NOTES:
-% - SUT Stack: Java 21, Spring Boot 3.x, Spring AI (spring-ai-bom).
-% - Database: PostgreSQL with pgvector extension (local Docker runner / Cloud SQL deployment path).
-% - Infrastructure & APIs: GCP Vertex AI (Gemini 2.5/3 Flash & Pro, text-embedding-004), Cross-Encoder Reranker.
-% - Instrumentation: Spring Boot Actuator with Micrometer export for latency and token tracking.
+% DRAFT NOTES - LOCKED SYSTEM IMPLEMENTATION DECISIONS:
+%
+% TODO: Add Visual System Architecture Diagram (figure illustrating Spring AI orchestrator, pgvector vector store, GCP Vertex Ranking API, GCP Context Cache, and 3 Gemini model tiers).
+%
+% 1. SOFTWARE STACK & VERSION BASELINE:
+%    - Java Baseline: Java 21 LTS.
+%    - Framework: Spring Boot 4.0 + Spring AI 2.0.0 (spring-ai-starter-model-google-genai).
+%    - Database Engine: PostgreSQL 16 + pgvector extension (v0.8.x).
+%    - Instrumentation: Spring Boot Actuator with Micrometer export for microsecond TTFT, end-to-end latency, and token accounting (RQ1 & RQ2).
+%
+% 2. CLOUD INFRASTRUCTURE & API GATEWAY (3 GEMINI MODEL TIERS):
+%    - Infrastructure: GCP Vertex AI enterprise gateway (aiplatform.googleapis.com in us-central1 via IAM/ADC), with Google AI Studio API key fallback (generativelanguage.googleapis.com) for local testing.
+%    - Generative Model Tiers (Module M4 Model Cascading):
+%      1. gemini-3.5-flash-lite : Ultra-fast / low-cost tier for query routing & low-complexity single-hop tasks.
+%      2. gemini-3.6-flash      : Primary workhorse for medium-complexity generation, coding, and fast context synthesis.
+%      3. gemini-3.1-pro        : Flagship reasoning model for complex multi-hop synthesis (3-hop / 4-hop queries) and fallback.
+%
+% 3. NATIVE EMBEDDINGS ARCHITECTURE:
+%    - Primary Model: GCP Native gemini-embedding-001 (2,048 token window).
+%    - Dimensionality Optimization: Matryoshka Representation Learning (MRL) configured to output 768 dimensions (via output_dimensionality=768) to minimize storage overhead and vector search latency without accuracy loss.
+%
+% 4. TWO-STAGE RE-RANKING ARCHITECTURE:
+%    - Production Standard: GCP Vertex AI Ranking API (Semantic Ranker: semantic-ranker-default-004 & semantic-ranker-fast-004).
+%    - Local Development Option: Optional local fallback using TEI-hosted open cross-encoders (e.g. deberta-v3-large / jina-reranker-v2) for offline testing without cloud credentials.
+%    - Workflow: Stateless cross-encoder joint self-attention re-sorting top-200 candidate passages retrieved by first-stage vector search.
+%
+% 5. DATABASE DEPLOYMENT & LOCAL-TO-CLOUD PORTABILITY:
+%    - Local Development: PostgreSQL 16 + pgvector running in Docker container.
+%    - GCP Cloud Production: Cloud SQL for PostgreSQL 16 with pgvector extension.
+%    - Portability & Migration: 100% feature and SQL operator parity (<=> Cosine distance, HNSW indexing). Data migration via standard pg_dump -Fc locally and pg_restore to Cloud SQL.
 
 \subsection{Optimization Pipeline}
 \label{subsec:opt_pipeline}
 
 % DRAFT NOTES:
-% - Baseline (M0): Naive flat RAG (fixed 512-token chunks, bi-encoder top-5, no caching).
-% - Module 1 (M1): Small-to-Big Retrieval (128-token child chunks expanding to 512-1024 parent windows).
-% - Module 2 (M2): Two-Stage Semantic Re-ranking (Bi-encoder top-30 candidates pruned to top-5 via Cross-Encoder).
-% - Module 3 (M3): Prompt Caching (GCP Context Caching / KV-cache reuse for static prompts & context).
-% - Module 4 (M4): Model Cascading & Complexity Routing (Intent/complexity classifier routing between Gemini Flash and Pro).
+% - Baseline (M0): Naive flat RAG (fixed 512-token chunks with 50-token overlap, bi-encoder top-5, no caching) \cite{wang2024searching, smigielski2026chunking, lewis2020rag, karpukhin2020dense}.
+% - Module 1 (M1): Small-to-Big Retrieval (128-256 token child chunks expanding to 512-1024 parent windows via native Java metadata mapping in Spring AI) \cite{demourajunior2026adaptive, li2026bridgerag, chen2026logicrag}.
+% - Module 2 (M2): Two-Stage Semantic Re-ranking (GCP Vertex AI Ranking API in production; TEI-hosted deberta-v3-large / jina-reranker-v2 microservice for local dev) \cite{moreira2024enhancing, cheng2026enhancing, yu2024rankrag, wang2025infogain}.
+% - Module 3 (M3): Prompt Caching (Dual-tier: GCP Gemini Context Caching for static system context >10k/32k tokens + dynamic KV prefix reuse) \cite{gim2024promptcache, jin2025ragcache, lu2025turborag, yao2025cacheblend, wang2026fusionrag}.
+% - Module 4 (M4): Hybrid Model Routing & Fallback Cascading (Native Spring AI ONNX/intent classifier routing 2-hop to Gemini Flash & 3/4-hop to Gemini Pro, with confidence fallback) \cite{chen2023frugalgpt, ong2025routellm, zhang2025ragrouter, jeong2024adaptiverag, guo2026deepsieve, park2025stoprag}.
 % - Extension: Thinking Effort Routing / Reasoning Budget Control (e.g. arXiv:2603.07915, OpenReview:W34UyCRQel).
 
 \subsection{Benchmark Datasets}
@@ -41,7 +70,27 @@ This chapter establishes the experimental framework and software architecture us
 \subsection{Evaluation Setup \& Metrics}
 \label{subsec:eval_metrics}
 
-% DRAFT NOTES:
-% - RQ1 & RQ2 Efficiency Metrics: Time to First Token (TTFT in ms), End-to-End Latency (ms), GCP Token Cost Model ($).
-% - RQ3 Quality Metrics: Offline RAGAS framework (Context Precision, Context Recall, Faithfulness, Answer Relevance).
-% - RQ4 Equilibrium Modeling: Multi-objective Pareto frontier scoring balancing quality against latency and financial expenditure.
+% DRAFT NOTES - LOCKED EVALUATION & MEASUREMENT DECISIONS:
+%
+% 1. EFFICIENCY & LATENCY INSTRUMENTATION (RQ1):
+%    - Metrics: Time to First Token (TTFT in ms), End-to-End Latency (ms), and micro-phase breakdown (Vector Retrieval, Vertex Re-ranking, Prompt Caching lookup, LLM TTFT, Stream Completion).
+%    - Measurement Protocol: Spring Boot Actuator + Micrometer Timers. 5 iterations per query configuration (1 warm-up run discarded to eliminate JVM JIT / TLS cold-start bias; 4 recorded runs).
+%    - Reporting: Report both Median (P50) and P95 tail latency for enterprise SLA analysis.
+%
+% 2. EXACT OPERATIONAL COST ACCOUNTING (RQ2):
+%    - Execution Cost Formula: Cost ($) = (N_uncached * P_prompt) + (N_cached * P_cached) + (N_completion * P_completion) + (N_rerank_calls * P_rerank).
+%    - Pricing Baseline: GCP Vertex AI official pricing tiers for gemini-3.5-flash-lite, gemini-3.6-flash, gemini-3.1-pro, Vertex Ranking API (semantic-ranker), and GCP Context Caching (75% discount on cached input tokens). Excludes fixed database storage.
+%    - TODO: Write out formal LaTeX equation environment for Cost ($) during prose writing.
+%
+% 3. QUALITY METRICS & LLM-AS-A-JUDGE SETUP (RQ3):
+%    - Framework: Offline Python RAGAS evaluation suite (Es et al., 2024).
+%    - Quality Triad: Context Precision (retrieval signal-to-noise ratio), Context Recall (ground-truth coverage), Faithfulness (hallucination check against retrieved context), and Answer Relevance (semantic alignment with user query).
+%    - Primary Judge Configuration: gemini-3.1-pro at T=0.0 as primary evaluation judge.
+%    - THREATS TO VALIDITY & JUDGE FLEXIBILITY NOTE: Address potential LLM self-preference bias (vendor affinity). Explicitly state that judge model can be cross-validated or substituted with alternative judge LLMs (e.g. GPT-4o, Claude 3.5 Sonnet, or open-weights evaluation judges) for robustness verification.
+%
+% 4. TRADE-OFF EQUILIBRIUM RATIOS (RQ4):
+%    - Trade-off Indicators: Practical Efficiency Ratios quantifying optimization ROI:
+%      a) Quality per Dollar (QPD = RAGAS Composite Score / Total Request Cost in $)
+%      b) Quality per Second (QPS = RAGAS Composite Score / End-to-End Latency in seconds)
+%    - Literature Sources for Math Equations: RAGAS (Es et al., 2024; Wang et al., 2024), FrugalGPT cost/routing (Chen et al., 2023), FlashRAG benchmarking (Jin et al., 2025), FusionRAG prompt caching (Wang et al., 2026).
+%    - TODO: Formulate formal LaTeX equation environments for QPD and QPS during prose writing.
