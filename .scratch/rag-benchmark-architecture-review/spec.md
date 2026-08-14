@@ -12,7 +12,7 @@ seam, adapter, leverage, locality — see `/codebase-design`.
 1. `issues/01-config-catalog-duplication.md` — **Strong** — RESOLVED (commit `b594a76`)
 2. `issues/02-shallow-dto-pass-through.md` — Worth exploring — RESOLVED
 3. `issues/03-untested-api-seam.md` — Worth exploring — RESOLVED
-4. `issues/04-ingestion-partial-failure-handler.md` — Worth exploring
+4. `issues/04-ingestion-partial-failure-handler.md` — Worth exploring — RESOLVED
 5. `issues/05-moduleid-scattered-conversion.md` — Worth exploring
 6. `issues/06-speculative-ports-and-timer-duplication.md` — Speculative
 
@@ -23,8 +23,10 @@ already live today rather than speculative, invisible drift risk. Done.
 
 ## Next in line
 
-Candidate 4 (ingestion partial-failure handler) is next up per the original ranking,
-unless redirected.
+Candidate 5 (ModuleId scattered conversion) is next up per the original ranking,
+unless redirected. Note: candidate 3's `InvalidModuleException` (thrown from
+`QueryController.toModuleId`) overlaps with candidate 5's plan to add a
+`ModuleId.parse()` static method — reconcile when picking this up.
 
 ## Not yet a tracked candidate
 
