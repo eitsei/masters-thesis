@@ -1,5 +1,6 @@
 package com.dippa.ragbenchmark.api;
 
+import com.dippa.ragbenchmark.domain.InvalidModuleException;
 import com.dippa.ragbenchmark.domain.ModuleNotImplementedException;
 import java.util.List;
 import java.util.Map;
@@ -28,8 +29,8 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(body);
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException exception) {
+    @ExceptionHandler(InvalidModuleException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidModule(InvalidModuleException exception) {
         return ResponseEntity.badRequest()
                 .body(Map.of("error", "bad_request", "message", exception.getMessage()));
     }

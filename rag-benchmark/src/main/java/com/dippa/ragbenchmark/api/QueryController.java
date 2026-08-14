@@ -2,6 +2,7 @@ package com.dippa.ragbenchmark.api;
 
 import com.dippa.ragbenchmark.application.RagQueryResult;
 import com.dippa.ragbenchmark.application.RagQueryService;
+import com.dippa.ragbenchmark.domain.InvalidModuleException;
 import com.dippa.ragbenchmark.domain.ModuleId;
 import jakarta.validation.Valid;
 import java.util.EnumSet;
@@ -59,7 +60,7 @@ public class QueryController {
         try {
             return ModuleId.valueOf(value.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Unknown module: " + value, ex);
+            throw new InvalidModuleException(value, ex);
         }
     }
 }
