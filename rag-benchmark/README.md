@@ -148,11 +148,14 @@ need different shapes (e.g. M3 cache markers, M1 expanded-window context).
 
 `ModelCatalogProperties` (`infrastructure/config`) binds `rag.models.*` in
 `application.yml` — the three Gemini tiers from the thesis's M4 design (flash-lite /
-flash / pro) and M2's two candidate re-ranking backends. This is a reference catalog
-only: nothing consumes it yet, since M2 and M4 are unimplemented (see table above).
-`spring.ai.google.genai.chat.model` (also in `application.yml`) is the one model
-Spring AI actually instantiates a bean for today — the single tier M0 uses regardless
-of which module tiers exist in the catalog.
+flash / pro) and M2's two candidate re-ranking backends. The typed record itself isn't
+consumed by any bean yet, since M2 and M4 are unimplemented (see table above), but the
+catalog's `flash` entry is the source of truth for `spring.ai.google.genai.chat.model`
+— the one model Spring AI actually instantiates a bean for today — via a nested
+`${GOOGLE_GENAI_CHAT_MODEL:${rag.models.google-genai.flash}}` placeholder in
+`application.yml`. `flash` doubles as M0's base model and the tier M4 will treat as its
+medium-complexity/fallback tier once routing exists; `GOOGLE_GENAI_CHAT_MODEL` still
+overrides it independently for ad hoc local runs.
 
 This keeps the thing being benchmarked — the pipeline and its optimization seams — as
 plain, framework-light domain/application code that can be tested and reasoned about

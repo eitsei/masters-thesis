@@ -9,7 +9,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * <p>Not yet consumed by any bean: M2 (re-ranking) and M4 (model routing/cascading) are
  * unimplemented in v1 (see TODO.md). This exists so those modules, once built, have a single
- * typed place to read model ids from instead of hardcoding strings at that point.</p>
+ * typed place to read model ids from instead of hardcoding strings at that point. The raw
+ * {@code flash} value is already the source of truth for
+ * {@code spring.ai.google.genai.chat.model}'s default via a YAML placeholder (see
+ * application.yml) -- that link is at the property level, not through this record.</p>
  */
 @ConfigurationProperties(prefix = "rag.models")
 public record ModelCatalogProperties(GoogleGenAiTiers googleGenai, Reranker reranker) {
