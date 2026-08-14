@@ -1,4 +1,4 @@
-Status: open
+Status: resolved
 Recommendation strength: Worth exploring
 
 # Shallow pass-through DTOs duplicate application-layer records field-for-field
@@ -30,3 +30,14 @@ document why api/application stay decoupled if that's intentional going forward.
 Locality (one fewer file per concept to keep in sync), leverage (deletes an
 indirection layer with no capability), removes two currently-untested mapping methods
 from the surface entirely (see issue 03).
+
+## Resolution
+Deleted `IngestDocumentResponse.java` and `RetrievedChunkDto.java`.
+`DocumentController.ingest` now returns `ResponseEntity<IngestionResult>` directly.
+`QueryController` no longer has a `toDto` method; `QueryResponse.retrievedChunks` is
+now typed `List<RetrievedChunk>`. Confirmed live (real Ollama chat + embedding calls,
+not just compiled): JSON field names are unchanged for both endpoints — ingest still
+returns `{"documentId","chunkCount","chunkIds"}`, query still returns
+`retrievedChunks: [{"id","snippet"}, ...]` — so this is invisible to any API caller.
+`IngestionResult`/`RetrievedChunk` javadoc updated to note they double as response
+bodies now.

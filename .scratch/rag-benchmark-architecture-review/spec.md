@@ -10,7 +10,7 @@ seam, adapter, leverage, locality — see `/codebase-design`.
 ## Candidates, strongest first
 
 1. `issues/01-config-catalog-duplication.md` — **Strong** — RESOLVED (commit `b594a76`)
-2. `issues/02-shallow-dto-pass-through.md` — Worth exploring
+2. `issues/02-shallow-dto-pass-through.md` — Worth exploring — RESOLVED
 3. `issues/03-untested-api-seam.md` — Worth exploring
 4. `issues/04-ingestion-partial-failure-handler.md` — Worth exploring
 5. `issues/05-moduleid-scattered-conversion.md` — Worth exploring
@@ -23,5 +23,5 @@ already live today rather than speculative, invisible drift risk. Done.
 
 ## Next in line
 
-Candidate 2 (shallow pass-through DTOs) is next up per the original ranking, unless
-redirected.
+Candidate 3 (untested API seam / overly broad exception handler) is next up per the
+original ranking, unless redirected.
