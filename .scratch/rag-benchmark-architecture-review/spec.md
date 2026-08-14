@@ -11,7 +11,7 @@ seam, adapter, leverage, locality — see `/codebase-design`.
 
 1. `issues/01-config-catalog-duplication.md` — **Strong** — RESOLVED (commit `b594a76`)
 2. `issues/02-shallow-dto-pass-through.md` — Worth exploring — RESOLVED
-3. `issues/03-untested-api-seam.md` — Worth exploring
+3. `issues/03-untested-api-seam.md` — Worth exploring — RESOLVED
 4. `issues/04-ingestion-partial-failure-handler.md` — Worth exploring
 5. `issues/05-moduleid-scattered-conversion.md` — Worth exploring
 6. `issues/06-speculative-ports-and-timer-duplication.md` — Speculative
@@ -23,5 +23,12 @@ already live today rather than speculative, invisible drift risk. Done.
 
 ## Next in line
 
-Candidate 3 (untested API seam / overly broad exception handler) is next up per the
-original ranking, unless redirected.
+Candidate 4 (ingestion partial-failure handler) is next up per the original ranking,
+unless redirected.
+
+## Not yet a tracked candidate
+
+Error-response shape inconsistency (validation failures / malformed JSON return a
+different JSON shape than domain errors) — discovered while resolving candidate 3,
+explicitly scoped out as its own separate concern. See "Explicitly deferred" in
+`issues/03-untested-api-seam.md` if this comes up again.
