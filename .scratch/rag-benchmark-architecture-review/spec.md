@@ -21,11 +21,13 @@ seam, adapter, leverage, locality — see `/codebase-design`.
 Candidate 1 (config catalog vs. live model config duplication) — smallest fix,
 already live today rather than speculative, invisible drift risk. Done.
 
-## Next in line
+## Status
 
-Candidate 6 (speculative ports + timer duplication) is next up per the original
-ranking, unless redirected. It's marked Speculative, so worth confirming with the
-user whether it's worth pursuing at all before grilling it.
+Review wrapped up at 5/6 resolved (2026-08-14). Candidate 6 (speculative ports + timer
+duplication) stays open/untouched — user confirmed it's not worth pursuing right now
+given its Speculative rating. Revisit if a second real adapter/timer use case shows up
+that would make the speculative seam concrete (see "one adapter = hypothetical seam,
+two = real" in `/codebase-design`).
 
 ## Not yet a tracked candidate
 
