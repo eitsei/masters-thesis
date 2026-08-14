@@ -1,8 +1,12 @@
 package com.dippa.ragbenchmark.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
+import com.dippa.ragbenchmark.domain.ChunkPersistenceException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,5 +71,19 @@ class DocumentIngestionServiceTest {
         assertThat(storedChunks).isNotEmpty();
         assertThat(storedChunks.get(0).getMetadata()).containsEntry("documentId", result.documentId());
         assertThat(result.documentId()).isNotBlank();
+    }
+
+    @Test
+    void ingest_whenVectorStoreAddFails_throwsChunkPersistenceExceptionWithDocumentAndChunkIds() {
+        doThrow(new RuntimeException("connection refused")).when(vectorStore).add(anyList());
+
+        assertThatThrownBy(() -> documentIngestionService.ingest("Some text to chunk and store.", null))
+                .isInstanceOf(ChunkPersistenceException.class)
+                .satisfies(ex -> {
+                    ChunkPersistenceException cpe = (ChunkPersistenceException) ex;
+                    assertThat(cpe.getDocumentId()).isNotBlank();
+                    assertThat(cpe.getChunkIds()).isNotEmpty();
+                    assertThat(cpe.getCause()).hasMessage("connection refused");
+                });
     }
 }

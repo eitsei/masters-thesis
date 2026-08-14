@@ -1,5 +1,6 @@
 package com.dippa.ragbenchmark.application;
 
+import com.dippa.ragbenchmark.domain.ChunkPersistenceException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,11 +62,7 @@ public class DocumentIngestionService {
         try {
             vectorStore.add(chunks);
         } catch (RuntimeException ex) {
-            // Chunk ids are generated before insertion, so even on failure we can name exactly
-            // what may have been partially persisted (VectorStore.add gives no partial-failure
-            // reporting of its own) rather than losing the documentId/chunkIds entirely.
-            throw new IllegalStateException("Failed to store chunks for documentId=" + documentId
-                    + "; some of chunkIds=" + chunkIds + " may have been partially persisted", ex);
+            throw new ChunkPersistenceException(documentId, chunkIds, ex);
         }
 
         return new IngestionResult(documentId, chunkIds.size(), chunkIds);

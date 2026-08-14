@@ -1,5 +1,6 @@
 package com.dippa.ragbenchmark.api;
 
+import com.dippa.ragbenchmark.domain.ChunkPersistenceException;
 import com.dippa.ragbenchmark.domain.InvalidModuleException;
 import com.dippa.ragbenchmark.domain.ModuleNotImplementedException;
 import java.util.List;
@@ -33,5 +34,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleInvalidModule(InvalidModuleException exception) {
         return ResponseEntity.badRequest()
                 .body(Map.of("error", "bad_request", "message", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ChunkPersistenceException.class)
+    public ResponseEntity<ChunkPersistenceErrorResponse> handleChunkPersistence(ChunkPersistenceException exception) {
+        ChunkPersistenceErrorResponse body = new ChunkPersistenceErrorResponse(
+                "chunk_persistence_failed",
+                exception.getMessage(),
+                exception.getDocumentId(),
+                exception.getChunkIds());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 }

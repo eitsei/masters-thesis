@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.dippa.ragbenchmark.application.DocumentIngestionService;
 import com.dippa.ragbenchmark.application.IngestionResult;
+import com.dippa.ragbenchmark.domain.ChunkPersistenceException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,22 @@ class DocumentControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.documentId").value("doc-1"))
                 .andExpect(jsonPath("$.chunkCount").value(2))
+                .andExpect(jsonPath("$.chunkIds[0]").value("chunk-1"))
+                .andExpect(jsonPath("$.chunkIds[1]").value("chunk-2"));
+    }
+
+    @Test
+    void ingest_whenChunkPersistenceFails_returns500WithDocumentAndChunkIds() throws Exception {
+        ChunkPersistenceException exception =
+                new ChunkPersistenceException("doc-1", List.of("chunk-1", "chunk-2"), new RuntimeException("boom"));
+        when(documentIngestionService.ingest(anyString(), any())).thenThrow(exception);
+
+        mockMvc.perform(post("/api/documents")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\": \"Paris is the capital of France.\"}"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error").value("chunk_persistence_failed"))
+                .andExpect(jsonPath("$.documentId").value("doc-1"))
                 .andExpect(jsonPath("$.chunkIds[0]").value("chunk-1"))
                 .andExpect(jsonPath("$.chunkIds[1]").value("chunk-2"));
     }
