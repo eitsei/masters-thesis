@@ -13,7 +13,7 @@ seam, adapter, leverage, locality — see `/codebase-design`.
 2. `issues/02-shallow-dto-pass-through.md` — Worth exploring — RESOLVED
 3. `issues/03-untested-api-seam.md` — Worth exploring — RESOLVED
 4. `issues/04-ingestion-partial-failure-handler.md` — Worth exploring — RESOLVED
-5. `issues/05-moduleid-scattered-conversion.md` — Worth exploring
+5. `issues/05-moduleid-scattered-conversion.md` — Worth exploring — RESOLVED
 6. `issues/06-speculative-ports-and-timer-duplication.md` — Speculative
 
 ## Original top recommendation
@@ -23,10 +23,9 @@ already live today rather than speculative, invisible drift risk. Done.
 
 ## Next in line
 
-Candidate 5 (ModuleId scattered conversion) is next up per the original ranking,
-unless redirected. Note: candidate 3's `InvalidModuleException` (thrown from
-`QueryController.toModuleId`) overlaps with candidate 5's plan to add a
-`ModuleId.parse()` static method — reconcile when picking this up.
+Candidate 6 (speculative ports + timer duplication) is next up per the original
+ranking, unless redirected. It's marked Speculative, so worth confirming with the
+user whether it's worth pursuing at all before grilling it.
 
 ## Not yet a tracked candidate
 

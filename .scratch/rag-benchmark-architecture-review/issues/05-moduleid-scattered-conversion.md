@@ -1,4 +1,4 @@
-Status: open
+Status: resolved
 Recommendation strength: Worth exploring
 
 # ModuleId string conversion is implemented outside ModuleId, split across two unrelated files
@@ -26,3 +26,22 @@ values) and `sortedNames(Set<ModuleId>)`. Have `QueryController` and
 Locality (one place owns how module ids are spelled on the wire), testability
 (`ModuleId.parse`/`sortedNames` become directly unit-testable, currently impossible —
 see issue 03).
+
+## Resolution
+Added `ModuleId.parse(String raw)` (case-insensitive, throws `InvalidModuleException`
+— reused directly from issue 03, resolving that overlap) and
+`ModuleId.sortedNames(Set<ModuleId>)` as static methods on the enum itself.
+`QueryController.toModuleId` was deleted entirely in favor of calling `ModuleId::parse`;
+`QueryController.parseModules` keeps its request-shape cleanup (trim/filter blanks) —
+decided to leave that in the controller since it's about HTTP request parsing, not
+something intrinsic to what a `ModuleId` is. `GlobalExceptionHandler`'s inline
+sorted-name stream was replaced with `ModuleId.sortedNames(...)`.
+
+Added `ModuleIdTest` (new, `domain` package) with 4 cases covering case-insensitive
+parsing, the unknown-value error, and `sortedNames` (both populated and empty).
+`mvn test`: 18/18 passing (4 new).
+
+**Verified live:** booted the real app, confirmed `POST /api/query` with
+`modules: ["bogus"]` still returns 400 `Unknown module: bogus`, and
+`modules: ["m2"]` (lowercase) still returns 501 with `modules: ["M2"]` — both
+byte-identical to pre-refactor behavior, now routed through the enum's own methods.
