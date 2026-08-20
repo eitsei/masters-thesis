@@ -3,7 +3,50 @@ This chapter establishes the experimental framework and software architecture us
 \subsection{Research Methodology}
 \label{subsec:res_methodology}
 
-Empirical research is conducted using quantitative benchmarking of each studied method alone and combinations against the baseline solution. The target of this research is to address the potential benefits of addressing the research questions defined in ~\ref{sec:introduction}. Research questions are 
+Empirical research is conducted using quantitative benchmarking in a two-stage experimental strategy. In the first phase, each of the optimization methods is tested against the baseline solution. In the second phase, pairwise and multi-method combinations are tested until the full-stack solution is tested against the baseline to identify the Pareto frontier of the methods and study the potential systemic trade-offs between optimization methods. The combination matrix is presented in Table~\ref{tab:combination_matrix}. The target of this research is to address the potential benefits of addressing the research questions outlined in Table~\ref{tab:research_questions}. 10 iterations per configuration are executed to test statistical significance and to mitigate potential network jitters and cold-start biases, and to make sure that caching is utilized effectively. 
+
+\begin{table}[htbp]
+\centering
+\caption{Full factorial experimental design matrix ($2^4 = 16$ configurations) across the two-stage benchmarking framework.}
+\label{tab:combination_matrix}
+\begin{tabular}{l l c c c c}
+\toprule
+\textbf{Config} & \textbf{Pipeline Composition} & \textbf{$M_1$: S2B} &\textbf{$M_2$: SR} & \textbf{$M_3$: PC} &
+\textbf{$M_4$: MC} \\
+    \midrule
+\multicolumn{6}{l}{\textbf{Baseline ($k=0$)}} \\
+    $C_{0}$  & Naive RAG Baseline            & --           & --          & --          & --          \\
+    \midrule
+\multicolumn{6}{l}{\textbf{Stage 1: Single-Factor Isolated Testing ($k=1$)}} \\
+    $C_{1}$  & Small-to-Big Retrieval (S2B)   & \checkmark   & --          & --          & --          \\
+    $C_{2}$  & Semantic Re-ranking (SR)       & --           & \checkmark  & --          & --          \\
+    $C_{3}$  & Prompt Caching (PC)            & --           & --          & \checkmark  & --          \\
+    $C_{4}$  & Model Cascading (MC)           & --           & --          & --          & \checkmark  \\
+    \midrule
+\multicolumn{6}{l}{\textbf{Stage 2: Pairwise Combinations ($k=2$)}} \\
+    $C_{5}$  & S2B + SR                       & \checkmark   & \checkmark  & --          & --          \\
+    $C_{6}$  & S2B + PC                       & \checkmark   & --          & \checkmark  & --          \\
+    $C_{7}$  & S2B + MC                       & \checkmark   & --          & --          & \checkmark  \\
+    $C_{8}$  & SR + PC                        & --           & \checkmark  & \checkmark  & --          \\
+    $C_{9}$  & SR + MC                        & --           & \checkmark  & --          & \checkmark  \\
+    $C_{10}$ & PC + MC                        & --           & --          & \checkmark  & \checkmark  \\
+    \midrule
+\multicolumn{6}{l}{\textbf{Stage 2: Multi-Module Triplets ($k=3$)}} \\
+    $C_{11}$ & S2B + SR + PC                  & \checkmark   & \checkmark  & \checkmark  & --          \\
+    $C_{12}$ & S2B + SR + MC                  & \checkmark   & \checkmark  & --          & \checkmark  \\
+    $C_{13}$ & S2B + PC + MC                  & \checkmark   & --          &\checkmark  & \checkmark  \\
+    $C_{14}$ & SR + PC + MC                   & --           & \checkmark  &\checkmark  & \checkmark  \\
+\midrule
+\multicolumn{6}{l}{\textbf{Stage 2: Full-Stack Integration ($k=4$)}} \\
+    $C_{15}$ & S2B + SR + PC + MC (Full-Stack)& \checkmark   & \checkmark  &\checkmark  & \checkmark  \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.75em}
+\parbox{0.88\textwidth}{\footnotesize
+\textbf{Notes:}
+$M_1$: Small-to-Big Retrieval (S2B); $M_2$: Semantic Re-ranking (SR); $M_3$: Prompt Caching (PC); $M_4$: Model Cascading (MC). Checkmarks (\checkmark) denote active optimization components in the pipeline.}
+\end{table}
 % DRAFT NOTES:
 % - Experimental quantitative benchmarking approach.
 % - Addressing RQ1 (Latency/TTFT), RQ2 (Cost $), RQ3 (Quality/RAGAS), RQ4 (Pareto Equilibrium).
@@ -13,8 +56,10 @@ Empirical research is conducted using quantitative benchmarking of each studied 
 %   2. Combinatorial Stacking & Interaction Analysis: Evaluate pairwise and multi-module combinations up to full stack (M1+M2+M3+M4) to identify Pareto frontier and systemic trade-offs (RQ4).
 % - TODO: Add Factorial / Experimental Design Matrix Table here (e.g., C0: Baseline, C1: M1, C2: M2, ..., C15: M1+M2+M3+M4 full stack).
 
-\subsection{System Implementation}
+\subsection{System Implementation and Models}
 \label{subsec:sys_implementation}
+
+The experimental system is based on the enterprise-standard software stack. The system is implemented using Java versions 21 LTS with Spring Boot 4.0.0 and Spring AI version 2.0.0. The database is implemented using PostgreSQL version 16 and the pgvector extension version 0.8.0. The software stack is deployed on Google Cloud Platform, and the database is hosted on Google CloudSQL to mimic a realistic enterprise system. Northen europe datacenters are used to decrease potential delays caused by the RRT. The base language model used in the stack is Google Gemini 3.7-Flash, and in model cascading, Flash-3.5-lite and 3.1-pro are also used. In embeddings, gemini-embedding-2 with a dimension output of 768 is used to balance between efficiency and storage needs. In the semantic re-ranking, GCP's semantic-ranker-default-004 model is used 
 
 % DRAFT NOTES - LOCKED SYSTEM IMPLEMENTATION DECISIONS:
 %
@@ -34,7 +79,7 @@ Empirical research is conducted using quantitative benchmarking of each studied 
 %      3. gemini-3.1-pro        : Flagship reasoning model for complex multi-hop synthesis (3-hop / 4-hop queries) and fallback.
 %
 % 3. NATIVE EMBEDDINGS ARCHITECTURE:
-%    - Primary Model: GCP Native gemini-embedding-001 (2,048 token window).
+%    - Primary Model: GCP Native gemini-embedding-002 (2,048 token window).
 %    - Dimensionality Optimization: Matryoshka Representation Learning (MRL) configured to output 768 dimensions (via output_dimensionality=768) to minimize storage overhead and vector search latency without accuracy loss.
 %
 % 4. TWO-STAGE RE-RANKING ARCHITECTURE:
@@ -50,10 +95,50 @@ Empirical research is conducted using quantitative benchmarking of each studied 
 \subsection{Optimization Pipeline}
 \label{subsec:opt_pipeline}
 
+There are dozens of potential ways to implement each of the optimization methods. For example, the number of tokens used in chunking could differ significantly between the methods and research papers on the methods. In addition to that, underlying model capabilities and sizes, not to mention different parameter combinations, increase the potential research space of the methods. In this subsection, the chosen methodology is presented in Table~\ref{tab:optimization_modules}. The chosen parameters are based balancing between on the occurrences in the articles in Section~\ref {sec:literature-review} and the ease of implementation and testing.
+
+    \begin{table}[htbp]
+    \centering
+    \small
+    \caption{Architectural specifications and technical implementation of the evaluated RAG optimization modules.}
+    \label{tab:optimization_modules}
+    \begin{tabularx}{\textwidth}{l p{3.2cm} X p{3.6cm}}
+    \toprule
+    \textbf{} & \textbf{Optimization Strategy} & \textbf{Technical Implementation and Configuration} & \textbf{Key
+  References} \\
+    \midrule
+    \textbf{$M_0$} & Naive RAG (Baseline)
+      & Fixed 512-token chunks (50-token overlap), standard dense bi-encoder retrieval ($k=5$), no re-ranking or
+  caching.
+      & \citep{wang2024searching, smigielski2026chunking, lewis2020rag, karpukhin2020dense} \\
+    \addlinespace
+    \textbf{$M_1$} & Small-to-Big Retrieval
+      & Hierarchical windowing: 128-token child chunks indexed for vector retrieval, expanding to 1024-token parent
+  contexts via Spring AI metadata mapping.
+      & \citep{demourajunior2026adaptive, li2026bridgerag, chen2026logicrag} \\
+    \addlinespace
+    \textbf{$M_2$} & Two-Stage Semantic Re-ranking
+      & Production-grade GCP Vertex AI Ranking API cross-encoder scoring to re-rank candidate passages and filter
+  irrelevant context.
+      & \citep{moreira2024enhancing, cheng2026enhancing, yu2024rankrag, wang2025infogain} \\
+    \addlinespace
+    \textbf{$M_3$} & Dual-Tier Prompt Caching
+      & GCP Gemini Context Caching for static system instructions/contexts ($>10\text{k}/32\text{k}$ tokens) combined
+  with dynamic KV prefix reuse.
+      & \citep{gim2024promptcache, jin2025ragcache, lu2025turborag, yao2025cacheblend, wang2026fusionrag} \\
+    \addlinespace
+    \textbf{$M_4$} & Hybrid Model Cascading
+      & Native Spring AI ONNX intent classifier routing low-complexity/2-hop queries to Gemini Flash and 3/4-hop
+  queries to Gemini Pro, with confidence fallback.
+      & \citep{chen2023frugalgpt, ong2025routellm, zhang2025ragrouter, jeong2024adaptiverag, guo2026deepsieve,
+  park2025stoprag} \\
+    \bottomrule
+    \end{tabularx}
+    \end{table}
 % DRAFT NOTES:
 % - Baseline (M0): Naive flat RAG (fixed 512-token chunks with 50-token overlap, bi-encoder top-5, no caching) \cite{wang2024searching, smigielski2026chunking, lewis2020rag, karpukhin2020dense}.
-% - Module 1 (M1): Small-to-Big Retrieval (128-256 token child chunks expanding to 512-1024 parent windows via native Java metadata mapping in Spring AI) \cite{demourajunior2026adaptive, li2026bridgerag, chen2026logicrag}.
-% - Module 2 (M2): Two-Stage Semantic Re-ranking (GCP Vertex AI Ranking API in production; TEI-hosted deberta-v3-large / jina-reranker-v2 microservice for local dev) \cite{moreira2024enhancing, cheng2026enhancing, yu2024rankrag, wang2025infogain}.
+% - Module 1 (M1): Small-to-Big Retrieval (128 token child chunks expanding to 1024 parent windows via native Java metadata mapping in Spring AI) \cite{demourajunior2026adaptive, li2026bridgerag, chen2026logicrag}.
+% - Module 2 (M2): Two-Stage Semantic Re-ranking (GCP Vertex AI Ranking API in production) \cite{moreira2024enhancing, cheng2026enhancing, yu2024rankrag, wang2025infogain}.
 % - Module 3 (M3): Prompt Caching (Dual-tier: GCP Gemini Context Caching for static system context >10k/32k tokens + dynamic KV prefix reuse) \cite{gim2024promptcache, jin2025ragcache, lu2025turborag, yao2025cacheblend, wang2026fusionrag}.
 % - Module 4 (M4): Hybrid Model Routing & Fallback Cascading (Native Spring AI ONNX/intent classifier routing 2-hop to Gemini Flash & 3/4-hop to Gemini Pro, with confidence fallback) \cite{chen2023frugalgpt, ong2025routellm, zhang2025ragrouter, jeong2024adaptiverag, guo2026deepsieve, park2025stoprag}.
 % - Extension: Thinking Effort Routing / Reasoning Budget Control (e.g. arXiv:2603.07915, OpenReview:W34UyCRQel).
@@ -68,7 +153,7 @@ Empirical research is conducted using quantitative benchmarking of each studied 
 % - Secondary Domain Corpus: Enterprise IT Customer Support Knowledge Base (500+ KB chunks) + 200 synthetic QA pairs (40% single-hop, 40% multi-hop, 20% out-of-domain bypass).
 
 
-\subsection{Evaluation Setup \& Metrics}
+\subsection{Evaluation Setup and Metrics}
 \label{subsec:eval_metrics}
 
 % DRAFT NOTES - LOCKED EVALUATION & MEASUREMENT DECISIONS:
