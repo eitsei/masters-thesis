@@ -1,13 +1,13 @@
-This chapter establishes the experimental framework and software architecture used to empirically evaluate the performance, operational cost, and output quality of Retrieval-Augmented Generation (RAG) optimization techniques. To address the research questions formulated in Chapter~\ref{sec:introduction}, this study implements a quantitative benchmarking suite built upon an enterprise-ready Java and Spring AI infrastructure connected to Google Cloud Platform (GCP) services. The remainder of this chapter is structured as follows: Section~\ref{subsec:res_methodology} details the overall research approach and experimental design, while Section~\ref{subsec:sys_implementation} describes the software architecture and cloud infrastructure. Section~\ref{subsec:opt_pipeline} outlines the specific optimization strategies evaluated. Finally, Section~\ref{subsec:bench_datasets} introduces the target datasets and Section~\ref{subsec:eval_metrics} specifies the quantitative evaluation metrics and measurement instrumentation.
+This chapter establishes the experimental framework and software architecture used to empirically evaluate the performance, operational cost, and output quality of Retrieval-Augmented Generation (RAG) optimization techniques. To address the research questions formulated in Section~\ref{sec:introduction}, this study implements a quantitative benchmarking suite built upon an enterprise-ready Java and Spring AI infrastructure connected to Google Cloud Platform (GCP) services. The remainder of this chapter is structured as follows: Section~\ref{subsec:res_methodology} details the overall research approach and experimental design, while Section~\ref{subsec:sys_implementation} describes the software architecture and cloud infrastructure. Section~\ref{subsec:opt_pipeline} outlines the specific optimization strategies evaluated. Finally, Section~\ref{subsec:bench_datasets} introduces the target datasets, and Section~\ref{subsec:eval_metrics} specifies the quantitative evaluation metrics and measurement instrumentation.
 
 \subsection{Research Methodology}
 \label{subsec:res_methodology}
 
-Empirical research is conducted using quantitative benchmarking in a two-stage experimental strategy. In the first phase, each of the optimization methods is tested against the baseline solution. In the second phase, pairwise and multi-method combinations are tested until the full-stack solution is tested against the baseline to identify the Pareto frontier of the methods and study the potential systemic trade-offs between optimization methods. The combination matrix is presented in Table~\ref{tab:combination_matrix}. The target of this research is to address the potential benefits of addressing the research questions outlined in Table~\ref{tab:research_questions}. 10 iterations per configuration are executed to test statistical significance and to mitigate potential network jitters and cold-start biases, and to make sure that caching is utilized effectively. 
+The empirical research is conducted using quantitative benchmarking following a two-stage experimental strategy. In the first stage, each optimization module is evaluated in isolation against the naive RAG baseline ($C_0$) to quantify its individual performance characteristics. In the second stage, combinatorial configurations—spanning pairwise pairings, multi-module triplets, and the fully integrated full-stack pipeline—are systematically tested against the baseline to identify the Pareto frontier and investigate systemic trade-offs between combined techniques. The complete experimental design matrix is presented in Table~\ref{tab:combination_matrix}. This evaluation framework directly addresses the research questions formulated in Table~\ref{tab:research_questions}. To ensure statistical reliability, mitigate transient network jitter, and eliminate cold-start bias while ensuring steady-state cache utilization, 10 iterations are executed for each configuration. 
 
 \begin{table}[htbp]
 \centering
-\caption{Full factorial experimental design matrix ($2^4 = 16$ configurations) across the two-stage benchmarking framework.}
+\caption[Full factorial experimental design matrix]{Full factorial experimental design matrix ($2^4 = 16$ configurations) across the two-stage benchmarking framework.}
 \label{tab:combination_matrix}
 \begin{tabular}{l l c c c c}
 \toprule
@@ -50,7 +50,7 @@ $M_1$: Small-to-Big Retrieval (S2B); $M_2$: Semantic Re-ranking (SR); $M_3$: Pro
 % DRAFT NOTES:
 % - Experimental quantitative benchmarking approach.
 % - Addressing RQ1 (Latency/TTFT), RQ2 (Cost $), RQ3 (Quality/RAGAS), RQ4 (Pareto Equilibrium).
-% - Multi-iteration execution (5 iterations per configuration) to mitigate network jitter and cold-start bias.
+% - Multi-iteration execution (10 iterations per configuration) to mitigate network jitter and cold-start bias.
 % - TWO-STAGE EXPERIMENTAL STRATEGY:
 %   1. Single-Factor Isolated Testing: Test each optimization module (M1, M2, M3, M4) separately against M0 Baseline to quantify individual impact.
 %   2. Combinatorial Stacking & Interaction Analysis: Evaluate pairwise and multi-module combinations up to full stack (M1+M2+M3+M4) to identify Pareto frontier and systemic trade-offs (RQ4).
@@ -59,7 +59,7 @@ $M_1$: Small-to-Big Retrieval (S2B); $M_2$: Semantic Re-ranking (SR); $M_3$: Pro
 \subsection{System Implementation and Models}
 \label{subsec:sys_implementation}
 
-The experimental system is based on the enterprise-standard software stack. The system is implemented using Java versions 21 LTS with Spring Boot 4.0.0 and Spring AI version 2.0.0. The database is implemented using PostgreSQL version 16 and the pgvector extension version 0.8.0. The software stack is deployed on Google Cloud Platform, and the database is hosted on Google CloudSQL to mimic a realistic enterprise system. Northen europe datacenters are used to decrease potential delays caused by the RRT. The base language model used in the stack is Google Gemini 3.7-Flash, and in model cascading, Flash-3.5-lite and 3.1-pro are also used. In embeddings, gemini-embedding-2 with a dimension output of 768 is used to balance between efficiency and storage needs. In the semantic re-ranking, GCP's semantic-ranker-default-004 model is used 
+The experimental testbed is built upon a production-grade enterprise software stack. The application is implemented in Java 21 LTS using Spring Boot 4.0.0 and Spring AI version 2.0.0. Relational metadata and vector embeddings are managed in PostgreSQL version 16 equipped with the \texttt{pgvector} extension (version 0.8.0). The software stack is deployed on Google Cloud Platform (GCP), with the database hosted on Google Cloud SQL to replicate a realistic enterprise production environment. Services are hosted in Northern Europe data centers to minimize round-trip time (RTT) and reduce network latency variance. The primary foundation model for generation is Google Gemini 3.7 Flash; for model cascading ($M_4$), Gemini 3.5 Flash-Lite and Gemini 3.1 Pro are utilized as low-latency and high-capacity tiers, respectively. Dense vector representations are generated using \texttt{gemini-embedding-2} configured with an output dimensionality of 768 via Matryoshka Representation Learning (MRL) to balance retrieval efficiency with storage requirements. For two-stage semantic re-ranking ($M_2$), GCP's cloud-native \texttt{semantic-ranker-default-004} cross-encoder model is used. 
 
 % DRAFT NOTES - LOCKED SYSTEM IMPLEMENTATION DECISIONS:
 %
@@ -75,11 +75,11 @@ The experimental system is based on the enterprise-standard software stack. The 
 %    - Infrastructure: GCP Vertex AI enterprise gateway (aiplatform.googleapis.com in us-central1 via IAM/ADC), with Google AI Studio API key fallback (generativelanguage.googleapis.com) for local testing.
 %    - Generative Model Tiers (Module M4 Model Cascading):
 %      1. gemini-3.5-flash-lite : Ultra-fast / low-cost tier for query routing & low-complexity single-hop tasks.
-%      2. gemini-3.6-flash      : Primary workhorse for medium-complexity generation, coding, and fast context synthesis.
+%      2. gemini-3.7-flash      : Primary workhorse for medium-complexity generation, coding, and fast context synthesis.
 %      3. gemini-3.1-pro        : Flagship reasoning model for complex multi-hop synthesis (3-hop / 4-hop queries) and fallback.
 %
 % 3. NATIVE EMBEDDINGS ARCHITECTURE:
-%    - Primary Model: GCP Native gemini-embedding-002 (2,048 token window).
+%    - Primary Model: GCP Native gemini-embedding-2.
 %    - Dimensionality Optimization: Matryoshka Representation Learning (MRL) configured to output 768 dimensions (via output_dimensionality=768) to minimize storage overhead and vector search latency without accuracy loss.
 %
 % 4. TWO-STAGE RE-RANKING ARCHITECTURE:
@@ -95,52 +95,46 @@ The experimental system is based on the enterprise-standard software stack. The 
 \subsection{Optimization Pipeline}
 \label{subsec:opt_pipeline}
 
-There are dozens of potential ways to implement each of the optimization methods. For example, the number of tokens used in chunking could differ significantly between the methods and research papers on the methods. In addition to that, underlying model capabilities and sizes, not to mention different parameter combinations, increase the potential research space of the methods. In this subsection, the chosen methodology is presented in Table~\ref{tab:optimization_modules}. The chosen parameters are based balancing between on the occurrences in the articles in Section~\ref {sec:literature-review} and the ease of implementation and testing.
+Each optimization method encompasses a broad architectural design space. For example, chunk token limits and overlap ratios vary substantially across RAG literature. Furthermore, differences in foundation model parameter scales, routing thresholds, and caching configurations significantly expand the potential parameter space. To ensure rigorous and reproducible evaluation, the technical implementation and baseline configurations evaluated in this study are summarized in Table~\ref{tab:optimization_modules}. The selected parameters balance empirical prevalence in the literature review (Section~\ref{sec:literature-review}) with practical feasibility in enterprise software stacks.
 
     \begin{table}[htbp]
     \centering
     \small
-    \caption{Architectural specifications and technical implementation of the evaluated RAG optimization modules.}
+    \caption[Architectural specifications of optimization modules]{Architectural specifications and technical implementation of the evaluated RAG optimization modules.}
     \label{tab:optimization_modules}
-    \begin{tabularx}{\textwidth}{l p{3.2cm} X p{3.6cm}}
+    \begin{tabularx}{\textwidth}{l p{3.0cm} X p{3.6cm}}
     \toprule
-    \textbf{} & \textbf{Optimization Strategy} & \textbf{Technical Implementation and Configuration} & \textbf{Key
-  References} \\
+    \textbf{} & \textbf{Optimization Strategy} & \textbf{Variables and Configuration} & \textbf{Key References} \\
     \midrule
     \textbf{$M_0$} & Naive RAG (Baseline)
-      & Fixed 512-token chunks (50-token overlap), standard dense bi-encoder retrieval ($k=5$), no re-ranking or
-  caching.
-      & \citep{wang2024searching, smigielski2026chunking, lewis2020rag, karpukhin2020dense} \\
+      & Chunk size: 512 tokens, overlap: 50 tokens, retrieval: top-$k = 5$.
+      & \citep{smigielski2026chunking, lewis2020rag} \\
     \addlinespace
     \textbf{$M_1$} & Small-to-Big Retrieval
-      & Hierarchical windowing: 128-token child chunks indexed for vector retrieval, expanding to 1024-token parent
-  contexts via Spring AI metadata mapping.
+      & Child chunk: 128 tokens, parent window: 1024 tokens, retrieval: top-$k = 5$.
       & \citep{demourajunior2026adaptive, li2026bridgerag, chen2026logicrag} \\
     \addlinespace
     \textbf{$M_2$} & Two-Stage Semantic Re-ranking
-      & Production-grade GCP Vertex AI Ranking API cross-encoder scoring to re-rank candidate passages and filter
-  irrelevant context.
+      & Candidate pool: top-50, reranked context: top-$k = 5$, model: \texttt{semantic-ranker-default-004}.
       & \citep{moreira2024enhancing, cheng2026enhancing, yu2024rankrag, wang2025infogain} \\
     \addlinespace
     \textbf{$M_3$} & Dual-Tier Prompt Caching
-      & GCP Gemini Context Caching for static system instructions/contexts ($>10\text{k}/32\text{k}$ tokens) combined
-  with dynamic KV prefix reuse.
+      & Context threshold: $\ge 10\text{k}$ tokens, caching mechanism: GCP Context Cache / KV prefix reuse.
       & \citep{gim2024promptcache, jin2025ragcache, lu2025turborag, yao2025cacheblend, wang2026fusionrag} \\
     \addlinespace
     \textbf{$M_4$} & Hybrid Model Cascading
-      & Native Spring AI ONNX intent classifier routing low-complexity/2-hop queries to Gemini Flash and 3/4-hop
-  queries to Gemini Pro, with confidence fallback.
-      & \citep{chen2023frugalgpt, ong2025routellm, zhang2025ragrouter, jeong2024adaptiverag, guo2026deepsieve,
+      & Routing targets: 2-hop $\to$ Gemini 3.7 Flash; 3/4-hop $\to$ Gemini 3.1 Pro.
+      & \citep{chen2023frugalgpt, ong2025routellm, zhang2025ragrouter, jeong2024adaptive, guo2026deepsieve,
   park2025stoprag} \\
     \bottomrule
     \end{tabularx}
     \end{table}
 % DRAFT NOTES:
-% - Baseline (M0): Naive flat RAG (fixed 512-token chunks with 50-token overlap, bi-encoder top-5, no caching) \cite{wang2024searching, smigielski2026chunking, lewis2020rag, karpukhin2020dense}.
+% - Baseline (M0): Naive flat RAG (fixed 512-token chunks with 50-token overlap, bi-encoder top-5, no caching) \cite{smigielski2026chunking, lewis2020rag}.
 % - Module 1 (M1): Small-to-Big Retrieval (128 token child chunks expanding to 1024 parent windows via native Java metadata mapping in Spring AI) \cite{demourajunior2026adaptive, li2026bridgerag, chen2026logicrag}.
 % - Module 2 (M2): Two-Stage Semantic Re-ranking (GCP Vertex AI Ranking API in production) \cite{moreira2024enhancing, cheng2026enhancing, yu2024rankrag, wang2025infogain}.
 % - Module 3 (M3): Prompt Caching (Dual-tier: GCP Gemini Context Caching for static system context >10k/32k tokens + dynamic KV prefix reuse) \cite{gim2024promptcache, jin2025ragcache, lu2025turborag, yao2025cacheblend, wang2026fusionrag}.
-% - Module 4 (M4): Hybrid Model Routing & Fallback Cascading (Native Spring AI ONNX/intent classifier routing 2-hop to Gemini Flash & 3/4-hop to Gemini Pro, with confidence fallback) \cite{chen2023frugalgpt, ong2025routellm, zhang2025ragrouter, jeong2024adaptiverag, guo2026deepsieve, park2025stoprag}.
+% - Module 4 (M4): Hybrid Model Routing & Fallback Cascading (Native Spring AI ONNX/intent classifier routing 2-hop to Gemini Flash & 3/4-hop to Gemini Pro, with confidence fallback) \cite{chen2023frugalgpt, ong2025routellm, zhang2025ragrouter, jeong2024adaptive, guo2026deepsieve, park2025stoprag}.
 % - Extension: Thinking Effort Routing / Reasoning Budget Control (e.g. arXiv:2603.07915, OpenReview:W34UyCRQel).
 
 \subsection{Benchmark Datasets}
@@ -160,12 +154,12 @@ There are dozens of potential ways to implement each of the optimization methods
 %
 % 1. EFFICIENCY & LATENCY INSTRUMENTATION (RQ1):
 %    - Metrics: Time to First Token (TTFT in ms), End-to-End Latency (ms), and micro-phase breakdown (Vector Retrieval, Vertex Re-ranking, Prompt Caching lookup, LLM TTFT, Stream Completion).
-%    - Measurement Protocol: Spring Boot Actuator + Micrometer Timers. 5 iterations per query configuration (1 warm-up run discarded to eliminate JVM JIT / TLS cold-start bias; 4 recorded runs).
+%    - Measurement Protocol: Spring Boot Actuator + Micrometer Timers. 10 iterations per query configuration (1 warm-up run discarded to eliminate JVM JIT / TLS cold-start bias; 9 recorded runs).
 %    - Reporting: Report both Median (P50) and P95 tail latency for enterprise SLA analysis.
 %
 % 2. EXACT OPERATIONAL COST ACCOUNTING (RQ2):
 %    - Execution Cost Formula: Cost ($) = (N_uncached * P_prompt) + (N_cached * P_cached) + (N_completion * P_completion) + (N_rerank_calls * P_rerank).
-%    - Pricing Baseline: GCP Vertex AI official pricing tiers for gemini-3.5-flash-lite, gemini-3.6-flash, gemini-3.1-pro, Vertex Ranking API (semantic-ranker), and GCP Context Caching (75% discount on cached input tokens). Excludes fixed database storage.
+%    - Pricing Baseline: GCP Vertex AI official pricing tiers for gemini-3.5-flash-lite, gemini-3.7-flash, gemini-3.1-pro, Vertex Ranking API (semantic-ranker), and GCP Context Caching (75% discount on cached input tokens). Excludes fixed database storage.
 %    - TODO: Write out formal LaTeX equation environment for Cost ($) during prose writing.
 %
 % 3. QUALITY METRICS & LLM-AS-A-JUDGE SETUP (RQ3):
