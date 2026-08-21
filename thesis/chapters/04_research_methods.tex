@@ -59,7 +59,7 @@ $M_1$: Small-to-Big Retrieval (S2B); $M_2$: Semantic Re-ranking (SR); $M_3$: Pro
 \subsection{System Implementation and Models}
 \label{subsec:sys_implementation}
 
-The experimental testbed is built upon a production-grade enterprise software stack. The application is implemented in Java 21 LTS using Spring Boot 4.0.0 and Spring AI version 2.0.0. Relational metadata and vector embeddings are managed in PostgreSQL version 16 equipped with the \texttt{pgvector} extension (version 0.8.0). The software stack is deployed on Google Cloud Platform (GCP), with the database hosted on Google Cloud SQL to replicate a realistic enterprise production environment. Services are hosted in Northern Europe data centers to minimize round-trip time (RTT) and reduce network latency variance. The primary foundation model for generation is Google Gemini 3.7 Flash; for model cascading ($M_4$), Gemini 3.5 Flash-Lite and Gemini 3.1 Pro are utilized as low-latency and high-capacity tiers, respectively. Dense vector representations are generated using \texttt{gemini-embedding-2} configured with an output dimensionality of 768 via Matryoshka Representation Learning (MRL) to balance retrieval efficiency with storage requirements. For two-stage semantic re-ranking ($M_2$), GCP's cloud-native \texttt{semantic-ranker-default-004} cross-encoder model is used. 
+The experimental testbed is built upon a production-grade enterprise software stack. The application is implemented in Java 21 LTS using Spring Boot 4.0.0 and Spring AI version 2.0.0. Relational metadata and vector embeddings are managed in PostgreSQL version 16 with the \texttt{pgvector} extension (version 0.8.0). The software stack is deployed on Google Cloud Platform (GCP), with the database hosted on Google Cloud SQL to replicate a realistic enterprise production environment. Services are colocated within a dedicated Virtual Private Cloud (VPC) using private IP peering in the \texttt{europe-north1} region to minimize round-trip time (RTT) and eliminate network latency variance. The primary foundation model for generation is Google Gemini 3.7 Flash; for model cascading ($M_4$), Gemini 3.5 Flash-Lite and Gemini 3.1 Pro are utilized as low-latency and high-capacity tiers, respectively. Dense vector representations are generated using \texttt{gemini-embedding-2} configured with an output dimensionality of 768 via Matryoshka Representation Learning (MRL) to balance retrieval efficiency with storage requirements. For two-stage semantic re-ranking ($M_2$), GCP's cloud-native \texttt{semantic-ranker-default-004} cross-encoder model is used. 
 
 % DRAFT NOTES - LOCKED SYSTEM IMPLEMENTATION DECISIONS:
 %
@@ -104,28 +104,27 @@ Each optimization method encompasses a broad architectural design space. For exa
     \label{tab:optimization_modules}
     \begin{tabularx}{\textwidth}{l p{3.0cm} X p{3.6cm}}
     \toprule
-    \textbf{} & \textbf{Optimization Strategy} & \textbf{Variables and Configuration} & \textbf{Key References} \\
+    \textbf{} & \textbf{Optimization Strategy} & \textbf{Variables and Configuration}\\
     \midrule
     \textbf{$M_0$} & Naive RAG (Baseline)
       & Chunk size: 512 tokens, overlap: 50 tokens, retrieval: top-$k = 5$.
-      & \citep{smigielski2026chunking, lewis2020rag} \\
+      \\
     \addlinespace
     \textbf{$M_1$} & Small-to-Big Retrieval
       & Child chunk: 128 tokens, parent window: 1024 tokens, retrieval: top-$k = 5$.
-      & \citep{demourajunior2026adaptive, li2026bridgerag, chen2026logicrag} \\
+      \\
     \addlinespace
     \textbf{$M_2$} & Two-Stage Semantic Re-ranking
       & Candidate pool: top-50, reranked context: top-$k = 5$, model: \texttt{semantic-ranker-default-004}.
-      & \citep{moreira2024enhancing, cheng2026enhancing, yu2024rankrag, wang2025infogain} \\
+      \\
     \addlinespace
     \textbf{$M_3$} & Dual-Tier Prompt Caching
       & Context threshold: $\ge 10\text{k}$ tokens, caching mechanism: GCP Context Cache / KV prefix reuse.
-      & \citep{gim2024promptcache, jin2025ragcache, lu2025turborag, yao2025cacheblend, wang2026fusionrag} \\
+       \\
     \addlinespace
     \textbf{$M_4$} & Hybrid Model Cascading
-      & Routing targets: 2-hop $\to$ Gemini 3.7 Flash; 3/4-hop $\to$ Gemini 3.1 Pro.
-      & \citep{chen2023frugalgpt, ong2025routellm, zhang2025ragrouter, jeong2024adaptive, guo2026deepsieve,
-  park2025stoprag} \\
+      & Routing targets: Router/1-hop $\to$ Gemini 3.5 Flash-Lite;  2-hop $\to$ Gemini 3.7 Flash; 3/4-hop $\to$ Gemini 3.1 Pro.
+\\
     \bottomrule
     \end{tabularx}
     \end{table}
@@ -140,6 +139,11 @@ Each optimization method encompasses a broad architectural design space. For exa
 \subsection{Benchmark Datasets}
 \label{subsec:bench_datasets}
 
+The main benchmark dataset is MuSiQue\cite{trivedi2022musique}, where in total a random sample of 100 question-answer pairs have been chosen to mitigate the established academic research\citep{lumer2025rethinking, demourajunior2026adaptive}. More precicely, 35\% 3 and 4-hop questions and 40\% 2-hop were chosen to equal distribution for different difficulty tiers. Multi-hop questions eliminates reasoning shortcuts that are present in single-hop questions\cite{trivedi2022musique}, and thus is ideal for testing S2B, SR and PC optimization methods. In addition, different hop tiers allows to utilize model cascading proefficiently. 
+
+The second dataset contains 100 synthetically generated question answers pairs, that mimics the customer questions related the services provided by the collaboration company. The QA set is generated by scraping the customer facing website of the collaboration company and extracting questions related to products and services provided by the company. Excact scraping methodology is provided in the Appendix~\ref{sec:appendix} The dataset contains 40\% of single-hop questions, 40\% of multi-hop questions and 20\% of out-of-domain QA's.
+ 
+
 % DRAFT NOTES:
 % - Main Academic Benchmark: MuSiQue dataset (Trivedi et al., 2022) - sampled 100 queries (35% 2-hop, 65% 3-hop/4-hop).
 % - Why MuSiQue: Eliminates single-hop reasoning shortcuts present in HotpotQA; 20 paragraphs/query (~2.5k-4k tokens) ideal for testing M1 (Small-to-Big), M2 (Re-ranking), and M3 (Prompt Caching).
@@ -150,23 +154,116 @@ Each optimization method encompasses a broad architectural design space. For exa
 \subsection{Evaluation Setup and Metrics}
 \label{subsec:eval_metrics}
 
+
+Main evaluation of the performance is conducted using the industry-standard RAGAS\cite{es2024ragas} framework. In the framework, Claude Sonnet 5 will be used as a LLM-as-a-judge. 
+
+In the following sub-sections, each measurement is formally presented 
 % DRAFT NOTES - LOCKED EVALUATION & MEASUREMENT DECISIONS:
+
+
+
+
+
+% --- RQ1: Latency Instrumentation ---
+\subsubsection{RQ1: Latence}
+\label{sec:latency}
+
+Latency of the RAG systems are evaluated using Time to First Token (TTFT in ms) and in End-to-End latency (E2E in ms). TTFT is the time of the system to produce first output token, while the E2E is the latency of the whole pipeline. In addition, breakdown of each phases of the pipeline will be recorded.
+
+\begin{equation}
+\label{eq:latency}
+T_{\text{total}}(q) = T_{\text{ret}} + T_{\text{rerank}} + T_{\text{cache}} + T_{\text{TTFT}} + T_{\text{stream}}
+\end{equation}
+
 %
 % 1. EFFICIENCY & LATENCY INSTRUMENTATION (RQ1):
 %    - Metrics: Time to First Token (TTFT in ms), End-to-End Latency (ms), and micro-phase breakdown (Vector Retrieval, Vertex Re-ranking, Prompt Caching lookup, LLM TTFT, Stream Completion).
 %    - Measurement Protocol: Spring Boot Actuator + Micrometer Timers. 10 iterations per query configuration (1 warm-up run discarded to eliminate JVM JIT / TLS cold-start bias; 9 recorded runs).
 %    - Reporting: Report both Median (P50) and P95 tail latency for enterprise SLA analysis.
 %
+
+% --- RQ2: Operational Cost Accounting ---
+
+\subsubsection{RQ2: Costs}
+\label{sec:costs}
+Total cost of the RAG pipeline is an important factor in the scalability of the system. There are multiple costs related to the pipeline, which are all included in the total costs. Costs are based on the official pricing tier of Googles Gemini Enterprise Agent Platforms API. All costs taken into consideration are defined in the Equation~\ref{eq:costs}:  
+\begin{equation}
+\label{eq:costs}
+\text{Cost}(q) = N_{\text{uncached}} \cdot P_{\text{prompt}} + N_{\text{cached}} \cdot P_{\text{cached}} + N_{\text{comp}} \cdot P_{\text{comp}} + N_{\text{rerank}} \cdot P_{\text{rerank}}
+\end{equation}
+
 % 2. EXACT OPERATIONAL COST ACCOUNTING (RQ2):
 %    - Execution Cost Formula: Cost ($) = (N_uncached * P_prompt) + (N_cached * P_cached) + (N_completion * P_completion) + (N_rerank_calls * P_rerank).
 %    - Pricing Baseline: GCP Vertex AI official pricing tiers for gemini-3.5-flash-lite, gemini-3.7-flash, gemini-3.1-pro, Vertex Ranking API (semantic-ranker), and GCP Context Caching (75% discount on cached input tokens). Excludes fixed database storage.
 %    - TODO: Write out formal LaTeX equation environment for Cost ($) during prose writing.
+
+% --- RQ3: Quality Metrics (RAGAS) ---
+\subsubsection{RQ3: Quality metrics}
+\label{sec:quality}
+
+Usefulness of the RAG pipeline are defined in the quality of the answers. If the answers does not provide anything meaningful, the other metrics are irrelevant. Quality metrics used in this subsection are following. 
+
+1. Context precision, defined in Equation~\ref{eq:context_precision}, measures the systems ability to rank relevant chunks over the irrelevant chunks during the retrieval phase \cite{es2024ragas}.
+
+% Context Precision
+\begin{equation}
+\label{eq:context_precision}
+\text{Context Precision}@K = \frac{\sum_{k=1}^{K} \left( \text{Precision}@k \times v_k \right)}{\sum_{k=1}^{K} v_k}
+\end{equation}
+
+2. Context recall, defined in Equation~\ref{eq:context_recall}, test how many relevant chunks the system could retrieve succesfully on the retrieval phase \cite{es2024ragas}.
+% Context Recall
+\begin{equation}
+\label{eq:context_recall}
+\text{Context Recall} = \frac{|S_{\text{ground}} \cap S_{\text{retrieved}}|}{|S_{\text{ground}}|}
+\end{equation}
+
+3. Faithfulness is the factual consistency of the responses of the system among the retrieved context \cite{es2024ragas}. Formula is defined in Equation~\ref{eq:faithfulness}.
+% Faithfulness
+\begin{equation}
+\label{eq:faithfulness}
+\text{Faithfulness} = \frac{|C_a \cap C_{R_q}|}{|C_a|}
+\end{equation}
+
+4. Answers that are considered relevant for the user are the ones, that directly answers the question in hand \cite{es2024ragas}. Answer relevance measeures the relevance and is defined in the Equation~\ref{eq:answer_relevance}.
+% Answer Relevance
+\begin{equation}
+\label{eq:answer_relevance}
+\text{Answer Relevance} = \frac{1}{N_g} \sum_{i=1}^{N_g} \frac{E(q) \cdot E(q_i^{\text{gen}})}{\|E(q)\| \|E(q_i^{\text{gen}})\|}
+\end{equation}
+
+5. Composite quality score is calculated as the harmonic mean of the scores calculated in the Equations~\ref{eq:context_precision, eq:context_recall, eq:faithfulness, eq:answer_relevance}. Quality score is used to calculate the optimize pareto frontier in RQ4.
+% Composite Quality Score
+\begin{equation}
+\label{eq:composite_quality}
+Q(q) = \frac{4}{\frac{1}{\text{Context Precision}} + \frac{1}{\text{Context Recall}} + \frac{1}{\text{Faithfulness}} + \frac{1}{\text{Answer Relevance}}}
+\end{equation}
+
 %
 % 3. QUALITY METRICS & LLM-AS-A-JUDGE SETUP (RQ3):
 %    - Framework: Offline Python RAGAS evaluation suite (Es et al., 2024).
 %    - Quality Triad: Context Precision (retrieval signal-to-noise ratio), Context Recall (ground-truth coverage), Faithfulness (hallucination check against retrieved context), and Answer Relevance (semantic alignment with user query).
 %    - Primary Judge Configuration: gemini-3.1-pro at T=0.0 as primary evaluation judge.
 %    - THREATS TO VALIDITY & JUDGE FLEXIBILITY NOTE: Address potential LLM self-preference bias (vendor affinity). Explicitly state that judge model can be cross-validated or substituted with alternative judge LLMs (e.g. GPT-4o, Claude 3.5 Sonnet, or open-weights evaluation judges) for robustness verification.
+
+% --- RQ4: Trade-off Equilibrium Indicators ---
+\subsubsection{RQ4: Pareto frontier equilibrium}
+\label{sec:pareto}
+
+To estimate the quality optimal pareto frontier from cost and latency perspective, Quality per Dollar (QPD) and Quality per Second (QPS) are defined to measure the quality per testable variable. These measurements are defined to capture the trade-off between quality, price and latency, which each are important factor of the scalability of the REG pipelines. QPD is defined in the Equation~\ref{eq:gpd} and QPS is defined in the Equation~\ref{eq:qps}. 
+
+% Quality per Dollar (QPD)
+\begin{equation}
+\label{eq:qpd}
+\text{QPD}(q) = \frac{Q(q)}{\text{Cost}(q)}
+\end{equation}
+
+% Quality per Second (QPS)
+\begin{equation}
+\label{eq:qps}
+\text{QPS}(q) = \frac{Q(q)}{T_{\text{total}}(q)}
+\end{equation}
+
 %
 % 4. TRADE-OFF EQUILIBRIUM RATIOS (RQ4):
 %    - Trade-off Indicators: Practical Efficiency Ratios quantifying optimization ROI:
