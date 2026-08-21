@@ -163,7 +163,7 @@ The empirical evaluation of system performance, operational expenditure, and res
 
 
 % --- RQ1: Latency Instrumentation ---
-\subsubsection{RQ1: Latency Profiles and Computational Overhead}
+\subsubsection{Latency Profiles and Computational Overhead}
 \label{sec:latency}
 
 The latency characteristics of the RAG pipelines are evaluated across two primary operational dimensions: Time to First Token ($\text{TTFT}$, in milliseconds) and overall End-to-End latency ($T_{\text{total}}$, in milliseconds). $\text{TTFT}$ measures the duration elapsed from query submission until the generation model emits its initial response token, serving as a critical indicator of perceived user responsiveness in interactive systems. End-to-end latency quantifies the total wall-clock execution time required for the entire pipeline to complete generation and stream the response. To isolate the computational overhead introduced by individual architectural optimizations, fine-grained telemetry records the execution latency of each micro-phase:
@@ -184,7 +184,7 @@ where $T_{\text{ret}}$ denotes the dense vector retrieval duration, $T_{\text{re
 
 % --- RQ2: Operational Cost Accounting ---
 
-\subsubsection{RQ2: Operational Cost Accounting}
+\subsubsection{Operational Cost Accounting}
 \label{sec:costs}
 
 Operational expenditure constitutes a critical bottleneck for enterprise RAG adoption at scale. To establish an accurate, reproducible economic model, execution costs are computed per query based on published Google Cloud Gemini Enterprise Agent Platform pricing tiers. The operational cost model incorporates dynamic model tier routing ($M_4$), context caching discounts ($M_3$), and auxiliary service invocation overhead ($M_2$). The total monetary cost $\text{Cost}(q)$ for processing query $q$ is formally defined as:
@@ -202,7 +202,7 @@ where $N_{\text{uncached}}$ and $N_{\text{cached}}$ represent the number of unca
 %    - TODO: Write out formal LaTeX equation environment for Cost ($) during prose writing.
 
 % --- RQ3: Quality Metrics (RAGAS) ---
-\subsubsection{RQ3: Quality Metrics}
+\subsubsection{Quality Metrics}
 \label{sec:quality}
 
 The usefulness of the RAG pipeline is defined by the quality of the generated answers. If the answers do not provide meaningful information, the other metrics are irrelevant. The quality metrics evaluated in this study are the following:
@@ -214,12 +214,16 @@ The usefulness of the RAG pipeline is defined by the quality of the generated an
 \text{Context Precision}@K = \frac{\sum_{k=1}^{K} \left( \text{Precision}@k \times v_k \right)}{\sum_{k=1}^{K} v_k}
 \end{equation}
 
+where $K$ is the retrieval cutoff depth, $v_k \in \{0, 1\}$ represents the binary ground-truth relevance indicator of the context chunk ranked at position $k$, and $\text{Precision}@k$ is the precision computed at rank cutoff $k$.
+
 \paragraph{Context Recall.} Context Recall, defined in Equation~\ref{eq:context_recall}, measures how many relevant chunks the system could retrieve successfully during the retrieval phase~\citep{es2024ragas}.
 
 \begin{equation}
 \label{eq:context_recall}
 \text{Context Recall} = \frac{|S_{\text{ground}} \cap S_{\text{retrieved}}|}{|S_{\text{ground}}|}
 \end{equation}
+
+where $S_{\text{ground}}$ denotes the set of reference factual statements in the ground truth, and $S_{\text{retrieved}}$ represents the sentences extracted from the retrieved context passages.
 
 \paragraph{Faithfulness.} Faithfulness measures the factual consistency of the system's responses against the retrieved context~\citep{es2024ragas}. The formula is defined in Equation~\ref{eq:faithfulness}.
 
@@ -228,12 +232,16 @@ The usefulness of the RAG pipeline is defined by the quality of the generated an
 \text{Faithfulness} = \frac{|C_a \cap C_{R_q}|}{|C_a|}
 \end{equation}
 
+where $C_a$ denotes the set of individual factual claims extracted from generated answer $a$, and $C_{R_q}$ represents the subset of claims that can be directly verified against retrieved context $R_q$.
+
 \paragraph{Answer Relevance.} Answers that are considered relevant for the user are those that directly answer the question at hand~\citep{es2024ragas}. Answer Relevance measures this relevance and is defined in Equation~\ref{eq:answer_relevance}.
 
 \begin{equation}
 \label{eq:answer_relevance}
 \text{Answer Relevance} = \frac{1}{N_g} \sum_{i=1}^{N_g} \frac{E(q) \cdot E(q_i^{\text{gen}})}{\|E(q)\| \|E(q_i^{\text{gen}})\|}
 \end{equation}
+
+where $N_g$ denotes the number of synthetic queries generated from the model's response by the evaluation judge, $q_i^{\text{gen}}$ is the $i$-th generated query, and $E(\cdot)$ represents the dense embedding function used to compute cosine similarity against the original query $q$.
 
 \paragraph{Composite Quality Score.} The Composite Quality Score is calculated as the harmonic mean of the scores calculated in Equations~\ref{eq:context_precision}, \ref{eq:context_recall}, \ref{eq:faithfulness}, and~\ref{eq:answer_relevance}. This quality score is used to identify the optimal Pareto frontier in Section~\ref{sec:pareto}.
 
@@ -250,7 +258,7 @@ Q(q) = \frac{4}{\frac{1}{\text{Context Precision}} + \frac{1}{\text{Context Reca
 %    - THREATS TO VALIDITY & JUDGE FLEXIBILITY NOTE: Address potential LLM self-preference bias (vendor affinity). Explicitly state that judge model can be cross-validated or substituted with alternative judge LLMs (e.g. GPT-4o, Claude 3.5 Sonnet, or open-weights evaluation judges) for robustness verification.
 
 % --- RQ4: Trade-off Equilibrium Indicators ---
-\subsubsection{RQ4: Pareto Frontier and Trade-off Equilibrium}
+\subsubsection{Pareto Frontier and Trade-off Equilibrium}
 \label{sec:pareto}
 
 To identify the Pareto frontier and quantify the trade-offs between response quality, operational expenditure, and execution speed, two practical efficiency ratios are formulated: Quality per Dollar ($\text{QPD}$) and Quality per Second ($\text{QPS}$). These composite indicators capture the return on investment (ROI) for each optimization technique and multi-module combination across the experimental matrix. Quality per Dollar is defined in Equation~\ref{eq:qpd}, and Quality per Second is defined in Equation~\ref{eq:qps}:
