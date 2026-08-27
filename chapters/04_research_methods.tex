@@ -1,4 +1,4 @@
-This chapter establishes the experimental framework and software architecture used to empirically evaluate the performance, operational cost, and output quality of Retrieval-Augmented Generation (RAG) optimization techniques. To address the research questions formulated in Section~\ref{sec:introduction}, this study implements a quantitative benchmarking suite built upon an enterprise-ready Java and Spring AI infrastructure connected to Google Cloud Platform (GCP) services. The remainder of this chapter is structured as follows: Section~\ref{subsec:res_methodology} details the overall research approach and experimental design, while Section~\ref{subsec:sys_implementation} describes the software architecture and cloud infrastructure. Section~\ref{subsec:opt_pipeline} outlines the specific optimization strategies evaluated. Finally, Section~\ref{subsec:bench_datasets} introduces the target datasets, and Section~\ref{subsec:eval_metrics} specifies the quantitative evaluation metrics and measurement instrumentation.
+This chapter establishes the experimental framework and software architecture used to empirically evaluate the performance, operational cost, and output quality of RAG optimization techniques. To address the research questions formulated in Section~\ref{sec:introduction}, this study implements a quantitative benchmarking suite built upon an enterprise-ready Java and Spring AI infrastructure connected to Google Cloud Platform (GCP) services. The remainder of this chapter is structured as follows: Section~\ref{subsec:res_methodology} details the overall research approach and experimental design, while Section~\ref{subsec:sys_implementation} describes the software architecture and cloud infrastructure. Section~\ref{subsec:opt_pipeline} outlines the specific optimization strategies evaluated. Finally, Section~\ref{subsec:bench_datasets} introduces the target datasets, and Section~\ref{subsec:eval_metrics} specifies the quantitative evaluation metrics and measurement instrumentation.
 
 \subsection{Research Methodology}
 \label{subsec:res_methodology}
@@ -18,10 +18,10 @@ The empirical research is conducted using quantitative benchmarking following a 
     $C_{0}$  & Naive RAG Baseline            & --           & --          & --          & --          \\
     \midrule
 \multicolumn{6}{l}{\textbf{Stage 1: Single-Factor Isolated Testing ($k=1$)}} \\
-    $C_{1}$  & Small-to-Big Retrieval (S2B)   & \checkmark   & --          & --          & --          \\
-    $C_{2}$  & Semantic Re-ranking (SR)       & --           & \checkmark  & --          & --          \\
-    $C_{3}$  & Prompt Caching (PC)            & --           & --          & \checkmark  & --          \\
-    $C_{4}$  & Model Cascading (MC)           & --           & --          & --          & \checkmark  \\
+    $C_{1}$  & S2B   & \checkmark   & --          & --          & --          \\
+    $C_{2}$  & SR       & --           & \checkmark  & --          & --          \\
+    $C_{3}$  & PC            & --           & --          & \checkmark  & --          \\
+    $C_{4}$  & MC           & --           & --          & --          & \checkmark  \\
     \midrule
 \multicolumn{6}{l}{\textbf{Stage 2: Pairwise Combinations ($k=2$)}} \\
     $C_{5}$  & S2B + SR                       & \checkmark   & \checkmark  & --          & --          \\
@@ -59,7 +59,7 @@ $M_1$: Small-to-Big Retrieval (S2B); $M_2$: Semantic Re-ranking (SR); $M_3$: Pro
 \subsection{System Implementation and Models}
 \label{subsec:sys_implementation}
 
-The experimental testbed is built upon a production-grade enterprise software stack. The application is implemented in Java 21 LTS using Spring Boot 4.0.0 and Spring AI version 2.0.0. Relational metadata and vector embeddings are managed in PostgreSQL version 16 with the \texttt{pgvector} extension (version 0.8.0). The software stack is deployed on Google Cloud Platform (GCP), with the database hosted on Google Cloud SQL to replicate a realistic enterprise production environment. Services are colocated within a dedicated Virtual Private Cloud (VPC) using private IP peering in the \texttt{europe-north1} region to minimize round-trip time (RTT) and eliminate network latency variance. The primary foundation model for generation is Google Gemini 3.7 Flash; for model cascading ($M_4$), Gemini 3.5 Flash-Lite and Gemini 3.1 Pro are utilized as low-latency and high-capacity tiers, respectively. Dense vector representations are generated using \texttt{gemini-embedding-2} configured with an output dimensionality of 768 via Matryoshka Representation Learning (MRL) to balance retrieval efficiency with storage requirements. For two-stage semantic re-ranking ($M_2$), GCP's cloud-native \texttt{semantic-ranker-default-004} cross-encoder model is used. 
+The experimental testbed is built upon a production-grade enterprise software stack. The application is implemented in Java 21 LTS using Spring Boot 4.0.0 and Spring AI version 2.0.0. Relational metadata and vector embeddings are managed in PostgreSQL version 16 with the \texttt{pgvector} extension (version 0.8.0). The software stack is deployed on GCP, with the database hosted on Google Cloud SQL (GCS) to replicate a realistic enterprise production environment. Services are co-located within a dedicated Virtual Private Cloud (VPC) using private IP peering in the \texttt{europe-north1} region to minimize round-trip time (RTT) and eliminate network latency variance. The primary foundation model for generation is Google Gemini 3.7 Flash; for model cascading ($M_4$), Gemini 3.5 Flash-Lite and Gemini 3.1 Pro are utilized as low-latency and high-capacity tiers, respectively. Dense vector representations are generated using \texttt{gemini-embedding-2} configured with an output dimensionality of 768 via Matryoshka Representation Learning (MRL)\cite{MRL2022} to balance retrieval efficiency with storage requirements. For two-stage semantic re-ranking ($M_2$), GCP's \texttt{semantic-ranker-default-004} cross-encoder model is used. 
 
 % DRAFT NOTES - LOCKED SYSTEM IMPLEMENTATION DECISIONS:
 %
@@ -119,7 +119,7 @@ Each optimization method encompasses a broad architectural design space. For exa
       \\
     \addlinespace
     \textbf{$M_3$} & Dual-Tier Prompt Caching
-      & Context threshold: $\ge 10\text{k}$ tokens, caching mechanism: GCP Context Cache / KV prefix reuse.
+      & Context threshold: $\ge 4096$ tokens, caching mechanism: GCP Explicit Context Cache / KV prefix reuse.
        \\
     \addlinespace
     \textbf{$M_4$} & Hybrid Model Cascading
@@ -155,13 +155,8 @@ To complement the academic benchmark with domain-specific enterprise workloads, 
 \label{subsec:eval_metrics}
 
 
-The empirical evaluation of system performance, operational expenditure, and response quality is conducted using the industry-standard RAGAS evaluation suite~\citep{es2024ragas} combined with enterprise-grade application telemetry. Within the RAGAS framework, Claude Sonnet 5 is deployed as an automated LLM-as-a-judge at zero temperature ($T=0.0$) to ensure deterministic evaluation scoring. The following subsections formally establish the measurement instrumentation and mathematical formulation for each research question. 
+The empirical evaluation of system performance, operational expenditure, and response quality is conducted using the industry-standard RAGAS evaluation suite~\citep{es2024ragas} combined with enterprise-grade application telemetry. Within the RAGAS framework, Claude Sonnet 5 is deployed as an automated LLM-as-a-judge at zero temperature ($T=0.0$) to ensure deterministic evaluation scoring, following the standards in the literature. The following subsections formally establish the measurement instrumentation and mathematical formulation for each research question. 
 % DRAFT NOTES - LOCKED EVALUATION & MEASUREMENT DECISIONS:
-
-
-
-
-
 % --- RQ1: Latency Instrumentation ---
 \subsubsection{Latency Profiles and Computational Overhead}
 \label{sec:latency}
@@ -194,7 +189,7 @@ Operational expenditure constitutes a critical bottleneck for enterprise RAG ado
 \text{Cost}(q) = N_{\text{uncached}} \cdot P_{\text{prompt}} + N_{\text{cached}} \cdot P_{\text{cached}} + N_{\text{comp}} \cdot P_{\text{comp}} + N_{\text{rerank}} \cdot P_{\text{rerank}}
 \end{equation}
 
-where $N_{\text{uncached}}$ and $N_{\text{cached}}$ represent the number of uncached and cached prompt tokens billed at unit rates $P_{\text{prompt}}$ and $P_{\text{cached}}$ respectively (reflecting the 75\% discount applied to cached input context), $N_{\text{comp}}$ denotes the generated completion tokens billed at rate $P_{\text{comp}}$ for the active generative model tier, and $N_{\text{rerank}}$ represents the count of candidate passages evaluated by the cross-encoder at per-request rate $P_{\text{rerank}}$. Fixed persistent infrastructure expenses, such as base Cloud SQL hosting, are invariant across configurations and therefore excluded from per-query operational cost calculations.
+where $N_{\text{uncached}}$ and $N_{\text{cached}}$ represent the number of uncached and cached prompt tokens billed at unit rates $P_{\text{prompt}}$ and $P_{\text{cached}}$ respectively (reflecting the 90\% discount applied to cached input context), $N_{\text{comp}}$ denotes the generated completion tokens billed at rate $P_{\text{comp}}$ for the active generative model tier, and $N_{\text{rerank}}$ represents the count of candidate passages evaluated by the cross-encoder at per-request rate $P_{\text{rerank}}$. Fixed persistent infrastructure expenses, such as base Cloud SQL hosting, are invariant across configurations and therefore excluded from per-query operational cost calculations.
 
 % 2. EXACT OPERATIONAL COST ACCOUNTING (RQ2):
 %    - Execution Cost Formula: Cost ($) = (N_uncached * P_prompt) + (N_cached * P_cached) + (N_completion * P_completion) + (N_rerank_calls * P_rerank).
@@ -214,12 +209,16 @@ The usefulness of the RAG pipeline is defined by the quality of the generated an
 \text{Context Precision}@K = \frac{\sum_{k=1}^{K} \left( \text{Precision}@k \times v_k \right)}{\sum_{k=1}^{K} v_k}
 \end{equation}
 
+where $K$ is the retrieval cutoff depth, $v_k \in \{0, 1\}$ represents the binary ground-truth relevance indicator of the context chunk ranked at position $k$, and $\text{Precision}@k$ is the precision computed at rank cutoff $k$.
+
 \paragraph{Context Recall.} Context Recall, defined in Equation~\ref{eq:context_recall}, measures how many relevant chunks the system could retrieve successfully during the retrieval phase~\citep{es2024ragas}.
 
 \begin{equation}
 \label{eq:context_recall}
 \text{Context Recall} = \frac{|S_{\text{ground}} \cap S_{\text{retrieved}}|}{|S_{\text{ground}}|}
 \end{equation}
+
+where $S_{\text{ground}}$ denotes the set of reference factual statements in the ground truth, and $S_{\text{retrieved}}$ represents the sentences extracted from the retrieved context passages.
 
 \paragraph{Faithfulness.} Faithfulness measures the factual consistency of the system's responses against the retrieved context~\citep{es2024ragas}. The formula is defined in Equation~\ref{eq:faithfulness}.
 
@@ -228,12 +227,16 @@ The usefulness of the RAG pipeline is defined by the quality of the generated an
 \text{Faithfulness} = \frac{|C_a \cap C_{R_q}|}{|C_a|}
 \end{equation}
 
+where $C_a$ denotes the set of individual factual claims extracted from generated answer $a$, and $C_{R_q}$ represents the subset of claims that can be directly verified against retrieved context $R_q$.
+
 \paragraph{Answer Relevance.} Answers that are considered relevant for the user are those that directly answer the question at hand~\citep{es2024ragas}. Answer Relevance measures this relevance and is defined in Equation~\ref{eq:answer_relevance}.
 
 \begin{equation}
 \label{eq:answer_relevance}
 \text{Answer Relevance} = \frac{1}{N_g} \sum_{i=1}^{N_g} \frac{E(q) \cdot E(q_i^{\text{gen}})}{\|E(q)\| \|E(q_i^{\text{gen}})\|}
 \end{equation}
+
+where $N_g$ denotes the number of synthetic queries generated from the model's response by the evaluation judge, $q_i^{\text{gen}}$ is the $i$-th generated query, and $E(\cdot)$ represents the dense embedding function used to compute cosine similarity against the original query $q$.
 
 \paragraph{Composite Quality Score.} The Composite Quality Score is calculated as the harmonic mean of the scores calculated in Equations~\ref{eq:context_precision}, \ref{eq:context_recall}, \ref{eq:faithfulness}, and~\ref{eq:answer_relevance}. This quality score is used to identify the optimal Pareto frontier in Section~\ref{sec:pareto}.
 
