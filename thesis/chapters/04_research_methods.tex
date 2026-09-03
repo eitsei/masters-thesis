@@ -329,21 +329,19 @@ where $K$ is the total number of retrieved context chunks, $v_k \in \{0, 1\}$ re
 
 \begin{equation}
 \label{eq:context_recall}
-\text{Context Recall} = \begin{cases}
-\frac{|\text{Ground Truth Sentences Attributed to Context}|}{|\text{Total Sentences in Ground Truth}|}, & \text{if } |\text{Total Sentences in Ground Truth}| > 0 \\
-1.0, & \text{otherwise (valid refusal)}
-\end{cases}
+\text{Context Recall} = \frac{|\text{Ground Truth Sentences Attributed to Context}|}{|\text{Total Sentences in Ground Truth}|}
 \end{equation}
+
+In edge cases where the reference ground truth contains no factual statements (e.g., in valid out-of-domain queries), Context Recall defaults to $1.0$ to prevent division by zero.
 
 \paragraph{Faithfulness.} Faithfulness measures the factual consistency of the generated response against retrieved context $R_q$, penalizing ungrounded hallucinations~\citep{es2024ragas}:
 
 \begin{equation}
 \label{eq:faithfulness}
-\text{Faithfulness} = \begin{cases}
-\frac{|\text{Claims in Answer Inferred from Context}|}{|\text{Total Claims in Generated Answer}|}, & \text{if } |\text{Total Claims in Generated Answer}| > 0 \\
-1.0, & \text{otherwise (valid refusal)}
-\end{cases}
+\text{Faithfulness} = \frac{|\text{Claims in Answer Inferred from Context}|}{|\text{Total Claims in Generated Answer}|}
 \end{equation}
+
+For valid refusals where the generated answer contains no affirmative factual claims, Faithfulness defaults to $1.0$.
 
 \paragraph{Answer Relevancy.} Answer Relevancy quantifies how directly the generated response addresses the user's initial prompt, penalizing incomplete answers or extraneous verbosity~\citep{es2024ragas}:
 
