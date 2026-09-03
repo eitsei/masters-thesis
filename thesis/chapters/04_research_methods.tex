@@ -356,10 +356,10 @@ where $N$ denotes the number of synthetic questions generated from the model's r
 
 \begin{equation}
 \label{eq:composite_quality}
-Q(q) = \frac{4}{\frac{1}{\text{Context Precision}(q) + \epsilon} + \frac{1}{\text{Context Recall}(q) + \epsilon} + \frac{1}{\text{Faithfulness}(q) + \epsilon} + \frac{1}{\text{Answer Relevancy}(q) + \epsilon}}
+Q(q) = \frac{4}{\frac{1}{\text{CP}(q) + \epsilon} + \frac{1}{\text{CR}(q) + \epsilon} + \frac{1}{\text{Faith}(q) + \epsilon} + \frac{1}{\text{AR}(q) + \epsilon}}
 \end{equation}
 
-where $\epsilon = 10^{-4}$ is a minimal smoothing parameter introduced to guarantee numerical stability and penalize catastrophic failures in any single quality dimension.
+where $\text{CP}(q)$, $\text{CR}(q)$, $\text{Faith}(q)$, and $\text{AR}(q)$ denote Context Precision, Context Recall, Faithfulness, and Answer Relevancy for query $q$, respectively, and $\epsilon = 10^{-4}$ is a minimal smoothing parameter introduced to guarantee numerical stability and penalize catastrophic failures in any single quality dimension.
 
 %
 % 3. QUALITY METRICS & LLM-AS-A-JUDGE SETUP (RQ3):
