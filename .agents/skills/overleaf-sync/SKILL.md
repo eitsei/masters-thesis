@@ -45,5 +45,20 @@ To pull changes from Overleaf to your local workspace:
    ./.agents/skills/overleaf-sync/scripts/sync.sh pull
    ```
 
-## Troubleshooting
-If you encounter merge conflicts, resolve them in the `thesis/` subdirectory, commit the resolved files locally, and push again.
+## Ground Truth & Conflict Resolution Policy
+- **Ground Truth**: Overleaf is **always the ground truth** for all files under `thesis/`.
+- **Conflict Handling**: Whenever merge conflicts occur during pulling from Overleaf or subtree sync, prioritize and resolve conflicts in favor of the Overleaf version.
+
+## Troubleshooting & Conflict Resolution
+If you encounter merge conflicts during `git subtree pull`:
+1. Check out the Overleaf version for conflicting files under `thesis/`:
+   ```bash
+   git checkout --theirs <conflicted_files>
+   ```
+2. Mark the conflicts as resolved:
+   ```bash
+   git add thesis/
+   git commit -m "Merge Overleaf changes into thesis (resolved conflicts in favor of Overleaf)"
+   ```
+3. Overleaf remains the authoritative source of truth.
+
