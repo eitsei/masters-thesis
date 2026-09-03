@@ -329,10 +329,8 @@ where $K$ is the total number of retrieved context chunks, $v_k \in \{0, 1\}$ re
 
 \begin{equation}
 \label{eq:context_recall}
-\text{Context Recall} = \frac{|\{s \in S_{\text{ref}} \mid R_q \models s\}|}{|S_{\text{ref}}|}
+\text{Context Recall} = \frac{|\text{Ground Truth Sentences Attributed to Context}|}{|\text{Total Sentences in Ground Truth}|}
 \end{equation}
-
-where $S_{\text{ref}}$ denotes the set of claims extracted from the reference answer, and $R_q \models s$ indicates that reference claim $s$ is semantically supported by the retrieved context $R_q$.
 
 \paragraph{Faithfulness.} Faithfulness measures the factual consistency of the generated response $a$ against the retrieved context $R_q$, penalizing ungrounded hallucinations~\citep{es2024ragas}:
 
