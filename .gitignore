@@ -4,3 +4,5 @@ token.txt
 target/
 .idea/
 *.iml
+data/
+rag-benchmark/data/

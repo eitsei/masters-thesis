@@ -30,6 +30,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class RagQueryService {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(RagQueryService.class);
+    private static final java.util.concurrent.ScheduledExecutorService PROGRESS_SCHEDULER = java.util.concurrent.Executors
+            .newSingleThreadScheduledExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "rag-progress-logger");
+                thread.setDaemon(true);
+                return thread;
+            });
+
     private final VectorStore vectorStore;
     private final ChatModel chatModel;
     private final Reranker reranker;
@@ -63,16 +71,34 @@ public class RagQueryService {
             throw new ModuleNotImplementedException(modules);
         }
 
+        logger.info("Executing RAG query: \"{}\"", query);
+
         Timer.Sample retrievalSample = Timer.start(meterRegistry);
         List<Document> retrieved = vectorStore.similaritySearch(
                 SearchRequest.builder().query(query).topK(topK).build());
         long retrievalNanos = retrievalSample.stop(meterRegistry.timer("rag.pipeline.retrieval"));
+        long retrievalMs = TimeUnit.NANOSECONDS.toMillis(retrievalNanos);
 
         List<Document> reranked = reranker.rerank(query, retrieved);
+        logger.info("Retrieved {} chunk(s) in {} ms. Generating answer...", reranked.size(), retrievalMs);
+
+        long startGenTime = System.currentTimeMillis();
+        java.util.concurrent.ScheduledFuture<?> progressTask = PROGRESS_SCHEDULER.scheduleAtFixedRate(() -> {
+            long elapsedSeconds = (System.currentTimeMillis() - startGenTime) / 1000;
+            logger.info("Still generating answer... took {}s", elapsedSeconds);
+        }, 3, 3, TimeUnit.SECONDS);
 
         Timer.Sample generationSample = Timer.start(meterRegistry);
-        String answer = chatModel.call(buildPrompt(query, reranked));
-        long generationNanos = generationSample.stop(meterRegistry.timer("rag.pipeline.generation"));
+        String answer;
+        long generationNanos;
+        try {
+            answer = chatModel.call(buildPrompt(query, reranked));
+        } finally {
+            progressTask.cancel(false);
+            generationNanos = generationSample.stop(meterRegistry.timer("rag.pipeline.generation"));
+        }
+        long generationMs = TimeUnit.NANOSECONDS.toMillis(generationNanos);
+        logger.info("Answer generated in {} ms ({} chars)", generationMs, answer != null ? answer.length() : 0);
 
         List<RetrievedChunk> retrievedChunks = reranked.stream()
                 .map(document -> new RetrievedChunk(document.getId(), snippet(document.getText())))
@@ -82,8 +108,8 @@ public class RagQueryService {
                 answer,
                 Set.of(),
                 retrievedChunks,
-                TimeUnit.NANOSECONDS.toMillis(retrievalNanos),
-                TimeUnit.NANOSECONDS.toMillis(generationNanos));
+                retrievalMs,
+                generationMs);
     }
 
     private String buildPrompt(String query, List<Document> chunks) {
