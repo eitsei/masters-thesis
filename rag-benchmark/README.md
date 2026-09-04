@@ -138,6 +138,12 @@ Notes:
   cookie-banner stripping in `NordeaCrawler` is a best-effort heuristic — spot-check a few
   ingested chunks after a run and tune the CSS selectors there if you see leftover site chrome.
 
+## Multi-hop benchmark dataset: MuSiQue
+
+The project includes full integration with the **MuSiQue** multi-hop QA benchmark dataset for evaluating retrieval recall and answer generation across 2-hop, 3-hop, and 4-hop questions.
+
+For full instructions, REST API endpoints, and evaluation workflows, see [`MUSIQUE_BENCHMARK.md`](MUSIQUE_BENCHMARK.md).
+
 ## Switching to the cloud (Gemini) path
 
 By default, both chat and embeddings run against local Ollama. To use Google Gemini
