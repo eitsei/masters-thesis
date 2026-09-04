@@ -1,0 +1,174 @@
+spring:
+  application:
+    name: rag-benchmark
+  ai:
+    model:
+      chat: ${SPRING_AI_MODEL_CHAT:ollama}
+      # Both properties are needed, driven by the same env var. spring.ai.model.embedding
+      # gates OllamaEmbeddingAutoConfiguration; Google's is gated by the separate, more
+      # specific spring.ai.model.embedding.text (matchIfMissing=true on THAT property, so
+      # leaving it unset means the Google GenAI embedding bean is created regardless of
+      # the setting above -- confirmed by decompiling both autoconfigure classes: the two
+      # providers do not share one switch property for embeddings the way they do for
+      # chat). Without this second line, having both embedding starters on the classpath
+      # (needed to fix Gemini embeddings existing at all -- see pom.xml) makes Spring fail
+      # to start with "required a single bean, but 2 were found" regardless of which
+      # provider spring.ai.model.embedding names.
+      embedding: ${SPRING_AI_MODEL_EMBEDDING:ollama}
+      embedding.text: ${SPRING_AI_MODEL_EMBEDDING:ollama}
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://172.21.64.1:11434}
+      chat:
+        model: ${OLLAMA_CHAT_MODEL:gemma4:e2b}
+      embedding:
+        model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+    google:
+      genai:
+        # Chat connection (spring.ai.google.genai.*). Leaving api-key as the only
+        # populated auth property here makes Spring AI pick Gemini Developer API /
+        # "AI Studio" mode by default. To switch to Vertex AI mode later: uncomment
+        # BOTH lines below, set GOOGLE_CLOUD_PROJECT_ID / GOOGLE_CLOUD_LOCATION in
+        # your env (see .env.example), and run
+        # `gcloud auth application-default login` first.
+        api-key: ${GOOGLE_AI_API_KEY:}
+        # project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
+        # location: ${GOOGLE_CLOUD_LOCATION:us-central1}
+        chat:
+          # Defaults to the catalog's "flash" tier (rag.models.google-genai.flash,
+          # below) so there's one place that literal is written; GOOGLE_GENAI_CHAT_MODEL
+          # still overrides it independently for ad hoc local runs.
+          model: ${GOOGLE_GENAI_CHAT_MODEL:${rag.models.google-genai.flash}}
+        embedding:
+          # NOTE: Spring AI's Google GenAI embedding support binds a SEPARATE
+          # connection-properties block (spring.ai.google.genai.embedding.*) from the
+          # chat block above -- it does NOT inherit spring.ai.google.genai.api-key.
+          # The same key must be repeated here; otherwise, as soon as
+          # SPRING_AI_MODEL_EMBEDDING=google-genai, Spring AI falls back to requiring
+          # project-id/location and the app fails to start with
+          # "Google GenAI project-id must be set!" (verified against
+          # spring-ai-autoconfigure-model-google-genai 2.0.0 bytecode).
+          #
+          # The "unset-see-application-yml" default below (not simply empty, unlike the
+          # chat api-key above) works around a real gap in Spring AI 2.0.0: the embedding
+          # connection-details bean (GoogleGenAiEmbeddingConnectionAutoConfiguration) has
+          # NO @ConditionalOnProperty at all -- only @ConditionalOnClass -- unlike the chat
+          # side, where spring.ai.model.chat=google-genai gates the whole autoconfiguration
+          # class. So once spring-ai-starter-model-google-genai-embedding is on the
+          # classpath (needed just to make Gemini embeddings exist -- see pom.xml), this
+          # bean is created eagerly at every startup, Ollama-only runs included, and its
+          # factory method unconditionally Assert.hasText-validates api-key/project-id
+          # regardless of spring.ai.model.embedding.text. A non-blank placeholder here
+          # satisfies that check for the default local (Ollama) path; it is never sent
+          # anywhere unless SPRING_AI_MODEL_EMBEDDING=google-genai is also set, at which
+          # point a real GOOGLE_AI_API_KEY is required (documented in .env.example) and
+          # this placeholder is overridden by it.
+          api-key: ${GOOGLE_AI_API_KEY:unset-see-application-yml}
+          # project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
+          # location: ${GOOGLE_CLOUD_LOCATION:us-central1}
+          text:
+            # NOTE: the model property lives one level deeper than the chat one --
+            # spring.ai.google.genai.embedding.text.model, NOT
+            # spring.ai.google.genai.embedding.model (also verified against the
+            # autoconfigure bytecode; the reference docs are inconsistent on this).
+            model: ${GOOGLE_GENAI_EMBEDDING_MODEL:gemini-embedding-001}
+            # gemini-embedding-001 natively outputs much larger vectors; this uses its
+            # Matryoshka Representation Learning (MRL) truncation support to match the
+            # same 768-dim pgvector column nomic-embed-text (the local default) already
+            # uses, so switching providers never requires a schema migration. Verified
+            # via javap against GoogleGenAiTextEmbeddingOptions (has a `dimensions`
+            # field) and GoogleGenAiTextEmbeddingProperties (CONFIG_PREFIX
+            # "spring.ai.google.genai.embedding.text", also exposes `dimensions`).
+            dimensions: 768
+    vectorstore:
+      pgvector:
+        # Local-dev/testing table, kept distinct so later datasets (synthetic, MuSiQue)
+        # can each get their own table without colliding with this one.
+        table-name: ${SPRING_AI_VECTORSTORE_PGVECTOR_TABLE_NAME:vector_store_musique}
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 768
+        initialize-schema: true
+
+# Fallback datasource config -- NOT needed for local dev. spring-boot-docker-compose
+# auto-detects the `postgres` service in docker-compose.yml (via the
+# org.springframework.boot.service-connection label) and supplies
+# spring.datasource.url/username/password automatically at startup, before the
+# spring-ai-starter-vector-store-pgvector auto-configuration needs a JdbcTemplate.
+# Uncomment below only when running against a Postgres instance that Docker Compose
+# did NOT start for you (e.g. a manually managed/remote instance); the values below
+# match the docker-compose.yml credentials (host port 5433, see docker-compose.yml).
+#  datasource:
+#    url: jdbc:postgresql://localhost:5433/ragbenchmark
+#    username: ragbenchmark
+#    password: ragbenchmark
+
+# One-off local test-data ingestion tool (com.dippa.ragbenchmark.ingest.nordea): crawls
+# nordea.fi/private-banking and writes chunked pages/PDFs into the vector_store_test table
+# above. Disabled by default so a normal `mvn spring-boot:run` never triggers a live crawl --
+# see README for how to run it explicitly.
+ingest:
+  nordea:
+    enabled: false
+    base-url: https://www.nordea.fi/private-banking/
+    max-pages: 150
+    max-pdfs: 50
+    max-pdf-size-bytes: 20000000
+    request-delay-millis: 400
+    user-agent: "RagBenchmarkThesisCrawler/1.0 (+mailto:aj.asunmaa@gmail.com; academic research, single crawl run)"
+  musique:
+    enabled: false
+    sample-only: true
+    sample-size: 100
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+
+# Reference catalog -- bound by ModelCatalogProperties, not yet read by any bean, but
+# `flash` below IS the single source of truth for spring.ai.google.genai.chat.model's
+# default (above): flash is M0's active/base model today AND the tier M4 (model
+# routing/cascading) will treat as its medium-complexity/fallback tier once it exists.
+# flash-lite and pro are the other two tiers M4 will choose between; the reranker
+# entries are M2's two candidate backends. See thesis chapter 4 (System Implementation
+# / Optimization Pipeline) for where these come from.
+rag:
+  query:
+    # Length (in characters) of the `snippet` field on each retrievedChunks entry in
+    # POST /api/query's response -- read directly by RagQueryService via @Value, not a
+    # ConfigurationProperties class (it's a single scalar, not a group). This is a display
+    # truncation only: retrieval and generation always use the full chunk text regardless of
+    # this value (see RagQueryService#buildPrompt). Chunk size is measured in *tokens* (512,
+    # see DocumentIngestionService), which doesn't map to a fixed character count, so
+    # Integer.MAX_VALUE is used here to mean "never truncate, always show the whole chunk"
+    # rather than guessing a character number that happens to be big enough. Lower this (e.g.
+    # to 200) to get short previews back instead.
+    snippet-length-chars: 2147483647
+    # Number of chunks retrieved from vector_store_test per query, before reranking (the M0
+    # baseline's Reranker is a no-op, so this is also how many chunks end up in the prompt and
+    # in retrievedChunks). Read directly by RagQueryService via @Value, same as
+    # snippet-length-chars above.
+    top-k: 5
+  models:
+    google-genai:
+      flash-lite: gemini-3.5-flash-lite
+      flash: gemini-3.7-flash
+      pro: gemini-3.1-pro-preview
+    reranker:
+      vertex-default: semantic-ranker-default-004
+      vertex-fast: semantic-ranker-fast-004
+      local-fallback-options:
+        - deberta-v3-large
+        - jina-reranker-v2
+  dataset:
+    musique:
+      file-path: ${MUSIQUE_DATASET_PATH:data/musique/musique_ans_v1.0_dev.jsonl}
+      sample-size: 100
+      two-hop-ratio: 0.40
+      three-hop-ratio: 0.30
+      four-hop-ratio: 0.30
+      random-seed: 42
+      batch-size: 100
+      include-title-in-chunk-text: true
+
