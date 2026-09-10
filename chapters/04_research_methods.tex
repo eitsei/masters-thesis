@@ -62,11 +62,11 @@ Tests are conducted independently across each evaluation metric using a two-tail
 \toprule
 \textbf{Target} & \textbf{Metric} & \textbf{Null Hypothesis ($H_0$)} & \textbf{Alternative Hypothesis ($H_1$)} \\
 \midrule
-\textbf{RQ1} & Latency (TTFT, E2E) & $\tilde{\mu}_{\Delta \text{Latency}} = 0$ (no latency difference) & $\tilde{\mu}_{\Delta \text{Latency}} \neq 0$ (latency changes) \\
+\textbf{RQ1} & Latency (TTFT, E2E) & $\tilde{\mu}_{\Delta \text{Latency}} = 0$  & $\tilde{\mu}_{\Delta \text{Latency}} \neq 0$  \\
 \addlinespace
-\textbf{RQ2} & Cost (USD / tokens) & $\tilde{\mu}_{\Delta \text{Cost}} = 0$ (no cost difference) & $\tilde{\mu}_{\Delta \text{Cost}} \neq 0$ (cost changes) \\
+\textbf{RQ2} & Cost (USD / tokens) & $\tilde{\mu}_{\Delta \text{Cost}} = 0$  & $\tilde{\mu}_{\Delta \text{Cost}} \neq 0$  \\
 \addlinespace
-\textbf{RQ3} & Quality (RAGAS) & $\tilde{\mu}_{\Delta \text{Quality}} = 0$ (no quality difference) & $\tilde{\mu}_{\Delta \text{Quality}} \neq 0$ (quality changes) \\
+\textbf{RQ3} & Quality (RAGAS) & $\tilde{\mu}_{\Delta \text{Quality}} = 0$ ) & $\tilde{\mu}_{\Delta \text{Quality}} \neq 0$ \\
 \bottomrule
 \end{tabularx}
 
@@ -74,66 +74,13 @@ Tests are conducted independently across each evaluation metric using a two-tail
 \parbox{\linewidth}{\footnotesize
 \textbf{Notes:} $\tilde{\mu}_{\Delta}$ represents the median paired difference between configuration $C_k$ and the naive baseline $C_0$. Tests are evaluated at significance level $\alpha = 0.05$.}
 \end{table}
-% DRAFT NOTES & SUGGESTIONS FOR REVISION:
-% - Experimental quantitative benchmarking approach.
-% - Addressing RQ1 (Latency/TTFT), RQ2 (Cost $), RQ3 (Quality/RAGAS), RQ4 (Pareto Equilibrium).
-% - Multi-iteration execution protocol:
-%   * Execute 2 untracked warm-up queries per configuration to prime JVM C1/C2 JIT compilation, HikariCP database connection pools, TLS handshakes, and GCP context caches.
-%   * Record the subsequent 10 steady-state iterations to compute median (P50) and tail (P95) latencies.
-%   * Record initial cold-cache write latency separately from steady-state warm-cache read latency for Prompt Caching (M3) ROI analysis.
-% - TWO-STAGE EXPERIMENTAL STRATEGY:
-%   1. Single-Factor Isolated Testing: Test each optimization module (M1, M2, M3, M4) separately against M0 Baseline to quantify individual impact.
-%   2. Combinatorial Stacking & Interaction Analysis: Evaluate pairwise and multi-module combinations up to full stack (M1+M2+M3+M4) to identify Pareto frontier and systemic trade-offs (RQ4).
-% - Statistical Significance Testing Protocol:
-%   * Evaluate pairwise performance differences across configurations (C1-C15 vs C0) using paired two-tailed Wilcoxon signed-rank tests with Bonferroni-Holm correction.
-%   * Report 95% bootstrap confidence intervals (CI_95%) alongside median and IQR dispersion metrics.
 
 \subsection{System Implementation and Models}
 \label{subsec:sys_implementation}
 
 The experimental testbed is built upon a production-grade enterprise software stack. The application is implemented in Java 21 LTS using Spring Boot 4.1.0 and Spring AI version 2.0.0. Relational metadata and vector embeddings are managed in PostgreSQL version 16 with the \texttt{pgvector} extension (version 0.8.0), utilizing Hierarchical Navigable Small World (HNSW) indexing with cosine distance~\citep{lewis2020rag}. The index uses standard parameters ($M = 16$, $ef\_construction = 64$, $ef\_search = 40$) to achieve high retrieval recall with sub-5\,ms search latency. The software stack is deployed on Google Cloud Platform (GCP), with the database hosted on fully managed Google Cloud SQL instances to replicate a realistic enterprise production environment. Services are co-located within a dedicated Virtual Private Cloud (VPC) using private IP peering in the \texttt{europe-north1} region to minimize round-trip time (RTT) and eliminate network latency variance. 
 
-The primary foundation model for generation is Google Gemini 3.7 Flash; for model cascading ($M_4$), Gemini 3.5 Flash-Lite and Gemini 3.1 Pro are utilized as low-latency and high-capacity tiers, respectively. Dense vector representations are generated using \texttt{gemini-embedding-2}, configured with an output dimensionality of 768 via Matryoshka Representation Learning (MRL)~\citep{MRL2022} to balance retrieval efficiency with storage requirements. For two-stage semantic re-ranking ($M_2$), Google Cloud's Vertex AI Ranking API with the \texttt{semantic-ranker-default-004} cross-encoder model is employed. 
-
-% DRAFT NOTES - LOCKED SYSTEM IMPLEMENTATION DECISIONS:
-%
-% TODO: Add Visual System Architecture Diagram (figure illustrating Spring AI orchestrator, pgvector vector store, GCP Vertex Ranking API, GCP Context Cache, and 3 Gemini model tiers).
-%
-% 1. SOFTWARE STACK & VERSION BASELINE:
-%    - Java Baseline: Java 21 LTS.
-%    - Framework: Spring Boot 4.0.0 + Spring AI 2.0.0 (spring-ai-starter-model-google-genai).
-%    - Database Engine: PostgreSQL 16 + pgvector extension (v0.8.0).
-%    - Vector Indexing Specification (SUGGESTION): Explicitly document HNSW index parameters:
-%      * Index type: HNSW with Cosine Distance operator (<=> / vector_cosine_ops).
-%      * Construction hyper-parameters: M = 16 (bidirectional links per node), ef_construction = 64.
-%      * Query-time search parameter: SET LOCAL hnsw.ef_search = 40 (balancing 99%+ recall with <5ms search latency).
-%    - Infrastructure & Hardware Sizing (SUGGESTION):
-%      * Cloud SQL Instance: db-custom-4-16384 (4 vCPU, 16 GB RAM, SSD persistent storage).
-%      * Application Runtime: Containerized Spring Boot service allocated 4 vCPUs, 8 GB RAM.
-%      * JVM Flags: -Xms4g -Xmx4g -XX:+UseG1GC.
-%    - Instrumentation: Spring Boot Actuator with Micrometer export for microsecond TTFT, end-to-end latency, and token accounting (RQ1 & RQ2).
-%
-% 2. CLOUD INFRASTRUCTURE & API GATEWAY (3 GEMINI MODEL TIERS):
-%    - Infrastructure: GCP Vertex AI enterprise gateway (aiplatform.googleapis.com in us-central1 / europe-west4 via IAM/ADC), with Google AI Studio API key fallback (generativelanguage.googleapis.com) for local testing.
-%    - Co-location & Network Topology: Private IP VPC peering between Cloud SQL and application service in europe-north1; regional endpoint routing for Vertex AI.
-%    - Generative Model Tiers (Module M4 Model Cascading):
-%      1. gemini-3.5-flash-lite : Ultra-fast / low-cost tier for query routing & low-complexity single-hop tasks.
-%      2. gemini-3.7-flash      : Primary workhorse for medium-complexity generation, coding, and fast context synthesis.
-%      3. gemini-3.1-pro        : Flagship reasoning model for complex multi-hop synthesis (3-hop / 4-hop queries) and fallback.
-%
-% 3. NATIVE EMBEDDINGS ARCHITECTURE:
-%    - Primary Model: GCP Native gemini-embedding-2.
-%    - Dimensionality Optimization: Matryoshka Representation Learning (MRL) configured to output 768 dimensions (via output_dimensionality=768) to minimize storage overhead and vector search latency without accuracy loss.
-%
-% 4. TWO-STAGE RE-RANKING ARCHITECTURE:
-%    - Production Standard: GCP Vertex AI Ranking API (Semantic Ranker: semantic-ranker-default-004 & semantic-ranker-fast-004).
-%    - Local Development Option: Optional local fallback using TEI-hosted open cross-encoders (e.g. deberta-v3-large / jina-reranker-v2) for offline testing without cloud credentials.
-%    - Candidate Pool: First-stage vector search retrieves top-50 candidates; cross-encoder reranks top-50 down to top-5 pruned chunks.
-%
-% 5. DATABASE DEPLOYMENT & LOCAL-TO-CLOUD PORTABILITY:
-%    - Local Development: PostgreSQL 16 + pgvector running in Docker container.
-%    - GCP Cloud Production: Cloud SQL for PostgreSQL 16 with pgvector extension.
-%    - Portability & Migration: 100% feature and SQL operator parity (<=> Cosine distance, HNSW indexing). Data migration via standard pg_dump -Fc locally and pg_restore to Cloud SQL.
+The primary foundation model for generation is Google Gemini 3.7 Flash; for model cascading ($M_4$), Gemini 3.5 Flash-Lite and Gemini 3.1 Pro are utilized as low-latency and high-capacity tiers, respectively. Dense vector representations are generated using \texttt{gemini-embedding-2}, configured with an output dimensionality of 768 via Matryoshka Representation Learning (MRL)~\citep{MRL2022} to balance retrieval efficiency with storage requirements. For two-stage semantic re-ranking ($M_2$), Google Cloud's Vertex AI Ranking API with the \texttt{semantic-ranker-default-004} cross-encoder model is employed.
 
 \subsection{Optimization Pipeline}
 \label{subsec:opt_pipeline}
@@ -187,56 +134,18 @@ A minimum threshold of 4096 tokens is selected to satisfy the operational bounda
 \paragraph{Hybrid Model Routing ($M_4$).}
 To replicate real-world enterprise deployments where query complexity is unknown a priori, an automated zero-shot classifier powered by Gemini 3.5 Flash-Lite dynamically evaluates incoming queries. Straightforward single-hop requests are handled directly by Gemini 3.5 Flash-Lite, intermediate queries requiring multi-passage synthesis are escalated to Gemini 3.7 Flash, and complex multi-hop reasoning tasks are routed to Gemini 3.1 Pro. The latency overhead ($T_{\text{route}}$) and token costs of the classifier are explicitly recorded in the evaluation.
 
-    % - Module 4 (M4): Hybrid Model Routing & Fallback Cascading \cite{chen2023frugalgpt, ong2025routellm, zhang2025ragrouter, jeong2024adaptive, guo2026deepsieve, park2025stoprag}.
-%   * Router Implementation Specification: Clarify whether M4 utilizes:
-%     (a) An automated runtime query complexity classifier (e.g., embedded Spring AI ONNX classifier or zero-shot Gemini 3.5 Flash-Lite router) with measured inference latency T_route and classification accuracy, OR
-%     (b) An Oracle Hop-Count Router based on dataset ground-truth hop metadata, representing the theoretical upper-bound ceiling for cascading efficiency.
-% - Long-Context Direct Baseline Comparison: Acknowledge direct long-context ingestion (No-RAG with 1M+ context window on Gemini Pro) as an architectural reference baseline.
-
-% DRAFT NOTES & SUGGESTIONS FOR REVISION:
-% - Baseline (M0): Naive flat RAG (fixed 512-token chunks with 50-token overlap, bi-encoder top-5, no caching) \cite{smigielski2026chunking, lewis2020rag}.
-% - Module 1 (M1): Small-to-Big Retrieval (128 token child chunks expanding to 1024 parent windows via native Java metadata mapping in Spring AI) \cite{demourajunior2026adaptive, li2026bridgerag, chen2026logicrag}.
-%   * Architectural Suggestion (Deduplication & Interval Merging): Specify that when top-k child chunks belong to the same or overlapping parent documents, a deduplication and interval-merging step collapses overlapping parent boundaries prior to prompt injection to prevent context duplication and token explosion (e.g., preventing 5 separate 1024-token parents from consuming 5120 tokens).
-% - Module 2 (M2): Two-Stage Semantic Re-ranking (GCP Vertex AI Ranking API: semantic-ranker-default-004 in production) \cite{moreira2024enhancing, cheng2026enhancing, yu2024rankrag, wang2025infogain}.
-%   * Combinatorial Sequencing (M1 + M2 Interaction): In combined configurations (C5, C11, C12, C15), the execution order is:
-%     1. First-stage dense vector retrieval fetches top-50 child chunks (128 tokens each = 6,400 tokens total).
-%     2. Vertex Ranking cross-encoder re-ranks the 50 child chunks directly.
-%     3. The top-5 winning child chunks are then expanded to their 1024-token parent windows for generation.
-%     (Note: Re-ranking child chunks instead of expanding 50 parent chunks first reduces cross-encoder input token payload by 8x from 51,200 tokens to 6,400 tokens, slashing re-ranking latency and API cost).
-%   * Dynamic Thresholding Extension: Acknowledge dynamic score threshold filtering (beta-cutoff, as in InfoGain-RAG) to prune irrelevant candidate chunks when fewer than 5 relevant chunks exist.
-% - Module 3 (M3): Prompt Caching (Dual-tier: GCP Gemini Context Caching for static system context and pre-indexed knowledge corpora >= 4096 tokens + dynamic KV prefix reuse for multi-turn sessions) \cite{gim2024promptcache, jin2025ragcache, lu2025turborag, yao2025cacheblend, wang2026fusionrag}.
-%   * Caching Context Specification: Explicit GCP Context Caching is established on static invariant prompt prefixes (system instructions and persistent knowledge bases >= 4096 tokens), while dynamic retrieved chunks benefit from KV prefix caching. Acknowledge hourly active cache storage TTL costs.
-% - Module 4 (M4): Hybrid Model Routing & Fallback Cascading \cite{chen2023frugalgpt, ong2025routellm, zhang2025ragrouter, jeong2024adaptive, guo2026deepsieve, park2025stoprag}.
-%   * Router Implementation Specification: Clarify whether M4 utilizes:
-%     (a) An automated runtime query complexity classifier (e.g., embedded Spring AI ONNX classifier or zero-shot Gemini 3.5 Flash-Lite router) with measured inference latency T_route and classification accuracy, OR
-%     (b) An Oracle Hop-Count Router based on dataset ground-truth hop metadata, representing the theoretical upper-bound ceiling for cascading efficiency.
-% - Long-Context Direct Baseline Comparison: Acknowledge direct long-context ingestion (No-RAG with 1M+ context window on Gemini Pro) as an architectural reference baseline.
-% - Extension: Thinking Effort Routing / Reasoning Budget Control (e.g. arXiv:2603.07915, OpenReview:W34UyCRQel).
-
 \subsection{Benchmark Datasets}
 \label{subsec:bench_datasets}
 
 The primary academic benchmark dataset is MuSiQue~\citep{trivedi2022musique}, from which a sample of 100 question--answer pairs is selected following established benchmarking methodologies in recent RAG literature~\citep{lumer2025rethinking, demourajunior2026adaptive}. Specifically, the sample comprises 40\% 2-hop questions and 60\% 3- and 4-hop questions to ensure balanced coverage across varying reasoning difficulty tiers. Multi-hop queries eliminate the reasoning shortcuts and surface-level lexical matching common in single-hop datasets~\citep{trivedi2022musique}, making them well-suited for evaluating Small-to-Big retrieval ($M_1$), Semantic Re-ranking ($M_2$), and Prompt Caching ($M_3$). Furthermore, stratifying the evaluation set by reasoning depth provides a realistic testbed for assessing hybrid Model Cascading ($M_4$) across distinct query complexity tiers. 
 
 To complement the academic benchmark with domain-specific enterprise workloads, a secondary evaluation dataset comprising 100 synthetically generated question--answer pairs is constructed to reflect real-world customer inquiries regarding the products and services of the partner enterprise. The underlying knowledge corpus is compiled by scraping the public-facing documentation and web portal of the partner organization, with the comprehensive extraction methodology detailed in Appendix~\ref{sec:appendix}. To evaluate pipeline robustness across varied interaction patterns, the dataset is partitioned into 40\% single-hop factual queries, 40\% multi-hop relational questions, and 20\% out-of-domain queries. For out-of-domain queries, the expected reference response is a standardized refusal string (\textit{``The provided context does not contain sufficient information to answer this query.''}), allowing rejection accuracy and hallucination resistance to be quantitatively evaluated.
- 
-
-% DRAFT NOTES & SUGGESTIONS FOR REVISION:
-% - Main Academic Benchmark: MuSiQue dataset (Trivedi et al., 2022) - sampled 100 queries (40% 2-hop, 60% 3-hop/4-hop).
-%   * Why MuSiQue: Eliminates single-hop reasoning shortcuts present in HotpotQA; 20 paragraphs/query (~2.5k-4k tokens) ideal for testing M1 (Small-to-Big), M2 (Re-ranking), and M3 (Prompt Caching).
-%   * Lexical Baseline Metrics: Report token-level F1 score and Exact Match (EM) against gold reference answers alongside RAGAS metrics for objective evaluation.
-%   * Hop-count difficulty tiers (2-hop vs 3/4-hop) natively replace RouterBench for M4 (Model Cascading: Gemini Flash vs Pro routing).
-% - Secondary Domain Corpus: Enterprise IT Customer Support Knowledge Base (500+ KB scraped text) + 100 synthetic QA pairs (40% single-hop, 40% multi-hop, 20% out-of-domain bypass).
-%   * Synthetic Generation Protocol: Specify generator model (e.g., multi-stage document-grounded prompt pipeline) and human expert verification filtering to eliminate ambiguous or hallucinated QA pairs.
-%   * Out-of-Domain (OOD) Ground Truth Specification: Standardized refusal reference string ("The provided context does not contain sufficient information to answer this query.") evaluated via Rejection Accuracy and Faithfulness.
-
 
 \subsection{Evaluation Setup and Metrics}
 \label{subsec:eval_metrics}
 
-The empirical evaluation of system performance, operational expenditure, and response quality is conducted using the industry-standard RAGAS evaluation suite~\citep{es2024ragas} combined with enterprise-grade application telemetry. Within the RAGAS framework, Claude Sonnet 5 is deployed as an automated LLM-as-a-judge at zero temperature ($T=0.0$) to ensure deterministic evaluation scoring, following established standards in the literature. The following subsections formally establish the measurement instrumentation and mathematical formulations for each research question. 
-% DRAFT NOTES - LOCKED EVALUATION & MEASUREMENT DECISIONS:
-% --- RQ1: Latency Instrumentation ---
+The empirical evaluation of system performance, operational expenditure, and response quality is conducted using the industry-standard RAGAS evaluation suite~\citep{es2024ragas} combined with enterprise-grade application telemetry. Within the RAGAS framework, Claude Sonnet 5 is deployed as an automated LLM-as-a-judge at zero temperature ($T=0.0$) to ensure deterministic evaluation scoring, following established standards in the literature. The following subsections formally establish the measurement instrumentation and mathematical formulations for each research question.
+
 \subsubsection{Latency Profiles and Computational Overhead}
 \label{sec:latency}
 
@@ -259,27 +168,6 @@ where $T_{\text{embed}}$ denotes query vectorization duration, $T_{\text{route}}
 
 Both median ($P_{50}$) and 95th percentile tail ($P_{95}$) latencies are reported across the steady-state executions to evaluate enterprise SLA compliance.
 
-%
-% 1. EFFICIENCY & LATENCY INSTRUMENTATION (RQ1):
-%    - Metrics: Time to First Token (TTFT in ms), End-to-End Latency (ms), and micro-phase breakdown:
-%      * T_embed  : Dense query vectorization via gemini-embedding-2 (output_dim=768).
-%      * T_route  : Query complexity evaluation / routing classifier overhead in M4.
-%      * T_ret    : First-stage dense vector search in Cloud SQL PostgreSQL pgvector.
-%      * T_rerank : Vertex AI Ranking API cross-encoder semantic re-sorting overhead in M2.
-%      * T_expand : Parent document resolution / relational metadata lookup in M1.
-%      * T_cache  : GCP context cache validation & prefix hash lookup in M3.
-%      * T_prefill: Generative LLM prefill and initial token dispatch latency (distinguished from user-perceived TTFT).
-%      * T_stream : Token-by-token generation and streaming completion latency.
-%    - TTFT Formulation Note: User-perceived TTFT_user(q) comprises:
-%      TTFT_user(q) = T_embed(q) + T_route(q) + T_ret(q) + T_rerank(q) + T_expand(q) + T_cache(q) + T_prefill(q).
-%      T_total(q) = TTFT_user(q) + T_stream(q).
-%    - Caching Latency Branches: Report cold-cache write latency (first execution) vs steady-state warm-cache read latency across recorded runs.
-%    - Measurement Protocol: Spring Boot Actuator + Micrometer Timers. 2 unmeasured warm-up runs + 10 recorded steady-state runs.
-%    - Reporting: Report both Median (P50) and P95 tail latency for enterprise SLA analysis.
-%
-
-% --- RQ2: Operational Cost Accounting ---
-
 \subsubsection{Operational Cost Accounting}
 \label{sec:costs}
 
@@ -295,15 +183,6 @@ Operational expenditure constitutes a critical bottleneck for enterprise RAG ado
 
 where $m(q) \in \{\text{Flash-Lite}, \text{Flash}, \text{Pro}\}$ represents the active generative model tier selected for query $q$, $N_{\text{embed}}$ is the number of query tokens vectorized at unit rate $P_{\text{embed}}$, $N_{\text{uncached}}$ and $N_{\text{cached}}$ represent uncached and cached prompt tokens billed at tier-specific rates $P_{\text{prompt}}^{(m(q))}$ and $P_{\text{cached}}^{(m(q))}$ (reflecting the 90\% discount applied to cached input context), $N_{\text{comp}}$ denotes the generated completion tokens billed at rate $P_{\text{comp}}^{(m(q))}$, and $N_{\text{rerank}}$ represents the count of candidate passages evaluated by the cross-encoder at per-document rate $P_{\text{rerank}}$. Fixed persistent infrastructure expenses, such as base Cloud SQL hosting, are invariant across configurations and therefore excluded from per-query operational cost calculations.
 
-% 2. EXACT OPERATIONAL COST ACCOUNTING (RQ2):
-%    - Execution Cost Formula Parameterization:
-%      Cost(q) = 10^-6 * [ N_embed(q) * P_embed + N_uncached(q) * P_prompt^(m(q)) + N_cached(q) * P_cached^(m(q)) + N_comp(q) * P_comp^(m(q)) + N_router_prompt(q) * P_prompt^(Lite) + N_router_comp(q) * P_comp^(Lite) ] + N_rerank(q) * P_rerank_doc
-%    - Dynamic Tier Indexing: Parameterize unit token prices by the active model tier m(q) in {gemini-3.5-flash-lite, gemini-3.7-flash, gemini-3.1-pro}.
-%    - Auxiliary Invocations: Include dense embedding costs (N_embed * P_embed for gemini-embedding-2) and router invocation costs if an LLM/classifier step is executed.
-%    - Unit Price Normalization: Specify that cloud token pricing tiers are expressed per million tokens (10^-6 scaling factor), and cross-encoder reranking is billed per candidate passage evaluated (or per batch request).
-%    - Prompt Caching Discount: Acknowledge GCP Gemini Context Caching token discounts (typically 75% to 90% discount on cached input context) alongside active cache storage TTL hourly rates.
-
-% --- RQ3: Quality Metrics (RAGAS) ---
 \subsubsection{Quality Metrics}
 \label{sec:quality}
 
@@ -329,22 +208,19 @@ where $K$ is the total number of retrieved context chunks, $v_k \in \{0, 1\}$ re
 
 \begin{equation}
 \label{eq:context_recall}
-\text{Context Recall} = \frac{|\{s \in S_{\text{ref}} \mid R_q \models s\}|}{|S_{\text{ref}}|}
+\text{Context Recall} = \frac{|\text{Ground Truth Sentences Attributed to Context}|}{|\text{Total Sentences in Ground Truth}|}
 \end{equation}
 
-where $S_{\text{ref}}$ denotes the set of claims extracted from the reference answer, and $R_q \models s$ indicates that reference claim $s$ is semantically supported by the retrieved context $R_q$.
+In edge cases where the reference ground truth contains no factual statements (e.g., in valid out-of-domain queries), Context Recall defaults to $1.0$ to prevent division by zero.
 
-\paragraph{Faithfulness.} Faithfulness measures the factual consistency of the generated response $a$ against the retrieved context $R_q$, penalizing ungrounded hallucinations~\citep{es2024ragas}:
+\paragraph{Faithfulness.} Faithfulness measures the factual consistency of the generated response against retrieved context $R_q$, penalizing ungrounded hallucinations~\citep{es2024ragas}:
 
 \begin{equation}
 \label{eq:faithfulness}
-\text{Faithfulness} = \begin{cases}
-\frac{|\{c \in C_a \mid R_q \models c\}|}{|C_a|}, & \text{if } |C_a| > 0 \\
-1, & \text{if } |C_a| = 0 \text{ (valid refusal)}
-\end{cases}
+\text{Faithfulness} = \frac{|\text{Claims in Answer Inferred from Context}|}{|\text{Total Claims in Generated Answer}|}
 \end{equation}
 
-where $C_a$ denotes the set of factual claims extracted from the generated answer $a$, and $R_q \models c$ indicates that claim $c$ can be directly inferred from the retrieved context $R_q$.
+For valid refusals where the generated answer contains no affirmative factual claims, Faithfulness defaults to $1.0$.
 
 \paragraph{Answer Relevancy.} Answer Relevancy quantifies how directly the generated response addresses the user's initial prompt, penalizing incomplete answers or extraneous verbosity~\citep{es2024ragas}:
 
@@ -359,26 +235,11 @@ where $N$ denotes the number of synthetic questions generated from the model's r
 
 \begin{equation}
 \label{eq:composite_quality}
-Q(q) = \frac{4}{\frac{1}{\text{Context Precision}(q) + \epsilon} + \frac{1}{\text{Context Recall}(q) + \epsilon} + \frac{1}{\text{Faithfulness}(q) + \epsilon} + \frac{1}{\text{Answer Relevancy}(q) + \epsilon}}
+Q(q) = \frac{4}{\frac{1}{\text{CP}(q) + \epsilon} + \frac{1}{\text{CR}(q) + \epsilon} + \frac{1}{\text{Faith}(q) + \epsilon} + \frac{1}{\text{AR}(q) + \epsilon}}
 \end{equation}
 
-where $\epsilon = 10^{-4}$ is a minimal smoothing parameter introduced to guarantee numerical stability and penalize failures in any single quality dimension.
+where $\text{CP}(q)$, $\text{CR}(q)$, $\text{Faith}(q)$, and $\text{AR}(q)$ denote Context Precision, Context Recall, Faithfulness, and Answer Relevancy for query $q$, respectively, and $\epsilon = 10^{-4}$ is a minimal smoothing parameter introduced to guarantee numerical stability and penalize catastrophic failures in any single quality dimension.
 
-%
-% 3. QUALITY METRICS & LLM-AS-A-JUDGE SETUP (RQ3):
-%    - Framework: Offline Python RAGAS evaluation suite (Es et al., 2024).
-%    - Quality Metrics Formulation Notes:
-%      * Context Precision: Add piecewise zero-guard when sum(v_k) = 0.
-%      * Context Recall: Formulate via semantic entailment |{s in S_ground | R_q |= s}| / |S_ground| rather than literal string intersection.
-%      * Faithfulness: Define as |{c in C_a | R_q |= c}| / |C_a| with piecewise handling for valid refusals (when |C_a| = 0 on unanswerable queries).
-%      * Composite Quality Score Q(q) Epsilon Smoothing:
-%        Q(q) = 4 / [ 1/(CP + eps) + 1/(CR + eps) + 1/(Faith + eps) + 1/(AR + eps) ] with eps = 10^-4
-%        to prevent division-by-zero singularities when retrieval misses relevant context or when handling valid out-of-domain refusals.
-%    - Primary Judge Configuration: Claude Sonnet 5 at T=0.0 as primary evaluation judge.
-%    - Vendor Independence & Bias Mitigation: Deploying Claude Sonnet 5 as an external non-Gemini frontier judge eliminates vendor self-preference bias (vendor affinity) when evaluating Gemini 3.7 Flash and Gemini 3.1 Pro generations.
-%    - Judge Calibration Protocol: Validate judge scoring against human annotator labels on a 20-query sample using Cohen's Kappa (kappa) to confirm alignment.
-
-% --- RQ4: Trade-off Equilibrium Indicators ---
 \subsubsection{Pareto Frontier and Trade-off Equilibrium}
 \label{sec:pareto}
 
@@ -396,17 +257,6 @@ To identify the Pareto frontier and quantify the trade-offs between response qua
 
 where $Q(q)$ is the composite quality score from Equation~\ref{eq:composite_quality}, $\text{Cost}(q)$ is the total monetary execution cost in USD from Equation~\ref{eq:costs}, and $T_{\text{total}}(q) / 1000$ represents end-to-end execution latency converted from milliseconds to seconds from Equation~\ref{eq:latency}. Together, these ratios allow systematic identification of configurations that maximize generative quality while minimizing operational latency and cost overhead.
 
-%
-% 4. TRADE-OFF EQUILIBRIUM RATIOS (RQ4):
-%    - Trade-off Indicators: Practical Efficiency Ratios quantifying optimization ROI:
-%      a) Quality per Dollar (QPD = RAGAS Composite Score / Total Request Cost in $)
-%      b) Quality per Second (QPS = RAGAS Composite Score / End-to-End Latency in seconds)
-%    - Unit & Dimensional Consistency: Ensure T_total(q) is consistently converted to seconds for QPS.
-%    - Formal Pareto Dominance Formulation: Note that a configuration C_a strictly dominates C_b (C_a > C_b) iff:
-%      Q(C_a) >= Q(C_b) AND Cost(C_a) <= Cost(C_b) AND T_total(C_a) <= T_total(C_b) with at least one strict inequality.
-%      The Pareto frontier comprises the non-dominated set P = { C_i in C | not exists C_j such that C_j > C_i }.
-%    - Literature Sources for Math Equations: RAGAS (Es et al., 2024; Wang et al., 2024), FrugalGPT cost/routing (Chen et al., 2023), FlashRAG benchmarking (Jin et al., 2025), FusionRAG prompt caching (Wang et al., 2026).
-
 \subsection{Threats to Validity}
 \label{subsec:threats_to_validity}
 
@@ -420,23 +270,3 @@ Distributed computer systems and network environments introduce numerous sources
 
 \paragraph{External Validity.}
 Practically all of the systems introduced in Section~\ref{sec:literature-review} are implemented using a very homogeneous set of programming languages, relying mostly on Python. A primary motivation of this study is to examine how these optimization concepts generalize into enterprise-standard languages and frameworks, specifically Java and Spring AI. There is also a risk that the pre-training corpus of the underlying LLMs might include academic benchmarks used in this study, potentially enabling the model to answer queries based on memorized parametric knowledge rather than retrieved context. To mitigate this issue, the standardized MuSiQue dataset~\citep{trivedi2022musique} is paired with a domain-specific synthetic customer support dataset to assess model generalizability.
-% =========================================================================
-% SECTION 4.6 PROPOSAL & DRAFT OUTLINE: THREATS TO VALIDITY
-% (Recommended structural addition matching empirical CS / NLP thesis standards)
-% =========================================================================
-% \subsection{Threats to Validity}
-% \label{subsec:threats_to_validity}
-%
-% 1. Construct Validity (Measurement Accuracy & Judge Reliability):
-%    - Evaluator Bias: RAGAS automated evaluations rely on an LLM-as-a-judge, which may exhibit verbosity bias or alignment drift. Mitigated by deploying an independent cross-vendor frontier model (Claude Sonnet 5 at T=0.0) to evaluate Gemini-based generations, preventing self-preference bias.
-%    - Human Alignment: Calibration against a 20-query human-annotated ground truth sample confirms judge reliability (reporting Cohen's kappa).
-%
-% 2. Internal Validity (Experimental Control & Measurement Noise):
-%    - Execution Stochasticity & Cold-Starts: JVM JIT compilation, database connection pooling, and cloud TLS handshakes introduce latency variance on initial requests. Mitigated by discarding 2 unmeasured warm-up iterations and recording 10 steady-state runs.
-%    - Network Variance: Virtual Private Cloud (VPC) private IP peering in europe-north1 minimizes network hops and isolates the testbed from public internet routing fluctuations.
-%    - State Contamination: Caches (PostgreSQL buffer cache and GCP context caches) are explicitly reset or partitioned between distinct experimental configurations to prevent state leakage.
-%
-% 3. External Validity (Generalizability & Portability):
-%    - Domain Diversity: Pairing the academic multi-hop benchmark (MuSiQue) with a real-world enterprise customer support corpus ensures findings generalize across complex reasoning and domain-specific factual retrieval.
-%    - Stack Transferability: While evaluated on Java 21 / Spring AI / GCP Gemini, the underlying architectural principles (Matryoshka indexing, small-to-big expansions, cross-encoder re-ranking, and dynamic cascading) are language- and vendor-agnostic, transferable to other enterprise frameworks and open-weights LLMs.
-% =========================================================================
