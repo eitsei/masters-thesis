@@ -109,6 +109,7 @@ spring:
 ingest:
   nordea:
     enabled: false
+    mode: ${INGEST_NORDEA_MODE:s2b}
     base-url: https://www.nordea.fi/private-banking/
     max-pages: 150
     max-pdfs: 50
@@ -117,6 +118,7 @@ ingest:
     user-agent: "RagBenchmarkThesisCrawler/1.0 (+mailto:aj.asunmaa@gmail.com; academic research, single crawl run)"
   musique:
     enabled: false
+    mode: ${INGEST_MUSIQUE_MODE:s2b}
     sample-only: true
     sample-size: 100
 

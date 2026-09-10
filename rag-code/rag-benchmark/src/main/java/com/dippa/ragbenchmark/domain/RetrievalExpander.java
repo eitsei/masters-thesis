@@ -18,4 +18,13 @@ public interface RetrievalExpander {
      * @return the corresponding parent-window documents
      */
     List<Document> expand(List<Document> childChunks);
+
+    /**
+     * @param childChunks the small chunks returned by the initial retrieval step
+     * @param defaultParentTable fallback parent table name if not present in child chunk metadata
+     * @return the corresponding parent-window documents
+     */
+    default List<Document> expand(List<Document> childChunks, String defaultParentTable) {
+        return expand(childChunks);
+    }
 }

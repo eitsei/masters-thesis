@@ -16,6 +16,7 @@ public record RagQueryResult(
         List<RetrievedChunk> retrievedChunks,
         long retrievalMs,
         long generationMs,
+        long expansionMs,
         TokenUsageDto tokenUsage) {
 
     public RagQueryResult(
@@ -23,11 +24,21 @@ public record RagQueryResult(
             Set<ModuleId> modulesApplied,
             List<RetrievedChunk> retrievedChunks,
             long retrievalMs,
+            long generationMs,
+            TokenUsageDto tokenUsage) {
+        this(answer, modulesApplied, retrievedChunks, retrievalMs, generationMs, 0L, tokenUsage);
+    }
+
+    public RagQueryResult(
+            String answer,
+            Set<ModuleId> modulesApplied,
+            List<RetrievedChunk> retrievedChunks,
+            long retrievalMs,
             long generationMs) {
-        this(answer, modulesApplied, retrievedChunks, retrievalMs, generationMs, TokenUsageDto.ZERO);
+        this(answer, modulesApplied, retrievedChunks, retrievalMs, generationMs, 0L, TokenUsageDto.ZERO);
     }
 
     public long totalLatencyMs() {
-        return retrievalMs + generationMs;
+        return retrievalMs + generationMs + expansionMs;
     }
 }

@@ -4,6 +4,7 @@ import com.dippa.ragbenchmark.api.TokenUsageDto;
 import com.dippa.ragbenchmark.domain.ModuleId;
 import com.dippa.ragbenchmark.domain.ModuleNotImplementedException;
 import com.dippa.ragbenchmark.domain.Reranker;
+import com.dippa.ragbenchmark.domain.RetrievalExpander;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.List;
@@ -34,12 +35,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /**
- * Orchestrates the M0 baseline RAG pipeline: retrieve top-K chunks, pass them through the
- * (currently no-op) {@link Reranker} seam, assemble a prompt and generate an answer.
- *
- * <p>Any request for M1-M4 optimization modules fails fast with {@link
- * ModuleNotImplementedException} before any retrieval/generation work happens, since none of
- * those modules are implemented in v1.</p>
+ * Orchestrates the RAG pipeline: retrieves chunks, passes them through the
+ * {@link Reranker} seam, expands small-to-big contexts via {@link RetrievalExpander} when M1 is active,
+ * assembles a prompt, and generates an answer.
  */
 @Service
 public class RagQueryService {
@@ -57,6 +55,7 @@ public class RagQueryService {
     private final VectorStore vectorStore;
     private final ChatModel chatModel;
     private final Reranker reranker;
+    private final RetrievalExpander retrievalExpander;
     private final MeterRegistry meterRegistry;
     private final int snippetLengthChars;
     private final int topK;
@@ -77,7 +76,8 @@ public class RagQueryService {
             @Value("classpath:prompts/answer-generation.st") Resource answerPromptResource,
             @Value("${spring.ai.vectorstore.pgvector.table-name:vector_store_test}") String defaultTableName,
             ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
-            ObjectProvider<EmbeddingModel> embeddingModelProvider) {
+            ObjectProvider<EmbeddingModel> embeddingModelProvider,
+            ObjectProvider<RetrievalExpander> retrievalExpanderProvider) {
         this.vectorStore = vectorStore;
         this.chatModel = chatModel;
         this.reranker = reranker;
@@ -88,6 +88,9 @@ public class RagQueryService {
         this.defaultTableName = (defaultTableName != null && !defaultTableName.isBlank()) ? defaultTableName : "vector_store_test";
         this.jdbcTemplate = jdbcTemplateProvider != null ? jdbcTemplateProvider.getIfAvailable() : null;
         this.embeddingModel = embeddingModelProvider != null ? embeddingModelProvider.getIfAvailable() : null;
+        this.retrievalExpander = (retrievalExpanderProvider != null && retrievalExpanderProvider.getIfAvailable() != null)
+                ? retrievalExpanderProvider.getIfAvailable()
+                : childChunks -> childChunks;
     }
 
     public RagQueryService(
@@ -98,7 +101,20 @@ public class RagQueryService {
             int snippetLengthChars,
             int topK,
             Resource answerPromptResource) {
-        this(vectorStore, chatModel, reranker, meterRegistry, snippetLengthChars, topK, answerPromptResource,
+        this(vectorStore, chatModel, reranker, (RetrievalExpander) null, meterRegistry, snippetLengthChars, topK, answerPromptResource,
+                "vector_store_test", (JdbcTemplate) null, (EmbeddingModel) null);
+    }
+
+    public RagQueryService(
+            VectorStore vectorStore,
+            ChatModel chatModel,
+            Reranker reranker,
+            RetrievalExpander retrievalExpander,
+            MeterRegistry meterRegistry,
+            int snippetLengthChars,
+            int topK,
+            Resource answerPromptResource) {
+        this(vectorStore, chatModel, reranker, retrievalExpander, meterRegistry, snippetLengthChars, topK, answerPromptResource,
                 "vector_store_test", (JdbcTemplate) null, (EmbeddingModel) null);
     }
 
@@ -113,9 +129,26 @@ public class RagQueryService {
             String defaultTableName,
             JdbcTemplate jdbcTemplate,
             EmbeddingModel embeddingModel) {
+        this(vectorStore, chatModel, reranker, (RetrievalExpander) null, meterRegistry, snippetLengthChars, topK, answerPromptResource,
+                defaultTableName, jdbcTemplate, embeddingModel);
+    }
+
+    public RagQueryService(
+            VectorStore vectorStore,
+            ChatModel chatModel,
+            Reranker reranker,
+            RetrievalExpander retrievalExpander,
+            MeterRegistry meterRegistry,
+            int snippetLengthChars,
+            int topK,
+            Resource answerPromptResource,
+            String defaultTableName,
+            JdbcTemplate jdbcTemplate,
+            EmbeddingModel embeddingModel) {
         this.vectorStore = vectorStore;
         this.chatModel = chatModel;
         this.reranker = reranker;
+        this.retrievalExpander = retrievalExpander != null ? retrievalExpander : childChunks -> childChunks;
         this.meterRegistry = meterRegistry;
         this.snippetLengthChars = snippetLengthChars;
         this.topK = topK;
@@ -130,19 +163,57 @@ public class RagQueryService {
     }
 
     public RagQueryResult query(String query, Set<ModuleId> requestedModules) {
-        return query(query, requestedModules, null, null);
+        return query(query, requestedModules, null, null, null);
     }
 
     public RagQueryResult query(String query, Set<ModuleId> requestedModules, String tableName, Integer topKOverride) {
+        return query(query, requestedModules, tableName, null, topKOverride);
+    }
+
+    public RagQueryResult query(
+            String query,
+            Set<ModuleId> requestedModules,
+            String tableName,
+            String parentTableName,
+            Integer topKOverride) {
         Set<ModuleId> modules = requestedModules == null ? Set.of() : requestedModules;
-        if (!modules.isEmpty()) {
-            throw new ModuleNotImplementedException(modules);
+        Set<ModuleId> unsupported = modules.stream()
+                .filter(m -> m != ModuleId.M1)
+                .collect(Collectors.toSet());
+        if (!unsupported.isEmpty()) {
+            throw new ModuleNotImplementedException(unsupported);
         }
 
-        VectorStore storeToUse = resolveVectorStore(tableName);
+        String searchTable;
+        String resolvedParentTable = null;
+
+        if (modules.contains(ModuleId.M1)) {
+            String baseTable = (tableName != null && !tableName.isBlank()) ? tableName : this.defaultTableName;
+            if (baseTable.equalsIgnoreCase("vector_store_musique")) {
+                searchTable = "vector_store_musique_small";
+                resolvedParentTable = (parentTableName != null && !parentTableName.isBlank()) ? parentTableName : "vector_store_musique_large";
+            } else if (baseTable.equalsIgnoreCase("vector_store_nordea") || baseTable.equalsIgnoreCase("vector_store_test")) {
+                searchTable = "vector_store_nordea_small";
+                resolvedParentTable = (parentTableName != null && !parentTableName.isBlank()) ? parentTableName : "vector_store_nordea_large";
+            } else if (baseTable.endsWith("_small")) {
+                searchTable = baseTable;
+                resolvedParentTable = (parentTableName != null && !parentTableName.isBlank()) ? parentTableName : baseTable.replaceAll("_small$", "_large");
+            } else if (parentTableName != null && !parentTableName.isBlank()) {
+                searchTable = baseTable;
+                resolvedParentTable = parentTableName;
+            } else {
+                searchTable = baseTable + "_small";
+                resolvedParentTable = baseTable + "_large";
+            }
+        } else {
+            searchTable = (tableName != null && !tableName.isBlank()) ? tableName : this.defaultTableName;
+        }
+
+        VectorStore storeToUse = resolveVectorStore(searchTable);
         int effectiveTopK = (topKOverride != null && topKOverride > 0) ? topKOverride : this.topK;
 
-        logger.info("Executing RAG query: \"{}\" (table={}, topK={})", query, tableName != null ? tableName : defaultTableName, effectiveTopK);
+        logger.info("Executing RAG query: \"{}\" (searchTable={}, parentTable={}, topK={}, modules={})",
+                query, searchTable, resolvedParentTable, effectiveTopK, modules);
 
         Timer.Sample retrievalSample = Timer.start(meterRegistry);
         List<Document> retrieved = storeToUse.similaritySearch(
@@ -151,7 +222,18 @@ public class RagQueryService {
         long retrievalMs = TimeUnit.NANOSECONDS.toMillis(retrievalNanos);
 
         List<Document> reranked = reranker.rerank(query, retrieved);
-        logger.info("Retrieved {} chunk(s) in {} ms. Generating answer...", reranked.size(), retrievalMs);
+        logger.info("Retrieved {} chunk(s) in {} ms.", reranked.size(), retrievalMs);
+
+        List<Document> contextDocuments = reranked;
+        long expansionMs = 0L;
+        if (modules.contains(ModuleId.M1)) {
+            Timer.Sample expansionSample = Timer.start(meterRegistry);
+            contextDocuments = retrievalExpander.expand(reranked, resolvedParentTable);
+            long expansionNanos = expansionSample.stop(meterRegistry.timer("rag.pipeline.expansion"));
+            expansionMs = TimeUnit.NANOSECONDS.toMillis(expansionNanos);
+            logger.info("Expanded {} child chunk(s) into {} parent document(s) in {} ms",
+                    reranked.size(), contextDocuments.size(), expansionMs);
+        }
 
         long startGenTime = System.currentTimeMillis();
         java.util.concurrent.ScheduledFuture<?> progressTask = PROGRESS_SCHEDULER.scheduleAtFixedRate(() -> {
@@ -163,7 +245,7 @@ public class RagQueryService {
         ChatResponse chatResponse;
         long generationNanos;
         try {
-            Prompt prompt = new Prompt(buildPrompt(query, reranked));
+            Prompt prompt = new Prompt(buildPrompt(query, contextDocuments));
             chatResponse = chatModel.call(prompt);
         } finally {
             progressTask.cancel(false);
@@ -182,16 +264,17 @@ public class RagQueryService {
 
         TokenUsageDto tokenUsage = extractTokenUsage(chatResponse);
 
-        List<RetrievedChunk> retrievedChunks = reranked.stream()
+        List<RetrievedChunk> retrievedChunks = contextDocuments.stream()
                 .map(document -> new RetrievedChunk(document.getId(), snippet(document.getText()), document.getText()))
                 .toList();
 
         return new RagQueryResult(
                 answer,
-                Set.of(),
+                modules,
                 retrievedChunks,
                 retrievalMs,
                 generationMs,
+                expansionMs,
                 tokenUsage);
     }
 

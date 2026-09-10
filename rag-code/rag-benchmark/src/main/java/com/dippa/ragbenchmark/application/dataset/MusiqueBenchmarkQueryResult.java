@@ -18,12 +18,48 @@ public record MusiqueBenchmarkQueryResult(
         List<RetrievedChunk> retrievedChunks,
         long retrievalMs,
         long generationMs,
+        long expansionMs,
         long totalLatencyMs,
         TokenUsageDto tokenUsage,
         String tableNameUsed,
         List<String> expectedSupportingTitles,
         boolean supportingEvidenceFound
 ) {
+    public MusiqueBenchmarkQueryResult(
+            String questionId,
+            String question,
+            String groundTruthAnswer,
+            List<String> groundTruthAliases,
+            int hopCount,
+            String generatedAnswer,
+            List<String> modulesApplied,
+            List<RetrievedChunk> retrievedChunks,
+            long retrievalMs,
+            long generationMs,
+            long totalLatencyMs,
+            TokenUsageDto tokenUsage,
+            String tableNameUsed,
+            List<String> expectedSupportingTitles,
+            boolean supportingEvidenceFound) {
+        this(
+                questionId,
+                question,
+                groundTruthAnswer,
+                groundTruthAliases,
+                hopCount,
+                generatedAnswer,
+                modulesApplied,
+                retrievedChunks,
+                retrievalMs,
+                generationMs,
+                0L,
+                totalLatencyMs,
+                tokenUsage,
+                tableNameUsed,
+                expectedSupportingTitles,
+                supportingEvidenceFound);
+    }
+
     public MusiqueBenchmarkQueryResult(
             String questionId,
             String question,
@@ -48,6 +84,7 @@ public record MusiqueBenchmarkQueryResult(
                 retrievedChunks,
                 retrievalMs,
                 generationMs,
+                0L,
                 retrievalMs + generationMs,
                 TokenUsageDto.ZERO,
                 "vector_store_test",

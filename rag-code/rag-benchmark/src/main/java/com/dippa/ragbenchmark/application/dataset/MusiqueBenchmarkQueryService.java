@@ -49,12 +49,15 @@ public class MusiqueBenchmarkQueryService {
 
         Set<ModuleId> modules = parseModules(request != null ? request.modules() : null);
         String requestedTable = request != null ? request.tableName() : null;
+        String parentTable = request != null ? request.parentTableName() : null;
         String tableNameUsed = (requestedTable != null && !requestedTable.isBlank())
                 ? requestedTable
-                : ragQueryService.getDefaultTableName();
+                : (modules.contains(ModuleId.M1) ? "vector_store_musique_small -> vector_store_musique_large" : ragQueryService.getDefaultTableName());
         Integer topK = request != null ? request.topK() : null;
 
-        RagQueryResult queryResult = ragQueryService.query(question.question(), modules, requestedTable, topK);
+        RagQueryResult queryResult = (parentTable != null)
+                ? ragQueryService.query(question.question(), modules, requestedTable, parentTable, topK)
+                : ragQueryService.query(question.question(), modules, requestedTable, topK);
 
         List<String> expectedTitles = question.getSupportingTitles();
         boolean supportingFound = false;
@@ -91,6 +94,7 @@ public class MusiqueBenchmarkQueryService {
                 queryResult.retrievedChunks(),
                 queryResult.retrievalMs(),
                 queryResult.generationMs(),
+                queryResult.expansionMs(),
                 totalLatencyMs,
                 tokenUsage,
                 tableNameUsed,
@@ -121,7 +125,7 @@ public class MusiqueBenchmarkQueryService {
         }
 
         BenchmarkQueryRequest singleQueryRequest = request != null
-                ? new BenchmarkQueryRequest(request.modules(), request.tableName(), request.topK())
+                ? new BenchmarkQueryRequest(request.modules(), request.tableName(), request.topK(), request.parentTableName())
                 : null;
 
         List<MusiqueBenchmarkQueryResult> results = new ArrayList<>(questionsToEvaluate.size());

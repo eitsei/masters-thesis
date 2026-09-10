@@ -12,11 +12,16 @@ import java.util.Set;
 public record BenchmarkQueryRequest(
         Set<String> modules,
         String tableName,
-        Integer topK
+        Integer topK,
+        String parentTableName
 ) {
     public BenchmarkQueryRequest {
         if (modules == null) {
             modules = Set.of();
         }
+    }
+
+    public BenchmarkQueryRequest(Set<String> modules, String tableName, Integer topK) {
+        this(modules, tableName, topK, null);
     }
 }

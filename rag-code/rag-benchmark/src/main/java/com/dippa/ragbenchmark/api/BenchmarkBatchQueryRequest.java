@@ -23,11 +23,24 @@ public record BenchmarkBatchQueryRequest(
         Boolean sample,
         Set<String> modules,
         String tableName,
-        Integer topK
+        Integer topK,
+        String parentTableName
 ) {
     public BenchmarkBatchQueryRequest {
         if (modules == null) {
             modules = Set.of();
         }
+    }
+
+    public BenchmarkBatchQueryRequest(
+            List<String> questionIds,
+            Integer limit,
+            Integer offset,
+            Integer hops,
+            Boolean sample,
+            Set<String> modules,
+            String tableName,
+            Integer topK) {
+        this(questionIds, limit, offset, hops, sample, modules, tableName, topK, null);
     }
 }

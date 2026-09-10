@@ -13,6 +13,7 @@ import com.dippa.ragbenchmark.api.TokenUsageDto;
 import com.dippa.ragbenchmark.domain.ModuleId;
 import com.dippa.ragbenchmark.domain.ModuleNotImplementedException;
 import com.dippa.ragbenchmark.domain.Reranker;
+import com.dippa.ragbenchmark.domain.RetrievalExpander;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
@@ -57,6 +58,9 @@ class RagQueryServiceTest {
     @Mock
     private Reranker reranker;
 
+    @Mock
+    private RetrievalExpander retrievalExpander;
+
     private MeterRegistry meterRegistry;
 
     private RagQueryService ragQueryService;
@@ -67,7 +71,7 @@ class RagQueryServiceTest {
         // No Spring context in these tests, so @Value can't inject the prompt resource -- load it
         // the same way Spring would resolve "classpath:prompts/answer-generation.st", via a plain
         // ClassPathResource (src/main/resources is on the test classpath by default in Maven).
-        ragQueryService = new RagQueryService(vectorStore, chatModel, reranker, meterRegistry, Integer.MAX_VALUE, 5,
+        ragQueryService = new RagQueryService(vectorStore, chatModel, reranker, retrievalExpander, meterRegistry, Integer.MAX_VALUE, 5,
                 new ClassPathResource("prompts/answer-generation.st"));
     }
 
@@ -201,13 +205,39 @@ class RagQueryServiceTest {
 
     @Test
     void multipleRequestedModules_areAllCarriedByTheException() {
-        assertThatThrownBy(() -> ragQueryService.query("query", Set.of(ModuleId.M1, ModuleId.M3)))
+        assertThatThrownBy(() -> ragQueryService.query("query", Set.of(ModuleId.M2, ModuleId.M3)))
                 .isInstanceOf(ModuleNotImplementedException.class)
                 .satisfies(exception -> {
                     ModuleNotImplementedException moduleException = (ModuleNotImplementedException) exception;
-                    assertThat(moduleException.getModules()).containsExactlyInAnyOrder(ModuleId.M1, ModuleId.M3);
+                    assertThat(moduleException.getModules()).containsExactlyInAnyOrder(ModuleId.M2, ModuleId.M3);
                 });
 
         verify(vectorStore, never()).similaritySearch(any(SearchRequest.class));
+    }
+
+    @Test
+    void m1HappyPath_retrievesChildChunksAndExpandsToParentDocuments() {
+        Document childOne = Document.builder().id("child-1").text("Paris is the capital.").build();
+        Document parentDoc = Document.builder().id("parent-1").text("Paris is the capital of France and has the Eiffel Tower.").build();
+        List<Document> retrievedChildren = List.of(childOne);
+        List<Document> expandedParents = List.of(parentDoc);
+
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(retrievedChildren);
+        when(reranker.rerank("Where is the Eiffel Tower?", retrievedChildren)).thenReturn(retrievedChildren);
+        when(retrievalExpander.expand(any(), any())).thenReturn(expandedParents);
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("In Paris.", null));
+
+        RagQueryResult result = ragQueryService.query("Where is the Eiffel Tower?", Set.of(ModuleId.M1));
+
+        assertThat(result.answer()).isEqualTo("In Paris.");
+        assertThat(result.modulesApplied()).containsExactly(ModuleId.M1);
+        assertThat(result.retrievedChunks()).hasSize(1);
+        assertThat(result.retrievedChunks().get(0).id()).isEqualTo("parent-1");
+        assertThat(result.retrievedChunks().get(0).text()).isEqualTo("Paris is the capital of France and has the Eiffel Tower.");
+        assertThat(result.expansionMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.generationMs() + result.expansionMs());
+
+        verify(retrievalExpander).expand(any(), any());
+        assertThat(meterRegistry.find("rag.pipeline.expansion").timer()).isNotNull();
     }
 }

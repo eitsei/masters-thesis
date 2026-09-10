@@ -31,14 +31,14 @@ public class QueryController {
     @PostMapping
     public ResponseEntity<QueryResponse> query(@Valid @RequestBody QueryRequest request) {
         Set<ModuleId> modules = parseModules(request.modules());
-        RagQueryResult result = (request.tableName() != null)
-                ? ragQueryService.query(request.query(), modules, request.tableName(), null)
+        RagQueryResult result = (request.tableName() != null || request.parentTableName() != null)
+                ? ragQueryService.query(request.query(), modules, request.tableName(), request.parentTableName(), null)
                 : ragQueryService.query(request.query(), modules);
 
         List<String> modulesApplied = result.modulesApplied().stream()
                 .map(Enum::name)
                 .toList();
-        TimingsDto timings = new TimingsDto(result.retrievalMs(), result.generationMs());
+        TimingsDto timings = new TimingsDto(result.retrievalMs(), result.generationMs(), result.expansionMs());
 
         return ResponseEntity.ok(
                 new QueryResponse(

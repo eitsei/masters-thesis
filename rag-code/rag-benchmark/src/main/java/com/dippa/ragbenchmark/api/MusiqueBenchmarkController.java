@@ -85,7 +85,9 @@ public class MusiqueBenchmarkController {
         boolean sampleOnly = request == null || request.isSampleOnly();
         int sampleSize = request != null && request.sampleSize() != null ? request.sampleSize() : 0;
 
-        MusiqueIngestionSummary summary = datasetService.ingest(sampleOnly, sampleSize);
+        MusiqueIngestionSummary summary = (request != null && request.mode() != null)
+                ? datasetService.ingest(sampleOnly, sampleSize, request.mode())
+                : datasetService.ingest(sampleOnly, sampleSize);
         return ResponseEntity.ok(MusiqueIngestResponse.fromSummary(summary));
     }
 

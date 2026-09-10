@@ -23,20 +23,23 @@ public class MusiqueIngestionRunner implements CommandLineRunner {
     private final MusiqueDatasetService datasetService;
     private final boolean sampleOnly;
     private final int sampleSize;
+    private final String mode;
 
     public MusiqueIngestionRunner(
             MusiqueDatasetService datasetService,
             @Value("${ingest.musique.sample-only:true}") boolean sampleOnly,
-            @Value("${ingest.musique.sample-size:100}") int sampleSize) {
+            @Value("${ingest.musique.sample-size:100}") int sampleSize,
+            @Value("${ingest.musique.mode:original}") String mode) {
         this.datasetService = datasetService;
         this.sampleOnly = sampleOnly;
         this.sampleSize = sampleSize;
+        this.mode = mode;
     }
 
     @Override
     public void run(String... args) {
-        logger.info("Starting MuSiQue startup ingestion (sampleOnly={}, sampleSize={})...", sampleOnly, sampleSize);
-        MusiqueIngestionSummary summary = datasetService.ingest(sampleOnly, sampleSize);
+        logger.info("Starting MuSiQue startup ingestion (sampleOnly={}, sampleSize={}, mode={})...", sampleOnly, sampleSize, mode);
+        MusiqueIngestionSummary summary = datasetService.ingest(sampleOnly, sampleSize, mode);
         logger.info("MuSiQue startup ingestion complete: {} paragraphs from {} questions in {} ms",
                 summary.uniqueParagraphsIngested(), summary.questionsProcessed(), summary.durationMs());
     }
