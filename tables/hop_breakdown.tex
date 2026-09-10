@@ -1,0 +1,25 @@
+% Auto-generated / Synthetic placeholder table
+% Ready for \input{tables/hop_breakdown.tex}
+\begin{table*}[!htbp]
+\centering
+\small
+\caption[Baseline evaluation stratified by reasoning depth]{Benchmark evaluation performance of the naive baseline ($C_0$) stratified by MuSiQue reasoning depth tiers \textbf{[SYNTHETIC MOCK DATA --- FOR STRUCTURAL VALIDATION ONLY]}.}
+\label{tab:hop_breakdown}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{l r r r r r r r r r r r}
+\toprule
+\textbf{Reasoning Tier} & \textbf{$N$} & \textbf{$P_{50}$} & \textbf{$P_{95}$} & \textbf{Tokens} & \textbf{Cost (\$)} & \textbf{EM (\%)} & \textbf{F1 (\%)} & \textbf{Faith} & \textbf{AR} & \textbf{CP} & \textbf{Comp $Q$} \\
+ & & \scriptsize{(ms)} & \scriptsize{(ms)} & \scriptsize{avg} & \scriptsize{per q} & & & & & & \scriptsize{$[0,1]$} \\
+\midrule
+2-Hop Reasoning & 40 & 487.5 & 505.1 & 576 & \$0.0001 & 35.0\% & 81.5\% & 0.895 & 0.871 & 0.864 & \textbf{0.8550} \\
+3-Hop Reasoning & 35 & 485.0 & 520.3 & 576 & \$0.0001 & 31.4\% & 80.4\% & 0.891 & 0.876 & 0.877 & \textbf{0.8514} \\
+4-Hop Reasoning & 25 & 500.0 & 510.8 & 576 & \$0.0001 & 36.0\% & 83.0\% & 0.900 & 0.874 & 0.860 & \textbf{0.8600} \\
+\midrule
+\textbf{Combined Corpus} & 100 & 492.5 & 517.0 & 576 & \$0.0001 & 34.0\% & 81.5\% & 0.895 & 0.873 & 0.868 & \textbf{0.8550} \\
+\bottomrule
+\end{tabular}%
+}
+\vspace{0.5em}
+\parbox{\textwidth}{\footnotesize
+\textbf{Disclaimer:} Quantitative figures in this table are synthetic mock placeholders to validate table formatting and column balance prior to full test execution. Evaluated over the MuSiQue multi-hop benchmark sample partitioned across 2-hop, 3-hop, and 4-hop questions. Metrics follow Chapter 4 formulations.}
+\end{table*}
