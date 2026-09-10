@@ -1,6 +1,16 @@
-This chapter presents the empirical findings from the quantitative benchmarking framework established in Section~\ref{sec:methods}. Across 3,200 evaluated pipeline executions spanning the $2^4 = 16$ experimental configurations ($C_0$ through $C_{15}$), system performance is evaluated against the four core research questions formulated in Section~\ref{sec:introduction}: operational latency profiles (RQ1), monetary and token expenditure (RQ2), multidimensional generation and retrieval quality (RQ3), and combinatorial interactions and Pareto trade-off equilibrium (RQ4).
+% =========================================================================
+% CHAPTER 5: RESULTS (STRUCTURAL SKELETON & DRAFTING NOTES)
+% =========================================================================
+% This chapter presents the empirical findings from the quantitative benchmarking framework.
+% Structure follows the Two-Stage Hybrid Architecture:
+% - 5.1 Naive Baseline Performance and Workload Calibration
+% - 5.2 Stage 1: Single-Factor Isolated Optimization (C1 - C4)
+% - 5.3 Stage 2: Combinatorial Pipeline Scaling and Multi-Module Interactions (C5 - C15)
+% - 5.4 Multi-Objective Synthesis and Trade-off Equilibrium (RQ1 - RQ4)
+% =========================================================================
 
-The remainder of this chapter is structured according to the two-stage experimental design: Section~\ref{subsec:res_baseline} characterizes the empirical baseline performance and reasoning-tier calibration of the unoptimized naive RAG pipeline ($C_0$). Section~\ref{subsec:res_stage1} analyzes Stage~1 single-factor isolated optimizations ($C_1$ through $C_4$), isolating the individual performance deltas introduced by each architectural component. Section~\ref{subsec:res_stage2} examines Stage~2 combinatorial pipeline scaling ($C_5$ through $C_{15}$), analyzing pairwise synergies, structural cache conflicts, and higher-order stacking dynamics. Finally, Section~\ref{subsec:res_synthesis} synthesizes the cross-cutting findings, presents paired statistical significance tests, maps the empirical Pareto frontier, and provides explicit answers to the research questions alongside actionable deployment archetypes for enterprise production systems.
+% Roadmap paragraph linking to sections:
+% The remainder of this chapter is structured as follows: Section~\ref{subsec:res_baseline} establishes the empirical baseline performance and reasoning-tier calibration ($C_0$). Section~\ref{subsec:res_stage1} investigates Stage~1 single-factor isolated optimizations ($C_1$ through $C_4$). Section~\ref{subsec:res_stage2} analyzes Stage~2 combinatorial pipeline scaling ($C_5$ through $C_{15}$). Finally, Section~\ref{subsec:res_synthesis} synthesizes the cross-cutting findings, presents paired statistical tests, maps the Pareto frontier, and provides explicit answers to the research questions alongside enterprise deployment archetypes.
 
 \subsection{Naive Baseline Performance and Workload Calibration}
 \label{subsec:res_baseline}
@@ -8,42 +18,33 @@ The remainder of this chapter is structured according to the two-stage experimen
 % =========================================================================
 % DRAFT NOTES: Section 5.1 Baseline Characterization
 % 1. Present Table 5.1 (tables/hop_breakdown.tex).
-% 2. Detail baseline performance on MuSiQue across 2-hop, 3-hop, and 4-hop queries.
-%    - Median latency P50 = 492.5 ms, tail latency P95 = 517.0 ms.
-%    - Average token footprint = 576 tokens, per-query cost = $0.00010.
-%    - Quality metrics: Exact Match (EM) = 34.0%, Token F1 = 81.5%, Faithfulness = 0.895,
-%      Answer Relevancy = 0.873, Context Precision = 0.868, Context Recall = 0.844,
-%      Composite Quality Q = 0.8550.
+% 2. Detail baseline performance on MuSiQue across 2-hop, 3-hop, and 4-hop queries:
+%    - Report median latency P50 and tail latency P95.
+%    - Average token footprint and per-query operational cost ($).
+%    - Quality metrics: Exact Match (EM), Token F1, Faithfulness, Answer Relevancy,
+%      Context Precision, Context Recall, and Composite Quality Q (Eq. 238).
 % 3. Multi-hop degradation narrative:
-%    - Highlight the dip in EM from 2-hop (35.0%) to 3-hop (31.4%) as evidence of
-%      reasoning distraction when dense retrieval top-5 contains irrelevant noise.
+%    - Highlight the dip in EM from 2-hop to 3-hop as evidence of reasoning distraction
+%      when dense retrieval top-5 contains irrelevant noise.
 % 4. Enterprise customer support calibration:
 %    - Discuss performance on synthetic partner corpus.
 %    - Highlight out-of-domain (OOD) query handling: Without reranking or confidence
-%      routing, the baseline is vulnerable to retrieving high-similarity noise and
-%      generating ungrounded answers instead of the required refusal string.
+%      routing, evaluate whether baseline retrieves spurious nearest neighbors and
+%      generates ungrounded answers instead of the required refusal string.
 % 5. Identify the 4 systemic bottlenecks of naive RAG:
 %    - Semantic fragmentation / Coherence loss (fixed 512 tokens).
-%    - Ranking noise (top-5 vector retrieval lacks fine-grained semantic cross-attention).
+%    - Ranking noise (top-5 vector retrieval lacks fine-grained cross-attention).
 %    - Redundant prefill compute (recomputing identical static prefixes).
 %    - Monolithic compute waste (routing simple queries to Gemini 3.7 Flash).
 % =========================================================================
 
-To establish an empirical reference point for all subsequent optimization evaluations, the naive RAG architecture ($C_0$) is benchmarked across both academic multi-hop reasoning tasks and enterprise customer support workloads. The naive baseline employs fixed-size chunking of 512 tokens with a 50-token overlap, standard dense bi-encoder retrieval ($k=5$) using \texttt{gemini-embedding-2}, and unrouted generation executed via Google Gemini 3.7 Flash without prompt caching or re-ranking. Benchmark results stratified across reasoning complexity tiers are summarized in Table~\ref{tab:hop_breakdown}.
-
 \input{tables/hop_breakdown.tex}
-
-Across the 100 benchmark queries of the academic multi-hop corpus, the naive baseline demonstrates a steady-state median end-to-end execution latency of $P_{50} = 492.5$\,ms and a 95th percentile tail latency of $P_{95} = 517.0$\,ms. The average token consumption per query is 576 tokens, corresponding to an operational expenditure of \$0.00010 per transaction under Google Cloud Gemini Enterprise platform pricing. In terms of generation quality, the baseline achieves an Exact Match (EM) score of 34.0\%, a token-level $F_1$ score of 81.5\%, Faithfulness of 0.895, Answer Relevancy of 0.873, Context Precision of 0.868, and Context Recall of 0.844, yielding a harmonic mean Composite Quality score of $Q = 0.8550$ (calculated according to Equation~\ref{eq:composite_quality}).
-
-Stratifying performance across reasoning depth tiers exposes the inherent limitations of unoptimized dense retrieval. On 2-hop queries, the system achieves an EM of 35.0\% and a Composite Quality score of $Q = 0.8550$. However, when progressing to 3-hop queries, Exact Match degrades to 31.4\% and Composite Quality drops to $Q = 0.8514$. This performance degradation illustrates the distractor passage vulnerability characteristic of standard vector search: as queries require synthesizing multiple factual dependencies, the retriever frequently introduces topically related but non-evidentiary distractors into the prompt context. 
-
-On the domain-specific enterprise customer support dataset, the baseline demonstrates robust performance on direct, single-hop factual inquiries. However, on the 20\% out-of-domain (OOD) query partition where the knowledge corpus contains no supporting context, the unoptimized baseline frequently retrieves spurious nearest-neighbor chunks, leading to ungrounded generations rather than emitting the required standardized refusal string. These findings confirm four core architectural bottlenecks in production naive RAG systems: semantic fragmentation from fixed chunk boundaries, distractor noise in dense top-$k$ retrieval, redundant input prefill computation, and uniform computational expenditure across heterogeneous query complexities.
 
 \subsection{Stage 1: Single-Factor Isolated Optimization}
 \label{subsec:res_stage1}
 
 % =========================================================================
-% DRAFT NOTES: Section 5.2 Stage 1 Isolated Testing
+% DRAFT NOTES: Section 5.2 Stage 1 Isolated Testing Overview
 % Goal: Isolate the pure, unconfounded delta of each individual optimization
 % against the naive baseline (C0).
 % Subsections:
@@ -53,238 +54,211 @@ On the domain-specific enterprise customer support dataset, the baseline demonst
 % 5.2.4 Hybrid Model Cascading (C4)
 % =========================================================================
 
-In the first experimental stage, each optimization module ($M_1$ through $M_4$) is evaluated in isolation against the naive baseline ($C_0$) to quantify its independent impact on latency profiles (RQ1), operational expenditures (RQ2), and generation quality (RQ3).
-
 \subsubsection{Small-to-Big Retrieval (\texorpdfstring{$C_1$}{C1}): Context Coherence vs. Expansion Overhead}
 \label{subsubsec:res_s2b}
 
 % =========================================================================
 % DRAFT NOTES: 5.2.1 Small-to-Big (C1)
-% Mechanics: 128-token child chunk retrieval -> 1024-token parent window expansion
-% with interval-merging deduplication.
-% Metrics:
-% - Recall lift: Context Recall jumps from 0.844 to 0.925 (+8.1%). F1 rises from
-%   81.5% to 85.2% (+3.7%), and EM rises to 37.0%. Composite Q reaches 0.8845.
-% - Latency penalty: P50 rises from 492.5 ms to 562.0 ms (+69.5 ms, p_adj = 0.0096).
-% - Cost penalty: Tokens rise from 576 to 1148 tokens (+99.3%), driving cost from
-%   $0.00010 to $0.00021 (+110.0%, p_adj = 0.0028).
-% Trade-off summary: S2B solves semantic fragmentation and eliminates intrachunk
-% boundary truncation, but acts as a cost- and latency-increasing optimization
-% when deployed without downstream filtering or caching.
+% - Architecture: 128-token child chunk retrieval -> 1024-token parent window
+%   expansion with interval-merging deduplication.
+% - Targets: intrachunk cohesion (ICC) vs document contextual coherence (DCC).
+% - Quality Impact (RQ3):
+%   * Context Recall lift (delta CR and statistical significance).
+%   * Impact on Token F1, Exact Match, and Composite Quality Q.
+%   * Multi-hop reasoning evidence: How surrounding context resolves relational links.
+% - Operational Trade-offs (RQ1 & RQ2):
+%   * Input token volume inflation (percentage increase in prompt tokens).
+%   * Latency penalty: Increase in generator prefill time (T_prefill) and P50/P95.
+%   * Cost penalty: Dollar cost increase per query.
+% - Equilibrium Insight: S2B is an effective quality booster, but acts as a cost-
+%   and latency-increasing intervention when deployed without downstream filtering.
 % =========================================================================
-
-Small-to-Big retrieval ($C_1$) decouples the semantic representation used for vector search from the context window supplied to the generation model. By indexing 128-token child passages and expanding retrieved candidates into 1024-token parent context windows with interval deduplication, $C_1$ directly targets intrachunk cohesion (ICC) and document contextual coherence (DCC). 
-
-The empirical results demonstrate a substantial quality improvement: Context Recall increases from 0.844 in the baseline to 0.925, representing a statistically significant gain ($p_{\text{adj}} = 0.0336$, Table~\ref{tab:wilcoxon_results}). Token-level $F_1$ improves from 81.5\% to 85.2\%, and Exact Match increases to 37.0\%, driving the overall Composite Quality score from $Q = 0.8550$ to $Q = 0.8845$. By providing complete surrounding contextual narratives, the generator avoids truncating critical relational evidence required to resolve multi-hop queries.
-
-However, this quality elevation incurs measurable operational trade-offs. Expanding child chunks into full parent windows inflates the average input token volume by 99.3\% (from 576 to 1,148 tokens per query). Consequently, operational expenditure doubles from \$0.00010 to \$0.00021 per query ($p_{\text{adj}} = 0.0028$). Furthermore, the increased context length amplifies generator prefill duration ($T_{\text{prefill}}$ in Equation~\ref{eq:latency}), shifting median execution latency from 492.5\,ms to 562.0\,ms ($+69.5$\,ms, $p_{\text{adj}} = 0.0096$). Thus, while $C_1$ successfully resolves context fragmentation, it acts as a cost- and latency-increasing intervention when deployed in isolation.
 
 \subsubsection{Two-Stage Semantic Re-ranking (\texorpdfstring{$C_2$}{C2}): Distractor Filtering vs. Cross-Encoder Latency}
 \label{subsubsec:res_rerank}
 
 % =========================================================================
 % DRAFT NOTES: 5.2.2 Two-Stage Semantic Re-ranking (C2)
-% Mechanics: First-stage dense retrieval (top-50 candidates) -> Vertex AI
-% semantic-ranker-default-004 cross-encoder -> top-5 reranked context.
-% Metrics:
-% - Precision lift: Context Precision jumps from 0.868 to 0.942 (+7.4%). Faithfulness
-%   improves from 0.895 to 0.932. Composite Q reaches 0.8968.
-% - Latency overhead: P50 increases from 492.5 ms to 684.5 ms (+192.0 ms, p_adj = 0.0008).
-%   Cross-encoder overhead T_rerank accounts for the majority of the delay.
-% - Cost impact: Tokens remain stable (542 vs 576), but cross-encoder API invocations
-%   increase per-query cost to $0.00018 (+80.0%, p_adj = 0.0110).
-% Trade-off summary: Maximizes retrieval precision and suppresses hallucination,
-% but imposes the highest isolated latency penalty among all single modules.
+% - Architecture: Dense vector search (top-50 pool) -> Vertex AI
+%   semantic-ranker-default-004 cross-encoder -> top-5 reranked context.
+% - Quality Impact (RQ3):
+%   * Context Precision lift: Filtering out false-positive lexical distractors.
+%   * Faithfulness lift: Shielding the generator from irrelevant context hallucinations.
+%   * Impact on Exact Match, Token F1, and Composite Quality Q.
+% - Operational Trade-offs (RQ1 & RQ2):
+%   * Latency penalty: Cross-encoder scoring duration (T_rerank in Eq. 157).
+%     Impact on Time to First Token (TTFT) and end-to-end execution latency.
+%   * Cost impact: Prompt tokens remain compact, but auxiliary cross-encoder API
+%     invocation fees increase net transactional cost.
+% - Equilibrium Insight: Exceptional for hallucination suppression and precision-critical
+%   domains, but incurs fixed compute overhead that penalizes latency.
 % =========================================================================
-
-Two-stage semantic re-ranking ($C_2$) addresses ranking noise and distractor passages by pairing first-stage bi-encoder retrieval (top-50 candidate pool) with a high-capacity cross-encoder (\texttt{semantic-ranker-default-004}) to distill the candidate set to the top-5 most relevant passages. 
-
-The introduction of cross-attention scoring produces the highest isolated Context Precision recorded in Stage~1, rising from 0.868 to 0.942 ($p_{\text{adj}} = 0.0096$, Table~\ref{tab:wilcoxon_results}). By filtering out false-positive lexical matches prior to prompt generation, generation Faithfulness increases from 0.895 to 0.932, and Exact Match rises to 39.0\%, resulting in a Composite Quality score of $Q = 0.8968$.
-
-The primary operational friction of cross-encoder re-ranking is computational latency. Evaluating 50 candidate passages through deep cross-attention introduces an auxiliary processing delay ($T_{\text{rerank}}$ in Equation~\ref{eq:latency}), shifting median execution latency from 492.5\,ms to 684.5\,ms ($+192.0$\,ms, $p_{\text{adj}} = 0.0008$). Although input prompt tokens remain compact (542 tokens average), auxiliary cross-encoder API charges raise per-query operational costs to \$0.00018 ($+80.0\%$). Consequently, while re-ranking is exceptionally effective at suppressing hallucinations in precision-critical domains, its execution overhead requires careful mitigation in latency-sensitive interactive systems.
 
 \subsubsection{Dual-Tier Prompt Caching (\texorpdfstring{$C_3$}{C3}): Prefill Bypassing and Economic Scaling}
 \label{subsubsec:res_caching}
 
 % =========================================================================
 % DRAFT NOTES: 5.2.3 Dual-Tier Prompt Caching (C3)
-% Mechanics: GCP Explicit Context Cache for static knowledge (>= 4096 tokens) +
-% KV prefix reuse for dynamic conversational context.
-% Metrics:
-% - Latency win: P50 drops from 492.5 ms to 312.0 ms (-180.5 ms, -36.7%, p_adj = 0.0008).
-%   Time to First Token (TTFT) decreases dramatically by bypassing T_prefill.
-% - Cost win: Cost drops from $0.00010 to $0.00004 (-60.0%, p_adj = 0.0008) due to
-%   the 90% unit price discount on cached prompt tokens.
-% - Quality invariance: Quality metrics remain identical to baseline (Comp Q = 0.8550)
-%   because generation context is deterministic and unchanged.
-% Trade-off summary: Pure efficiency enhancement with zero quality compromise.
+% - Architecture: Explicit Context Caching for static knowledge (>= 4096 tokens) +
+%   dynamic KV cache prefix reuse for conversational multi-turn sessions.
+% - Latency Profile (RQ1):
+%   * Substantial reduction in TTFT and end-to-end latency by bypassing
+%     transformer prefill compute (T_prefill).
+%   * Cache lookup validation overhead (T_cache) is negligible (<10 ms).
+% - Cost Reduction (RQ2):
+%   * 90% pricing discount on cached prompt tokens (P_cached vs P_prompt in Eq. 179).
+%   * Net dollar cost reduction per query.
+% - Quality Invariance (RQ3):
+%   * Exact preservation of response quality (deterministic KV cache behavior).
+% - Equilibrium Insight: Pure operational efficiency enhancement (RQ1/RQ2 wins)
+%   with zero quality compromise.
 % =========================================================================
-
-Configuration $C_3$ implements dual-tier prompt caching, utilizing Google Cloud Vertex AI explicit context caching for static system instructions and knowledge base prefixes exceeding the 4,096-token boundary, alongside dynamic KV cache prefix reuse across sequential turns.
-
-Prompt caching achieves substantial operational efficiency improvements across both latency and cost. By bypassing redundant transformer prefill computation ($T_{\text{prefill}}$ in Equation~\ref{eq:latency}), median end-to-end execution latency decreases from 492.5\,ms to 312.0\,ms (a 36.7\% reduction, $p_{\text{adj}} = 0.0008$). In addition, Time to First Token ($\text{TTFT}$) exhibits an immediate reduction, enhancing user-perceived interactive responsiveness. Under the Gemini Enterprise platform pricing schedule, cached prompt tokens receive a 90\% billing discount, lowering average per-query operational expenditure from \$0.00010 to \$0.00004 (a 60.0\% cost reduction, $p_{\text{adj}} = 0.0008$).
-
-Crucially, because prompt caching stores and retrieves exact key-value states without modifying prompt semantics, response quality remains strictly invariant relative to the naive baseline ($Q = 0.8550$, $p_{\text{adj}} = 1.0000$, Table~\ref{tab:wilcoxon_results}). Prompt caching thus represents a pure efficiency enhancement, delivering substantial reductions in latency and operational cost without introducing quality compromises.
 
 \subsubsection{Hybrid Model Cascading (\texorpdfstring{$C_4$}{C4}): Workload-Aware Complexity Tiering}
 \label{subsubsec:res_cascading}
 
 % =========================================================================
 % DRAFT NOTES: 5.2.4 Hybrid Model Cascading (C4)
-% Mechanics: Gemini 3.5 Flash-Lite zero-shot router classifies queries:
-% single-hop -> Flash-Lite, 2-hop -> Flash, 3/4-hop -> Pro.
-% Metrics:
-% - Cost win: Cost drops from $0.00010 to $0.00006 (-40.0%, p_adj = 0.0008).
-% - Latency profile: Bimodal distribution; median latency P50 decreases to 412.5 ms
-%   (-80.0 ms, p_adj = 0.0162), but tail latency P95 expands to 535.0 ms.
-% - Quality impact: Slight, non-significant variation (Comp Q = 0.8504 vs 0.8550,
-%   p_adj = 0.4800, ns).
-% Trade-off summary: Significant cost optimization on heterogeneous enterprise
-% workloads, but routing overhead T_route and potential misclassification risks
-% require careful boundary tuning.
+% - Architecture: Zero-shot Gemini 3.5 Flash-Lite router classifying queries:
+%   * Single-hop / trivial -> Gemini 3.5 Flash-Lite
+%   * Intermediate 2-hop -> Gemini 3.7 Flash
+%   * Complex 3/4-hop -> Gemini 3.1 Pro
+% - Cost Reduction (RQ2):
+%   * Monetary savings from handling high proportions of routine enterprise inquiries
+%     on lightweight model tiers.
+% - Latency Profile (RQ1):
+%   * Bimodal latency distribution: Faster TTFT for simple queries on Flash-Lite,
+%     balanced against classifier overhead (T_route) and high-capacity model duration.
+% - Quality Dynamics (RQ3):
+%   * Evaluation of router accuracy: Risk of false-negative down-routing vs.
+%     reasoning elevation when complex queries escalate to Pro.
 % =========================================================================
-
-Configuration $C_4$ incorporates dynamic model cascading, deploying an automated zero-shot classifier powered by Gemini 3.5 Flash-Lite to categorize incoming queries and route them across three specialized model tiers: Gemini 3.5 Flash-Lite for single-hop queries, Gemini 3.7 Flash for intermediate 2-hop queries, and Gemini 3.1 Pro for complex 3- and 4-hop multi-hop reasoning.
-
-Model cascading yields marked economic advantages: resolving single-hop factual queries on the low-cost Flash-Lite tier reduces average operational expenditure by 40.0\%, lowering per-query cost from \$0.00010 to \$0.00006 ($p_{\text{adj}} = 0.0008$). Median latency drops from 492.5\,ms to 412.5\,ms ($p_{\text{adj}} = 0.0162$), driven by the rapid token generation velocity of the lightweight tier.
-
-However, model cascading introduces a bimodal latency distribution. Complex queries routed to Gemini 3.1 Pro incur both classifier evaluation overhead ($T_{\text{route}} \approx 85$\,ms) and higher foundation model generation latency, resulting in an expanded 95th percentile tail latency of $P_{95} = 535.0$\,ms (compared to 517.0\,ms in the baseline). Quality remains statistically comparable to the baseline ($Q = 0.8504$ vs. $0.8550$, $p_{\text{adj}} = 0.4800$), indicating that the zero-shot router reliably preserves generation fidelity across reasoning tiers without causing systematic degradation.
 
 \subsection{Stage 2: Combinatorial Pipeline Scaling and Multi-Module Interactions}
 \label{subsec:res_stage2}
 
 % =========================================================================
-% DRAFT NOTES: Section 5.3 Stage 2 Combinations
-% Goal: Analyze the 11 multi-module combinations (C5 - C15) to answer RQ4.
-% Focus on interaction dynamics rather than cataloging numbers:
+% DRAFT NOTES: Section 5.3 Stage 2 Combinations Overview
+% Goal: Directly address RQ4 (Interactions). Analyze the 11 multi-module
+% configurations (C5 - C15) grouped by interaction dynamics:
 % 5.3.1 Pairwise Synergies and Structural Conflicts (C5 - C10)
 % 5.3.2 Multi-Module Triplets and Full-Stack Integration (C11 - C15)
 % 5.3.3 Stacking Anomalies and the Law of Diminishing Returns
 % =========================================================================
-
-Stage~2 investigates combinatorial pipeline architectures ($C_5$ through $C_{15}$) to address RQ4. Combining modular optimizations introduces complex inter-component dynamics, including non-linear synergies that amplify retrieval precision and structural conflicts that degrade caching efficiency.
 
 \subsubsection{Pairwise Synergies and Structural Conflicts (\texorpdfstring{$C_5 - C_{10}$}{C5--C10})}
 \label{subsubsec:res_pairwise}
 
 % =========================================================================
 % DRAFT NOTES: 5.3.1 Pairwise Synergies & Conflicts
-% Key interactions to analyze:
+% Key interactions to evaluate:
 % 1. The Retrieval Synergy (C5: S2B + SR):
-%    - First-stage vector search retrieves 50 child chunks (128 tokens).
-%    - Cross-encoder reranks child chunks BEFORE parent expansion.
-%    - Only top-5 winning child chunks expand to 1024-token parent windows.
-%    - Result: Drastic token reduction compared to naive expansion (945 vs 1148 tokens).
-%      Avoids expanding distractors. Both Context Precision (0.948) and Recall (0.932)
-%      peak simultaneously. Highest composite quality in pairwise tier (Q = 0.9251, p_adj = 0.0008).
+%    - Mechanics: 50 child chunks retrieved -> cross-encoder ranks child chunks
+%      BEFORE parent expansion -> only top-5 winning child chunks expand to parent windows.
+%    - Benefit: Prevents expanding distractors, drastically cutting prompt token inflation
+%      relative to C1 while achieving peak Context Precision and Context Recall.
 % 2. The Caching Collision (C8: SR + PC and C6: S2B + PC):
-%    - Cross-encoder dynamically permutes chunk order and identity per query,
-%      disrupting KV cache prefix alignment and lowering cache hit rates.
-%    - Variable parent interval merging (C6) creates irregular prompt prefixes.
-% 3. The Cost Minimizer (C10: PC + MC):
-%    - Fastest latency (P50 = 264.0 ms) and lowest cost ($0.00003 per query, -70.0%).
+%    - Conflict: Cross-encoder dynamically permutes chunk order and selection per query,
+%      disrupting KV cache prefix alignment and degrading cache hit rate.
+%    - Interval merging variance in C6 alters prefix boundaries.
+% 3. Maximum Operational Efficiency (C10: PC + MC):
+%    - Pairing prompt caching discounts with low-tier model generation yields
+%      the lowest latency and transactional cost in the pairwise suite.
+% 4. Other Pairings (C7: S2B+MC, C9: SR+MC):
+%    - Interaction between expanded context / reranked passages and model routing.
 % =========================================================================
 
-The pairwise evaluation ($k=2$) reveals substantial divergence between synergistic component pairings and structural architectural conflicts:
-
 \paragraph{The Retrieval Synergy ($C_5$: Small-to-Big + Re-ranking).}
-Configuration $C_5$ represents the most pronounced technical synergy in the experimental matrix. In naive isolated expansion ($C_1$), all retrieved child chunks are expanded into parent windows, needlessly multiplying prompt token volume. In $C_5$, the cross-encoder reranks the 50 retrieved 128-token child passages \textit{prior} to parent window expansion. Consequently, parent expansion is restricted strictly to the top-5 validated relevant chunks. This pre-expansion filtering eliminates distractor passages before token inflation occurs, reducing average prompt token volume from 1,148 in $C_1$ to 945 tokens in $C_5$. Concurrently, Context Precision rises to 0.948 and Context Recall reaches 0.932, achieving the highest Composite Quality score among all pairwise configurations ($Q = 0.9251$, $p_{\text{adj}} = 0.0008$).
+% NOTE: Detail pre-expansion cross-encoder filtering, prompt token reduction, and dual precision/recall peaks.
 
 \paragraph{The Caching Friction ($C_8$: Re-ranking + Prompt Caching).}
-Conversely, pairing semantic re-ranking with prompt caching ($C_8$) exposes fundamental architectural friction. Cross-encoder re-ranking dynamically scores and permutes retrieved passages based on nuanced lexical and semantic query features. This dynamic re-ordering alters the sequential token prefix of the context prompt across sequential interactions, disrupting the prefix-matching criteria of transformer KV caches. While static system instructions remain cached, the dynamic context prefix suffers repeated cache misses, attenuating the expected economic benefits of prompt caching.
+% NOTE: Detail dynamic chunk permutation, prefix alignment disruption, and cache invalidation.
 
 \paragraph{The Maximum Efficiency Pair ($C_{10}$: Prompt Caching + Model Cascading).}
-Configuration $C_{10}$ combines model cascading with prompt caching, creating an ultra-efficient operational profile. By resolving common queries on Gemini 3.5 Flash-Lite while caching pre-indexed system and enterprise knowledge contexts, $C_{10}$ records the lowest execution latency ($P_{50} = 264.0$\,ms, a 46.4\% speedup) and lowest operational expenditure (\$0.00003 per query, a 70.0\% reduction) across the entire benchmark suite, while maintaining baseline response quality ($Q = 0.8504$).
+% NOTE: Detail speedup, cost minimization, and applicability to high-volume enterprise traffic.
 
 \subsubsection{Multi-Module Triplets and Full-Stack Integration (\texorpdfstring{$C_{11} - C_{15}$}{C11--C15})}
 \label{subsubsec:res_triplets_fullstack}
 
 % =========================================================================
 % DRAFT NOTES: 5.3.2 Triplets and Full-Stack Integration
-% Triplets:
-% - C11 (S2B + SR + PC): Advanced retrieval with caching offset. P50 = 565.0 ms,
-%   cost = $0.00014, Comp Q = 0.9251.
-% - C12 (S2B + SR + MC): Quality-first cascading. P50 = 652.0 ms, cost = $0.00016,
-%   Comp Q = 0.9198.
-% - C13 (S2B + PC + MC) & C14 (SR + PC + MC): Balanced operating points.
+% Triplets (C11 - C14):
+% - C11 (S2B + SR + PC): Advanced retrieval coupled with context caching.
+% - C12 (S2B + SR + MC): High-precision retrieval feeding dynamically routed models.
+% - C13 (S2B + PC + MC) & C14 (SR + PC + MC): Balanced intermediate configurations.
 % Full-Stack Integration (C15: S2B + SR + PC + MC):
-% - All four optimizations active.
-% - Performance: P50 = 518.0 ms, cost = $0.00010, Comp Q = 0.9198.
-% - Compounding latency equation: sum of all micro-phase durations.
+% - Evaluates simultaneous activation of all 4 modules.
+% - Micro-phase latency formula: T_total = T_embed + T_route + T_ret + T_rerank +
+%   T_expand + T_cache + T_prefill + T_stream.
+% - Evaluate overall quality, net cost per query, and engineering complexity.
 % =========================================================================
 
-Higher-order multi-module triplets ($k=3$, configurations $C_{11}$ through $C_{14}$) and the full-stack architecture ($k=4$, configuration $C_{15}$) demonstrate the compounding operational dynamics of fully integrated enterprise pipelines:
-
 \paragraph{Multi-Module Triplets ($C_{11} - C_{14}$).}
-Configuration $C_{11}$ (S2B + SR + PC) combines high-fidelity retrieval with context caching, matching the peak quality score of $Q = 0.9251$ while mitigating the latency overhead of re-ranking through prompt prefill caching ($P_{50} = 565.0$\,ms vs. $718.0$\,ms in $C_5$). Configuration $C_{12}$ (S2B + SR + MC) couples advanced retrieval with dynamic model tiering, sustaining high generation quality ($Q = 0.9198$) while dampening token expansion costs (\$0.00016 per query).
+% NOTE: Discuss C11 through C14 trade-offs, cumulative benefits, and caching offsets.
 
 \paragraph{Full-Stack Integration ($C_{15}$).}
-The full-stack configuration ($C_{15}$) activates all four optimization mechanisms simultaneously. Under this architecture, the query pipeline executes the complete latency chain formalized in Equation~\ref{eq:latency}:
-\begin{equation}
-T_{\text{total}} = T_{\text{embed}} + T_{\text{route}} + T_{\text{ret}} + T_{\text{rerank}} + T_{\text{expand}} + T_{\text{cache}} + T_{\text{prefill}} + T_{\text{stream}}
-\end{equation}
-Empirically, $C_{15}$ achieves a Composite Quality score of $Q = 0.9198$ with a balanced median execution latency of $P_{50} = 518.0$\,ms and an operational cost of \$0.00010 per query. While $C_{15}$ successfully establishes equilibrium across quality, latency, and cost, it introduces substantial architectural complexity, requiring orchestration of multiple external cloud APIs across each transaction.
+% NOTE: Discuss end-to-end full-stack behavior, orchestration overhead, and holistic performance.
 
 \subsubsection{Stacking Anomalies and the Law of Diminishing Returns}
 \label{subsubsec:res_diminishing}
 
 % =========================================================================
 % DRAFT NOTES: 5.3.3 Diminishing Returns & Latency Compounding
-% Narrative:
 % 1. Law of Diminishing Returns:
-%    - Adding a 3rd (C11, C12) or 4th module (C15) yields marginal quality gains
-%      over a well-tuned duo (C5: Q = 0.9251 vs C15: Q = 0.9198).
-%    - Quality reaches a soft asymptote governed by underlying foundation model reasoning.
-% 2. Chained service latency and tail variance:
-%    - Compounding latency across networked services expands P95 tail latency
-%      (e.g., C12 P95 = 760.0 ms, C5 P95 = 795.0 ms).
-%    - Micro-phase serialization introduces cumulative jitter.
+%    - Evaluate whether stacking 3 or 4 modules (C11, C12, C15) yields statistically
+%      meaningful quality gains over an optimal duo (C5).
+%    - Asymptotic quality boundary governed by foundation model reasoning capacity.
+% 2. Latency Compounding and P95 Tail Expansion:
+%    - Serialization of chained cloud APIs (Vertex Search + Vertex Reranker +
+%      Gemini Cache + Model API) expanding tail latency variance (P95).
+%    - Production SLA implications for enterprise customer support.
 % =========================================================================
-
-The progression from isolated modules to full-stack integration demonstrates the empirical Law of Diminishing Returns in RAG pipeline engineering. While advancing from the naive baseline ($C_0$, $Q = 0.8550$) to the optimal pairwise retrieval pipeline ($C_5$, $Q = 0.9251$) yields an 8.2\% relative quality surge, incorporating additional modules into triplets ($C_{12}$, $Q = 0.9198$) or full-stack integration ($C_{15}$, $Q = 0.9198$) produces no further statistical quality gains ($p_{\text{adj}} > 0.05$). Beyond a certain architectural threshold, response quality becomes bounded by the reasoning capabilities of the underlying foundation models rather than retrieval precision.
-
-Furthermore, multi-module stacking amplifies tail latency variance ($P_{95}$). Chaining multiple synchronous cloud API calls (Vertex Vector Search $\to$ Vertex AI Ranking API $\to$ Gemini Context Cache $\to$ Gemini Generation Model) serializes network latency and upstream service fluctuations. As shown in Table~\ref{tab:benchmark_summary}, tail latency expands to $P_{95} = 795.0$\,ms in $C_5$ and $P_{95} = 760.0$\,ms in $C_{12}$. In enterprise production environments with strict Service Level Agreements (SLAs), this compounding tail latency must be balanced against the marginal quality enhancements achieved by higher-order stacking.
 
 \subsection{Multi-Objective Synthesis and Trade-off Equilibrium}
 \label{subsec:res_synthesis}
 
 % =========================================================================
 % DRAFT NOTES: Section 5.4 Synthesis, Pareto Frontier, and RQs
-% Goal: Global cross-cutting analysis.
-% Subsections:
-% 5.4.1 Master Benchmark Performance & Statistical Testing (Table 5.2, Table 5.3)
-% 5.4.2 Latency Profiles & Computational Overhead (RQ1 - Figure 5.1)
-% 5.4.3 Operational Cost Scaling & Token Economics (RQ2)
-% 5.4.4 Multidimensional Response Quality Dynamics (RQ3 - Figure 5.2)
-% 5.4.5 Pareto Frontier & Enterprise Deployment Archetypes (RQ4 - Figure 5.3)
-% 5.4.6 Summary Resolution of Research Questions (RQ1 - RQ4)
+% Purpose: Global comparative analysis across all 16 configurations.
+% Centralizes all master tables, publication figures, and definitive answers to RQ1-RQ4:
+% - 5.4.1 Master Benchmark Performance & Statistical Testing (Table 5.2, Table 5.3)
+% - 5.4.2 Latency Profiles & Computational Overhead (RQ1 - Figure 5.1)
+% - 5.4.3 Operational Cost Scaling & Token Economics (RQ2)
+% - 5.4.4 Multidimensional Response Quality Dynamics (RQ3 - Figure 5.2)
+% - 5.4.5 Pareto Frontier & Enterprise Deployment Archetypes (RQ4 - Figure 5.3)
+% - 5.4.6 Summary Resolution of Research Questions (RQ1 - RQ4)
 % =========================================================================
-
-To provide a comprehensive synthesis across all 16 configurations, this section integrates the full experimental campaign, presents formal hypothesis testing results, deconstructs latency and quality profiles, maps the empirical Pareto frontier, and answers the four research questions.
 
 \subsubsection{Master Benchmark Performance and Statistical Testing}
 \label{subsubsec:res_master_benchmark}
 
-Table~\ref{tab:benchmark_summary} reports the consolidated empirical results across all 16 evaluated configurations. Furthermore, Table~\ref{tab:wilcoxon_results} presents paired Wilcoxon signed-rank tests evaluated against the naive baseline ($C_0$), with family-wise error rates strictly controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\text{adj}}$) at significance level $\alpha = 0.05$.
+% =========================================================================
+% DRAFT NOTES: Master Benchmark Performance & Wilcoxon Analysis
+% 1. Reference Table 5.2 (tables/benchmark_summary.tex):
+%    - Walk through cross-configuration trends across P50, P95, tokens, costs,
+%      lexical metrics (EM, F1), and RAGAS scores.
+% 2. Reference Table 5.3 (tables/wilcoxon_tests.tex):
+%    - Report paired Wilcoxon signed-rank tests with Holm-Bonferroni corrections.
+%    - Identify which performance deltas are statistically significant (alpha = 0.05).
+% =========================================================================
 
 \input{tables/benchmark_summary.tex}
 
 \input{tables/wilcoxon_tests.tex}
 
-The statistical results confirm that performance improvements observed across Stage~1 and Stage~2 are statistically significant. Small-to-Big retrieval ($C_1$), Semantic Re-ranking ($C_2$), and the combined retrieval pipeline ($C_5$) achieve statistically significant improvements in Composite Quality ($p_{\text{adj}} \le 0.0336$, Table~\ref{tab:wilcoxon_results}). Conversely, configurations emphasizing prompt caching ($C_3, C_{10}$) exhibit highly significant latency and cost reductions ($p_{\text{adj}} = 0.0008$) with invariant quality ($p_{\text{adj}} \ge 0.4800, \text{ns}$). Full-stack integration ($C_{15}$) achieves significant quality elevation ($p_{\text{adj}} = 0.0008$) with latency and operational cost profiles that do not differ significantly from baseline expenditure ($p_{\text{adj}} \ge 0.2900, \text{ns}$).
-
 \subsubsection{Latency Profiles and Computational Overhead (RQ1)}
 \label{subsubsec:res_rq1_latency}
 
 % =========================================================================
-% DRAFT NOTES: 5.4.2 Latency Breakdown (RQ1)
-% Figure 5.1: figures/latency_breakdown.pdf (Stacked bar chart of T_ret vs T_gen).
-% Deconstruct Time to First Token (TTFT) vs Generation Streaming.
-% Conclude RQ1: Small-to-Big and Re-ranking increase latency (overhead T_rerank,
-% T_expand), while Prompt Caching sharply reduces TTFT by cutting T_prefill.
+% DRAFT NOTES: 5.4.2 Latency Deconstruction (RQ1)
+% 1. Embed Figure 5.1 (figures/latency_breakdown.pdf):
+%    - Deconstruct retrieval duration (T_ret) vs generation duration (T_gen).
+% 2. Directly resolve RQ1:
+%    - Contrast user-perceived Time to First Token (TTFT) against streaming generation.
+%    - S2B (M1) and Re-ranking (M2) introduce computational latency overhead (T_expand, T_rerank).
+%    - Prompt Caching (M3) sharply accelerates TTFT by bypassing prefill compute (T_prefill).
+%    - Model Cascading (M4) lowers median latency on simple queries but widens P95 tail latency.
 % =========================================================================
-
-Figure~\ref{fig:latency_breakdown} decomposes the end-to-end execution latency across the evaluated pipeline configurations into retrieval micro-phases ($T_{\text{ret}}$) and generation processing ($T_{\text{gen}}$).
 
 \begin{figure}[!htbp]
 \centering
@@ -293,47 +267,32 @@ Figure~\ref{fig:latency_breakdown} decomposes the end-to-end execution latency a
 \label{fig:latency_breakdown}
 \end{figure}
 
-The latency deconstruction directly addresses \textbf{RQ1}:
-\begin{itemize}
-    \item \textbf{Small-to-Big Retrieval ($M_1$):} Introduces moderate latency overhead ($+69.5$\,ms in $C_1$), primarily attributable to parent context expansion ($T_{\text{expand}}$) and increased generator prefill duration ($T_{\text{prefill}}$).
-    \item \textbf{Two-Stage Semantic Re-ranking ($M_2$):} Imposes the largest isolated latency penalty ($+192.0$\,ms in $C_2$, shifting $P_{50}$ to 684.5\,ms), driven by cross-encoder candidate evaluation ($T_{\text{rerank}}$).
-    \item \textbf{Dual-Tier Prompt Caching ($M_3$):} Significantly decreases latency ($-180.5$\,ms in $C_3$, lowering $P_{50}$ to 312.0\,ms) by bypassing prompt prefill computation ($T_{\text{prefill}}$), directly accelerating user-perceived Time to First Token ($\text{TTFT}$).
-    \item \textbf{Hybrid Model Cascading ($M_4$):} Decreases median execution latency ($-80.0$\,ms in $C_4$) for simple queries routed to lightweight models, but increases tail latency ($P_{95} = 535.0$\,ms) due to routing overhead ($T_{\text{route}}$) on complex multi-hop tasks.
-\end{itemize}
-
 \subsubsection{Operational Cost Scaling and Token Economics (RQ2)}
 \label{subsubsec:res_rq2_cost}
 
 % =========================================================================
 % DRAFT NOTES: 5.4.3 Operational Cost Scaling (RQ2)
-% Address RQ2: Quantify cost reduction ($) and token consumption.
-% Contrast token expansion in S2B (+99.3% tokens) against 90% prompt caching discount
-% and model tier discounts in cascading.
-% Breakeven thresholds for prompt caching in high-volume enterprise pipelines.
+% 1. Directly resolve RQ2:
+%    - Quantify operational cost ($) reduction and token consumption across configurations.
+%    - Contrast token inflation from parent context expansion (M1) against the 90%
+%      pricing discount from prompt caching (M3) and model tier discounts (M4).
+%    - Economic breakeven thresholds for prompt caching in high-volume enterprise systems.
 % =========================================================================
-
-Addressing \textbf{RQ2}, the empirical cost analysis demonstrates that operational expenditure is driven by the dynamic interaction between token volume, unit price tiers, and caching discounts (Equation~\ref{eq:costs}):
-\begin{itemize}
-    \item \textbf{Context Expansion vs. Pricing Tiers:} Small-to-Big retrieval ($C_1$) doubles prompt token volume (1,148 vs. 576 tokens), elevating transactional cost to \$0.00021 per query ($+110.0\%$). However, when paired with prompt caching ($C_6$), the 90\% discount applied to cached parent contexts reduces cost to \$0.00009 per query, fully offsetting the token inflation penalty.
-    \item \textbf{Model Cascading Cost Dynamics:} Model cascading ($C_4$) achieves a 40.0\% expenditure reduction (\$0.00006 per query) by steering single-hop and direct factual inquiries to Gemini 3.5 Flash-Lite, whose unit pricing is an order of magnitude lower than Gemini 3.7 Flash.
-    \item \textbf{Combined Economic Optimization:} Pairing prompt caching with model cascading ($C_{10}$) achieves the lowest operational expenditure in the experimental campaign (\$0.00003 per query, a 70.0\% reduction relative to the naive baseline).
-\end{itemize}
 
 \subsubsection{Multidimensional Response Quality Dynamics (RQ3)}
 \label{subsubsec:res_rq3_quality}
 
 % =========================================================================
-% DRAFT NOTES: 5.4.4 Quality Profiles (RQ3)
-% Figure 5.2: figures/ragas_metrics_radar.pdf (Radar chart of RAGAS metrics).
-% Dissect the trade-off:
-% - S2B drives Context Recall (0.844 -> 0.925).
-% - Semantic Re-ranking drives Context Precision (0.868 -> 0.942).
-% - Combined in C5, they achieve peak quality (Q = 0.9251).
-% - Caching has zero quality trade-off (invariant).
-% - Cascading preserves quality (Q = 0.8504) provided router false-negative rate is low.
+% DRAFT NOTES: 5.4.4 Multidimensional Quality Profiles (RQ3)
+% 1. Embed Figure 5.2 (figures/ragas_metrics_radar.pdf):
+%    - Radar chart comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy.
+% 2. Directly resolve RQ3:
+%    - Small-to-Big (M1) primarily elevates Context Recall (expanding evidentiary boundaries).
+%    - Re-ranking (M2) primarily elevates Context Precision (eliminating distractor passages).
+%    - High Context Precision directly translates into higher Faithfulness (hallucination suppression).
+%    - Peak quality achieved in combined retrieval (C5).
+%    - Prompt caching preserves identical quality (invariant).
 % =========================================================================
-
-Figure~\ref{fig:ragas_radar} compares the four foundational RAGAS quality dimensions across representative optimization configurations.
 
 \begin{figure}[!htbp]
 \centering
@@ -342,35 +301,23 @@ Figure~\ref{fig:ragas_radar} compares the four foundational RAGAS quality dimens
 \label{fig:ragas_radar}
 \end{figure}
 
-The multidimensional quality analysis directly resolves \textbf{RQ3}:
-\begin{itemize}
-    \item \textbf{Complementary Retrieval Mechanics:} Small-to-Big retrieval ($M_1$) primarily elevates Context Recall (0.844 to 0.925) by expanding evidentiary context boundaries, whereas Semantic Re-ranking ($M_2$) elevates Context Precision (0.868 to 0.942) by filtering out distractor passages.
-    \item \textbf{Faithfulness and Hallucination Suppression:} Elevating Context Precision directly improves Faithfulness (from 0.895 in $C_0$ to 0.945 in $C_5$). By eliminating irrelevant passages from the generative prompt, the LLM is shielded from ungrounded contextual hallucinations.
-    \item \textbf{Overall Quality Peak:} Configuration $C_5$ (S2B + SR) achieves peak Composite Quality ($Q = 0.9251$), establishing that optimizing retrieval precision and context coherence simultaneously yields the highest generative accuracy.
-\end{itemize}
-
 \subsubsection{Pareto Frontier and Enterprise Deployment Archetypes (RQ4)}
 \label{subsubsec:res_rq4_pareto}
 
 % =========================================================================
 % DRAFT NOTES: 5.4.5 Pareto Frontier & Deployment Archetypes (RQ4)
-% Figure 5.3: figures/pareto_frontier.pdf (Dual-panel Pareto frontier:
-% (a) Quality vs Latency, (b) Quality vs Cost).
-% Efficiency indicators:
-% - Quality per Dollar: QPD = Q(q) / Cost(q)
-% - Quality per Second: QPS = Q(q) / (T_total / 1000)
-% Non-dominated Pareto set P:
-% - C10 (PC + MC): Extreme cost & latency efficiency.
-% - C3 (PC): Low latency, baseline quality.
-% - C15 (Full-Stack) / C11 (S2B+SR+PC): High quality, moderate cost/latency.
-% - C5 (S2B + SR): Peak absolute quality.
-% Define 3 Enterprise Production Archetypes:
-% 1. Interactive / High-Throughput Archetype (C10, C3)
-% 2. Cost-Optimized Enterprise Archetype (C10, C4)
-% 3. High-Assurance / Maximum Fidelity Archetype (C5, C12)
+% 1. Embed Figure 5.3 (figures/pareto_frontier.pdf):
+%    - Dual-panel trade-off: (a) Quality vs Median Latency, (b) Quality vs Cost per Query.
+% 2. Efficiency indicators:
+%    - Quality per Dollar: QPD = Q(q) / Cost(q) (Eq. 249).
+%    - Quality per Second: QPS = Q(q) / (T_total / 1000) (Eq. 253).
+% 3. Non-dominated Pareto frontier (P):
+%    - Identify non-dominated configurations along the efficient frontier.
+% 4. Define 3 Enterprise Production Archetypes:
+%    - Interactive / Real-Time Tier (optimized for low TTFT and high TPS: C3, C10).
+%    - Cost-Optimized Enterprise Tier (optimized for maximum QPD in high-volume workloads: C10, C4).
+%    - High-Assurance / Maximum Fidelity Tier (optimized for compliance and accuracy: C5, C12).
 % =========================================================================
-
-To identify the optimal operational equilibrium and resolve \textbf{RQ4}, Figure~\ref{fig:pareto_frontier} plots the dual-panel Pareto trade-off curves: Panel~(a) maps Composite Quality against median latency ($P_{50}$), while Panel~(b) maps Composite Quality against operational cost per query.
 
 \begin{figure}[!htbp]
 \centering
@@ -379,25 +326,15 @@ To identify the optimal operational equilibrium and resolve \textbf{RQ4}, Figure
 \label{fig:pareto_frontier}
 \end{figure}
 
-The empirical Pareto frontier ($\mathcal{P}$) is defined by the non-dominated configurations that maximize the efficiency ratios formulated in Equations~\ref{eq:qpd} and~\ref{eq:qps}: Quality per Dollar ($\text{QPD} = Q / \text{Cost}$) and Quality per Second ($\text{QPS} = Q / (T_{\text{total}}/1000)$). The non-dominated set comprises:
-\begin{itemize}
-    \item $C_{10}$ (PC + MC): Dominates the extreme low-cost, low-latency frontier, maximizing Quality per Dollar ($\text{QPD} = 28,347$\,Q/\$) and Quality per Second ($\text{QPS} = 3.22$\,Q/s).
-    \item $C_{3}$ (PC): Dominates single-module efficiency, delivering a 36.7\% latency reduction and 60.0\% cost reduction with zero quality penalty.
-    \item $C_{11}$ (S2B + SR + PC): Balances peak retrieval quality ($Q = 0.9251$) with caching cost discounts (\$0.00014 per query).
-    \item $C_{5}$ (S2B + SR): Anchors the maximum fidelity frontier, achieving the highest absolute Composite Quality ($Q = 0.9251$) at the expense of higher latency (718.0\,ms) and cost (\$0.00024).
-\end{itemize}
-
-Based on these empirical Pareto boundaries, three production-ready enterprise deployment archetypes are established:
-\begin{enumerate}
-    \item \textbf{Interactive / Real-Time Tier ($C_3$ or $C_{10}$):} Tailored for interactive consumer-facing virtual assistants where sub-350\,ms responsiveness and high request throughput (TPS) are paramount.
-    \item \textbf{Cost-Optimized Enterprise Tier ($C_{10}$ or $C_4$):} Designed for high-volume corporate help desks and internal knowledge management where operational budgets dictate minimizing per-query expenditures without sacrificing baseline fidelity.
-    \item \textbf{High-Assurance / Maximum Fidelity Tier ($C_5$ or $C_{12}$):} Tailored for compliance-critical enterprise domains—such as regulatory compliance, medical advisory, and financial decision support—where response accuracy and hallucination suppression strictly supersede latency and infrastructure costs.
-\end{enumerate}
-
 \subsubsection{Summary Resolution of Research Questions}
 \label{subsubsec:res_rq_summary}
 
-Table~\ref{tab:rq_resolution_summary} summarizes the definitive empirical answers to the four core research questions established in Section~\ref{sec:introduction}.
+% =========================================================================
+% DRAFT NOTES: 5.4.6 Summary of Research Questions
+% Provide explicit, concise resolutions for RQ1, RQ2, RQ3, and RQ4.
+% Can be summarized in Table 5.4 (tab:rq_resolution_summary) or dedicated bullet points,
+% establishing a seamless transition into Chapter 6 (Discussion).
+% =========================================================================
 
 \begin{table}[!htbp]
 \centering
@@ -409,18 +346,16 @@ Table~\ref{tab:rq_resolution_summary} summarizes the definitive empirical answer
 \textbf{RQ} & \textbf{Core Focus} & \textbf{Empirical Findings and Resolution} \\
 \midrule
 \textbf{RQ1} & \textbf{Latency Profile}
-  & Two-stage re-ranking ($M_2$) and child-to-parent expansion ($M_1$) increase median latency by $+192.0$\,ms and $+69.5$\,ms, respectively. Conversely, prompt caching ($M_3$) reduces latency by $36.7\%$ ($-180.5$\,ms) and accelerates TTFT by bypassing prefill compute. \\
+  & Two-stage re-ranking ($M_2$) and child-to-parent expansion ($M_1$) increase median latency, while prompt caching ($M_3$) reduces latency by bypassing prefill compute and accelerating TTFT. Model cascading ($M_4$) reduces median latency on simple queries but expands tail latency on complex multi-hop tasks. \\
 \addlinespace
 \textbf{RQ2} & \textbf{Operational Cost}
-  & Prompt caching ($M_3$) and model cascading ($M_4$) reduce per-query operational expenditure by $60.0\%$ and $40.0\%$, respectively. When combined ($C_{10}$), costs decrease by $70.0\%$ (\$0.00003 vs. \$0.00010). Token expansion ($M_1$) doubles prompt tokens, but costs are neutralized when combined with caching ($C_6$). \\
+  & Prompt caching ($M_3$) and model cascading ($M_4$) yield substantial operational cost reductions. Pairing caching with cascading ($C_{10}$) achieves maximum cost minimization. Token expansion in $M_1$ increases prompt token volume, but expenses are neutralized when paired with caching ($C_6$). \\
 \addlinespace
 \textbf{RQ3} & \textbf{Generation Quality}
-  & Small-to-Big retrieval ($M_1$) maximizes Context Recall ($0.925$ vs. $0.844$), while Semantic Re-ranking ($M_2$) maximizes Context Precision ($0.942$ vs. $0.868$). Their pairing ($C_5$) achieves peak Composite Quality ($Q = 0.9251$), significantly suppressing contextual hallucinations. \\
+  & Small-to-Big retrieval ($M_1$) maximizes Context Recall, while Semantic Re-ranking ($M_2$) maximizes Context Precision. Their combination ($C_5$) achieves peak Composite Quality, significantly suppressing hallucinations. Caching maintains identical quality. \\
 \addlinespace
 \textbf{RQ4} & \textbf{Combinations \& Pareto}
-  & Re-ranking dynamically permutes chunk prefixes, reducing downstream prompt cache hit rates ($C_8$). Stacking higher-order modules ($C_{11}-C_{15}$) exhibits diminishing quality returns while accumulating tail latency ($P_{95} \le 795$\,ms). Three distinct enterprise deployment archetypes lie along the Pareto frontier ($\mathcal{P}$). \\
+  & Re-ranking permutes chunk prefixes, reducing downstream prompt cache hit rates ($C_8$). Stacking higher-order modules ($C_{11}-C_{15}$) exhibits diminishing quality returns while accumulating tail latency ($P_{95}$). Three distinct enterprise deployment archetypes define the Pareto frontier ($\mathcal{P}$). \\
 \bottomrule
 \end{tabularx}
 \end{table}
-
-The empirical findings presented in this chapter demonstrate that no single RAG optimization strategy universally dominates across latency, cost, and quality simultaneously. Instead, production enterprise systems must selectively compose optimization techniques based on target operational SLAs, balancing retrieval precision against latency and expenditure constraints along the Pareto frontier. The broader architectural implications, system limitations, and industry generalizability of these findings are examined in Chapter~\ref{sec:discussion}.
