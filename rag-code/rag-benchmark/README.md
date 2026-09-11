@@ -158,13 +158,13 @@ GOOGLE_AI_API_KEY=<your key from https://aistudio.google.com/apikey>
 then export the updated `.env` and re-run `mvn spring-boot:run`. No code or config
 file changes are needed for this switch — only environment variables.
 
-## What's implemented (M0/M1) vs. stubbed (M2-M4)
+## What's implemented (M0-M2) vs. stubbed (M3-M4)
 
 | Module | Status |
 |---|---|
 | M0 — baseline retrieve-then-generate pipeline | Implemented (`RagQueryService`) |
 | M1 — small-to-big retrieval expansion | Implemented with child-table retrieval, parent-table expansion, ranked deduplication, and explicit failure responses |
-| M2 — re-ranking | Not implemented; a `Reranker` port exists with a `NoOpReranker` default; requesting it via the API returns `501` |
+| M2 — re-ranking | Implemented via `VertexAiReranker` (`semantic-ranker-default-004`), retrieving a candidate pool of 50 chunks, re-ranking down to top-N, and attaching score metadata (`rerank_score`); `NoOpReranker` serves the baseline |
 | M3 — prompt / context caching | Not implemented; requesting it returns `501` |
 | M4 — model routing / cascading | Not implemented; a `ModelRouter` port exists but has no implementation wired up; requesting it returns `501` |
 
@@ -213,17 +213,17 @@ M1-M4 will each add their own file here rather than growing this one, since they
 need different shapes (e.g. M3 cache markers, M1 expanded-window context).
 
 ### Model catalog
-
-`ModelCatalogProperties` (`infrastructure/config`) binds `rag.models.*` in
-`application.yml` — the three Gemini tiers from the thesis's M4 design (flash-lite /
-flash / pro) and M2's two candidate re-ranking backends. The typed record itself isn't
-consumed by any bean yet, since M2 and M4 are unimplemented (see table above), but the
-catalog's `flash` entry is the source of truth for `spring.ai.google.genai.chat.model`
-— the one model Spring AI actually instantiates a bean for today — via a nested
-`${GOOGLE_GENAI_CHAT_MODEL:${rag.models.google-genai.flash}}` placeholder in
-`application.yml`. `flash` doubles as M0's base model and the tier M4 will treat as its
-medium-complexity/fallback tier once routing exists; `GOOGLE_GENAI_CHAT_MODEL` still
-overrides it independently for ad hoc local runs.
+ 
+ `ModelCatalogProperties` (`infrastructure/config`) binds `rag.models.*` in
+ `application.yml` — the three Gemini tiers from the thesis's M4 design (flash-lite /
+ flash / pro) and M2's candidate re-ranking backends. Its `vertex-default` entry provides
+ the default ranking model (`semantic-ranker-default-004`) for `rag.reranker.model`. The
+ catalog's `flash` entry is also the source of truth for `spring.ai.google.genai.chat.model`
+ — the one chat model Spring AI actually instantiates a bean for today — via a nested
+ `${GOOGLE_GENAI_CHAT_MODEL:${rag.models.google-genai.flash}}` placeholder in
+ `application.yml`. `flash` doubles as M0's base model and the tier M4 will treat as its
+ medium-complexity/fallback tier once routing exists; `GOOGLE_GENAI_CHAT_MODEL` still
+ overrides it independently for ad hoc local runs.
 
 This keeps the thing being benchmarked — the pipeline and its optimization seams — as
 plain, framework-light domain/application code that can be tested and reasoned about

@@ -8,6 +8,7 @@ import com.dippa.ragbenchmark.domain.RerankingConfigurationException;
 import com.dippa.ragbenchmark.domain.RetrievalExpander;
 import com.dippa.ragbenchmark.infrastructure.NoOpReranker;
 import com.dippa.ragbenchmark.infrastructure.TableNameValidator;
+import com.dippa.ragbenchmark.infrastructure.config.RerankerProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.List;
@@ -74,38 +75,25 @@ public class RagQueryService {
             MeterRegistry meterRegistry,
             @Value("${rag.query.snippet-length-chars}") int snippetLengthChars,
             @Value("${rag.query.top-k}") int topK,
-            @Value("${rag.reranker.candidate-pool-size:50}") int candidatePoolSize,
+            RerankerProperties rerankerProperties,
             @Value("classpath:prompts/answer-generation.st") Resource answerPromptResource,
             @Value("${spring.ai.vectorstore.pgvector.table-name:vector_store_test}") String defaultTableName,
             ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
             ObjectProvider<EmbeddingModel> embeddingModelProvider,
             ObjectProvider<RetrievalExpander> retrievalExpanderProvider) {
-        this.vectorStore = vectorStore;
-        this.chatModel = chatModel;
-        this.reranker = reranker;
-        this.meterRegistry = meterRegistry;
-        this.snippetLengthChars = snippetLengthChars;
-        this.topK = topK;
-        this.candidatePoolSize = candidatePoolSize;
-        this.answerPromptTemplate = new PromptTemplate(answerPromptResource);
-        this.defaultTableName = (defaultTableName != null && !defaultTableName.isBlank()) ? defaultTableName : "vector_store_test";
-        this.jdbcTemplate = jdbcTemplateProvider != null ? jdbcTemplateProvider.getIfAvailable() : null;
-        this.embeddingModel = embeddingModelProvider != null ? embeddingModelProvider.getIfAvailable() : null;
-        this.retrievalExpander = (retrievalExpanderProvider != null && retrievalExpanderProvider.getIfAvailable() != null)
-                ? retrievalExpanderProvider.getIfAvailable()
-                : childChunks -> childChunks;
-    }
-
-    public RagQueryService(
-            VectorStore vectorStore,
-            ChatModel chatModel,
-            Reranker reranker,
-            MeterRegistry meterRegistry,
-            int snippetLengthChars,
-            int topK,
-            Resource answerPromptResource) {
-        this(vectorStore, chatModel, reranker, (RetrievalExpander) null, meterRegistry, snippetLengthChars, topK, 50, answerPromptResource,
-                "vector_store_test", (JdbcTemplate) null, (EmbeddingModel) null);
+        this(
+                vectorStore,
+                chatModel,
+                reranker,
+                retrievalExpanderProvider != null ? retrievalExpanderProvider.getIfAvailable() : null,
+                meterRegistry,
+                snippetLengthChars,
+                topK,
+                rerankerProperties,
+                answerPromptResource,
+                defaultTableName,
+                jdbcTemplateProvider != null ? jdbcTemplateProvider.getIfAvailable() : null,
+                embeddingModelProvider != null ? embeddingModelProvider.getIfAvailable() : null);
     }
 
     public RagQueryService(
@@ -117,8 +105,8 @@ public class RagQueryService {
             int snippetLengthChars,
             int topK,
             Resource answerPromptResource) {
-        this(vectorStore, chatModel, reranker, retrievalExpander, meterRegistry, snippetLengthChars, topK, 50, answerPromptResource,
-                "vector_store_test", (JdbcTemplate) null, (EmbeddingModel) null);
+        this(vectorStore, chatModel, reranker, retrievalExpander, meterRegistry, snippetLengthChars, topK,
+                RerankerProperties.defaultProperties(), answerPromptResource, "vector_store_test", null, null);
     }
 
     public RagQueryService(
@@ -129,25 +117,10 @@ public class RagQueryService {
             MeterRegistry meterRegistry,
             int snippetLengthChars,
             int topK,
-            int candidatePoolSize,
+            RerankerProperties rerankerProperties,
             Resource answerPromptResource) {
-        this(vectorStore, chatModel, reranker, retrievalExpander, meterRegistry, snippetLengthChars, topK, candidatePoolSize, answerPromptResource,
-                "vector_store_test", (JdbcTemplate) null, (EmbeddingModel) null);
-    }
-
-    public RagQueryService(
-            VectorStore vectorStore,
-            ChatModel chatModel,
-            Reranker reranker,
-            MeterRegistry meterRegistry,
-            int snippetLengthChars,
-            int topK,
-            Resource answerPromptResource,
-            String defaultTableName,
-            JdbcTemplate jdbcTemplate,
-            EmbeddingModel embeddingModel) {
-        this(vectorStore, chatModel, reranker, (RetrievalExpander) null, meterRegistry, snippetLengthChars, topK, 50, answerPromptResource,
-                defaultTableName, jdbcTemplate, embeddingModel);
+        this(vectorStore, chatModel, reranker, retrievalExpander, meterRegistry, snippetLengthChars, topK,
+                rerankerProperties, answerPromptResource, "vector_store_test", null, null);
     }
 
     public RagQueryService(
@@ -158,23 +131,7 @@ public class RagQueryService {
             MeterRegistry meterRegistry,
             int snippetLengthChars,
             int topK,
-            Resource answerPromptResource,
-            String defaultTableName,
-            JdbcTemplate jdbcTemplate,
-            EmbeddingModel embeddingModel) {
-        this(vectorStore, chatModel, reranker, retrievalExpander, meterRegistry, snippetLengthChars, topK, 50,
-                answerPromptResource, defaultTableName, jdbcTemplate, embeddingModel);
-    }
-
-    public RagQueryService(
-            VectorStore vectorStore,
-            ChatModel chatModel,
-            Reranker reranker,
-            RetrievalExpander retrievalExpander,
-            MeterRegistry meterRegistry,
-            int snippetLengthChars,
-            int topK,
-            int candidatePoolSize,
+            RerankerProperties rerankerProperties,
             Resource answerPromptResource,
             String defaultTableName,
             JdbcTemplate jdbcTemplate,
@@ -186,7 +143,7 @@ public class RagQueryService {
         this.meterRegistry = meterRegistry;
         this.snippetLengthChars = snippetLengthChars;
         this.topK = topK;
-        this.candidatePoolSize = candidatePoolSize;
+        this.candidatePoolSize = rerankerProperties != null ? rerankerProperties.candidatePoolSize() : 50;
         this.answerPromptTemplate = new PromptTemplate(answerPromptResource);
         this.defaultTableName = (defaultTableName != null && !defaultTableName.isBlank()) ? defaultTableName : "vector_store_test";
         this.jdbcTemplate = jdbcTemplate;

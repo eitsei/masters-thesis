@@ -146,7 +146,7 @@ rag:
     # Integer.MAX_VALUE is used here to mean "never truncate, always show the whole chunk"
     # rather than guessing a character number that happens to be big enough. Lower this (e.g.
     # to 200) to get short previews back instead.
-    snippet-length-chars: 100
+    snippet-length-chars: 2147483647
     # Number of chunks retrieved from vector_store_test per query, before reranking (the M0
     # baseline's Reranker is a no-op, so this is also how many chunks end up in the prompt and
     # in retrievedChunks). Read directly by RagQueryService via @Value, same as

@@ -32,7 +32,7 @@ class VertexAiRerankerTest {
         restClientBuilder = RestClient.builder();
         mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
         properties = new RerankerProperties(
-                "vertex",
+                RerankerProperties.Provider.VERTEX,
                 50,
                 "semantic-ranker-default-004",
                 new RerankerProperties.VertexProperties("test-project", "global", "default_ranking_config"));
@@ -88,7 +88,7 @@ class VertexAiRerankerTest {
     @Test
     void rerank_missingProjectId_throwsRerankingException() {
         RerankerProperties invalidProps = new RerankerProperties(
-                "vertex",
+                RerankerProperties.Provider.VERTEX,
                 50,
                 "semantic-ranker-default-004",
                 new RerankerProperties.VertexProperties("", "global", "default_ranking_config"));
