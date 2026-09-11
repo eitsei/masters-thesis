@@ -77,6 +77,27 @@ class TestJudgeFactoryCreation:
         assert isinstance(emb, GoogleGenerativeAIEmbeddings)
         assert emb.model == "models/text-embedding-004"
 
+    def test_vertex_ai_provider_configuration_global(self, monkeypatch):
+        monkeypatch.delenv("GOOGLE_AI_API_KEY", raising=False)
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        monkeypatch.setenv("GOOGLE_CLOUD_PROJECT_ID", "test-project")
+        monkeypatch.delenv("GOOGLE_CLOUD_LOCATION", raising=False)
+
+        with patch("langchain_google_vertexai.ChatVertexAI") as mock_chat, \
+             patch("langchain_google_vertexai.VertexAIEmbeddings") as mock_emb:
+            llm, emb = JudgeFactory.create_judge(
+                provider="gemini",
+            )
+            mock_chat.assert_called_once()
+            call_kwargs = mock_chat.call_args.kwargs
+            assert call_kwargs["model_name"] == "gemini-3.5-flash-lite"
+            assert call_kwargs["location"] == "global"
+            assert call_kwargs["project"] == "test-project"
+
+            mock_emb.assert_called_once()
+            emb_kwargs = mock_emb.call_args.kwargs
+            assert emb_kwargs["location"] == "us-central1"
+
     def test_claude_provider_configuration(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-anthropic-key")
         monkeypatch.delenv("GOOGLE_AI_API_KEY", raising=False)

@@ -26,6 +26,73 @@ DEFAULT_OLLAMA_CANDIDATES = [
 ]
 
 
+_VERTEX_PATCHED = False
+
+
+def _patch_vertex_ai_async_prediction_client() -> None:
+    """Patches ChatVertexAI to re-bind async_client if the active asyncio event loop changes.
+
+    Fixes a known issue where ChatVertexAI caches an async gRPC PredictionServiceClient
+    tied to a single event loop. When evaluation frameworks (such as RAGAS) run multiple
+    evaluation passes across separate event loops (via asyncio.run), subsequent
+    calls raise 'RuntimeError: Event loop is closed' and cause gRPC InterceptedCall
+    cancellation errors (__del__ AttributeError).
+    """
+    global _VERTEX_PATCHED
+    if _VERTEX_PATCHED:
+        return
+
+    import asyncio
+    from typing import cast
+    from google.api_core.client_options import ClientOptions
+    from langchain_google_vertexai import ChatVertexAI
+    from langchain_google_vertexai._base import _get_async_prediction_client
+
+    # Defensively patch gRPC InterceptedCall.__del__ cancellation bug
+    try:
+        import grpc.aio._interceptor as grpc_interceptor
+
+        orig_cancel = grpc_interceptor.InterceptedCall.cancel
+
+        def _safe_cancel(self):
+            if not hasattr(self, "_interceptors_task"):
+                return False
+            return orig_cancel(self)
+
+        grpc_interceptor.InterceptedCall.cancel = _safe_cancel
+    except Exception:
+        pass
+
+    # Patch ChatVertexAI.async_prediction_client property to bind to current loop
+    def _safe_async_prediction_client(self):
+        current_loop = None
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+
+        client_loop = getattr(self, "_async_client_loop", None)
+        if self.async_client is not None and (
+            client_loop is None
+            or client_loop.is_closed()
+            or (current_loop is not None and client_loop is not current_loop)
+        ):
+            self.async_client = None
+
+        if self.async_client is None:
+            self.async_client = _get_async_prediction_client(
+                endpoint_version=self.endpoint_version,
+                credentials=self.credentials,
+                client_options=cast(ClientOptions, self.client_options),
+                user_agent=self._user_agent,
+            )
+            self._async_client_loop = current_loop
+        return self.async_client
+
+    ChatVertexAI.async_prediction_client = property(_safe_async_prediction_client)
+    _VERTEX_PATCHED = True
+
+
 def discover_ollama_endpoint(
     candidate_urls: list[str] | None = None,
     timeout: float = 1.0,
@@ -111,28 +178,80 @@ class JudgeFactory:
             )
             return llm, embeddings
 
-        elif selected_provider in ("gemini", "google"):
-            judge_model = model or os.getenv("JUDGE_MODEL") or "gemini-2.5-flash"
-            emb_model = (
-                embedding_model
-                or os.getenv("JUDGE_EMBEDDING_MODEL")
-                or "models/text-embedding-004"
-            )
+        elif selected_provider in ("gemini", "google", "vertex", "vertexai"):
+            judge_model = model
+            if not judge_model:
+                env_model = os.getenv("JUDGE_MODEL")
+                if env_model and ("gemini" in env_model or "gemma" not in env_model):
+                    judge_model = env_model
+                else:
+                    judge_model = "gemini-3.5-flash-lite"
+
+            emb_model = embedding_model
+            if not emb_model:
+                env_emb = os.getenv("JUDGE_EMBEDDING_MODEL")
+                if env_emb and "nomic" not in env_emb:
+                    emb_model = env_emb
+                else:
+                    emb_model = "text-embedding-004"
+
             api_key = os.getenv("GOOGLE_AI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
-            llm_kwargs = dict(kwargs)
-            llm_kwargs["model"] = judge_model
-            llm_kwargs["temperature"] = temperature
-            if api_key:
+            if api_key and selected_provider not in ("vertex", "vertexai"):
+                llm_kwargs = dict(kwargs)
+                llm_kwargs["model"] = judge_model
+                llm_kwargs["temperature"] = temperature
                 llm_kwargs["google_api_key"] = api_key
 
-            emb_kwargs: dict[str, Any] = {"model": emb_model}
-            if api_key:
-                emb_kwargs["google_api_key"] = api_key
+                emb_target = emb_model if emb_model.startswith("models/") else f"models/{emb_model}"
+                emb_kwargs: dict[str, Any] = {"model": emb_target, "google_api_key": api_key}
+                llm = ChatGoogleGenerativeAI(**llm_kwargs)
+                embeddings = GoogleGenerativeAIEmbeddings(**emb_kwargs)
+                return llm, embeddings
+            else:
+                from langchain_google_vertexai import ChatVertexAI, VertexAIEmbeddings
+                import google.auth
 
-            llm = ChatGoogleGenerativeAI(**llm_kwargs)
-            embeddings = GoogleGenerativeAIEmbeddings(**emb_kwargs)
-            return llm, embeddings
+                _patch_vertex_ai_async_prediction_client()
+
+                project = os.getenv("GOOGLE_CLOUD_PROJECT_ID") or os.getenv("GCP_PROJECT")
+                if not project:
+                    try:
+                        _, project = google.auth.default()
+                    except Exception:
+                        pass
+
+                # Newer Gemini models (e.g., gemini-3.5-flash-lite, gemini-3.8-flash) are available
+                # on the 'global' endpoint on Vertex AI, not regional endpoints.
+                location = (
+                    kwargs.pop("location", None)
+                    or os.getenv("GOOGLE_CLOUD_LOCATION")
+                    or os.getenv("GCP_REGION")
+                    or "global"
+                )
+
+                vertex_emb_model = emb_model.replace("models/", "") if emb_model.startswith("models/") else emb_model
+
+                # Text embedding models on Vertex AI (e.g., text-embedding-004) require regional endpoints (e.g. us-central1)
+                emb_location = (
+                    kwargs.pop("embedding_location", None)
+                    or os.getenv("GOOGLE_CLOUD_EMBEDDING_LOCATION")
+                    or (location if location != "global" else "us-central1")
+                )
+
+                llm = ChatVertexAI(
+                    model_name=judge_model,
+                    project=project,
+                    location=location,
+                    temperature=temperature,
+                    **kwargs,
+                )
+                embeddings = VertexAIEmbeddings(
+                    model_name=vertex_emb_model,
+                    project=project,
+                    location=emb_location,
+                )
+                return llm, embeddings
 
         elif selected_provider in ("claude", "anthropic"):
             judge_model = (

@@ -134,9 +134,18 @@ PRICING_CATALOG: dict[str, PricingTier] = {
         rerank_price_per_doc=0.0001,
         embed_price_per_million=0.025,
     ),
-    # Gemini 3.7 Flash (Primary generation workhorse)
+    # Gemini 3.7 Flash (Generation workhorse)
     "gemini-3.7-flash": PricingTier(
         name="gemini-3.7-flash",
+        prompt_price_per_million=0.15,
+        comp_price_per_million=0.60,
+        cached_price_per_million=0.0375,
+        rerank_price_per_doc=0.0001,
+        embed_price_per_million=0.025,
+    ),
+    # Gemini 3.8 Flash (Latest generation workhorse)
+    "gemini-3.8-flash": PricingTier(
+        name="gemini-3.8-flash",
         prompt_price_per_million=0.15,
         comp_price_per_million=0.60,
         cached_price_per_million=0.0375,

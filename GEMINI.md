@@ -2,6 +2,19 @@
 
 Your primary objective is to process academic papers to extract technical data regarding RAG optimization. You must maintain a strictly balanced focus between **operational efficiency** (latency and costs) and **output quality**, as the core of this research is to identify the optimal equilibrium for enterprise-grade systems.
 
+## 📅 Temporal Context & Model Ecosystem (September 2026):
+- **Current Timeline:** September 2026.
+- **Model Landscape:**
+  - **Gemini 3.8 Flash** (Released September 2, 2026): Latest frontier model for complex reasoning and agentic workflows.
+  - **Gemini 3.5 Flash** (Released May 19, 2026) & **Gemini 3.5 Flash-Lite** (Released July 21, 2026): High-efficiency, low-latency tiers optimized for developers and routing.
+  - **Model Tiers for Thesis Evaluation (M4 & Benchmarks):**
+    - Lite / Router: `gemini-3.5-flash-lite`
+    - Baseline / Workhorse: `gemini-3.7-flash` / `gemini-3.8-flash`
+    - Complex Multi-hop: `gemini-3.1-pro`
+  - **Vertex AI Endpoint / Deployment Requirement:**
+    - Frontier Gemini 3.x models (`gemini-3.5-flash-lite`, `gemini-3.8-flash`) are deployed exclusively on the **`global`** endpoint (`GOOGLE_CLOUD_LOCATION=global`), not regional endpoints.
+    - Vertex text embedding models (`text-embedding-004`) require regional endpoints (e.g. `us-central1`).
+
 ## 📂 File Handling & Workflow:
 1. **Input:** Recursively process all documents in `/LLM_wiki/sources/background`, `/LLM_wiki/sources/surveys`, and `/LLM_wiki/sources/literature_review`.
 2. **File Renaming:** Generate a descriptive, slugified filename based on the **Full Paper Title**.
