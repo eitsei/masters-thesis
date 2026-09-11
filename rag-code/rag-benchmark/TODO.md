@@ -11,11 +11,7 @@ yet; each item is a starting point for later work, not a spec.
 - **M1 — small-to-big retrieval.** Implemented through `RetrievalExpander` (`domain/RetrievalExpander.java`), including explicit parent-expansion failures and ranked parent deduplication. Integration benchmarking and full overlap-aware ingestion remain follow-up work.
   is defined but has no implementation or bean; child-chunk retrieval with parent-window
   expansion is not wired into `RagQueryService`.
-- **M2 — re-ranking.** Only `NoOpReranker` (`infrastructure/NoOpReranker.java`) exists.
-  A real implementation needs to call either a hosted re-ranking API (e.g. the Vertex
-  AI Ranking API) or a local cross-encoder served via a TEI (Text Embeddings Inference)
-  container. Candidate model ids are already catalogued in `rag.models.reranker`
-  (`application.yml` / `ModelCatalogProperties`) — not yet read by anything.
+- **M2 — re-ranking.** Implemented via `VertexAiReranker` (`infrastructure/VertexAiReranker.java`) using GCP Vertex AI / Discovery Engine Ranking API (`semantic-ranker-default-004`), with `NoOpReranker` retained for baseline and non-M2 queries. Includes candidate pool retrieval (50 items), top-N ranking, metadata score attachment (`rerank_score`), and telemetry (`rag.pipeline.rerank`). Local TEI cross-encoder fallback remains a future addition.
 - **M3 — prompt/context caching.** `PromptCache` (`domain/PromptCache.java`) is defined
   but has no implementation or bean. Needs a caching strategy and a decision on what's
   cached (raw prompts vs. assembled context vs. provider-side cached content, e.g.

@@ -17,6 +17,7 @@ public record MusiqueBenchmarkQueryResult(
         List<String> modulesApplied,
         List<RetrievedChunk> retrievedChunks,
         long retrievalMs,
+        long rerankMs,
         long generationMs,
         long expansionMs,
         long totalLatencyMs,
@@ -27,6 +28,47 @@ public record MusiqueBenchmarkQueryResult(
         int supportingTitlesFound,
         boolean allSupportingEvidenceFound
 ) {
+    public MusiqueBenchmarkQueryResult(
+            String questionId,
+            String question,
+            String groundTruthAnswer,
+            List<String> groundTruthAliases,
+            int hopCount,
+            String generatedAnswer,
+            List<String> modulesApplied,
+            List<RetrievedChunk> retrievedChunks,
+            long retrievalMs,
+            long generationMs,
+            long expansionMs,
+            long totalLatencyMs,
+            TokenUsageDto tokenUsage,
+            String tableNameUsed,
+            List<String> expectedSupportingTitles,
+            boolean supportingEvidenceFound,
+            int supportingTitlesFound,
+            boolean allSupportingEvidenceFound) {
+        this(
+                questionId,
+                question,
+                groundTruthAnswer,
+                groundTruthAliases,
+                hopCount,
+                generatedAnswer,
+                modulesApplied,
+                retrievedChunks,
+                retrievalMs,
+                0L,
+                generationMs,
+                expansionMs,
+                totalLatencyMs,
+                tokenUsage,
+                tableNameUsed,
+                expectedSupportingTitles,
+                supportingEvidenceFound,
+                supportingTitlesFound,
+                allSupportingEvidenceFound);
+    }
+
     public MusiqueBenchmarkQueryResult(
             String questionId,
             String question,
@@ -53,6 +95,7 @@ public record MusiqueBenchmarkQueryResult(
                 modulesApplied,
                 retrievedChunks,
                 retrievalMs,
+                0L,
                 generationMs,
                 0L,
                 totalLatencyMs,

@@ -17,5 +17,15 @@ public interface Reranker {
      * @param candidates retrieved candidates, in their original retrieval order
      * @return candidates reordered (or left untouched) by relevance to {@code query}
      */
-    List<Document> rerank(String query, List<Document> candidates);
+    default List<Document> rerank(String query, List<Document> candidates) {
+        return rerank(query, candidates, candidates != null ? candidates.size() : 0);
+    }
+
+    /**
+     * @param query      the original user query
+     * @param candidates retrieved candidates, in their original retrieval order
+     * @param topN       the maximum number of top-ranked candidates to return
+     * @return top-N candidates reordered by relevance to {@code query}
+     */
+    List<Document> rerank(String query, List<Document> candidates, int topN);
 }

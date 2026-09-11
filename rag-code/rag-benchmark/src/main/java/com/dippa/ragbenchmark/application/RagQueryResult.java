@@ -17,6 +17,7 @@ public record RagQueryResult(
         long retrievalMs,
         long generationMs,
         long expansionMs,
+        long rerankMs,
         TokenUsageDto tokenUsage) {
 
     public RagQueryResult(
@@ -25,8 +26,19 @@ public record RagQueryResult(
             List<RetrievedChunk> retrievedChunks,
             long retrievalMs,
             long generationMs,
+            long expansionMs,
             TokenUsageDto tokenUsage) {
-        this(answer, modulesApplied, retrievedChunks, retrievalMs, generationMs, 0L, tokenUsage);
+        this(answer, modulesApplied, retrievedChunks, retrievalMs, generationMs, expansionMs, 0L, tokenUsage);
+    }
+
+    public RagQueryResult(
+            String answer,
+            Set<ModuleId> modulesApplied,
+            List<RetrievedChunk> retrievedChunks,
+            long retrievalMs,
+            long generationMs,
+            TokenUsageDto tokenUsage) {
+        this(answer, modulesApplied, retrievedChunks, retrievalMs, generationMs, 0L, 0L, tokenUsage);
     }
 
     public RagQueryResult(
@@ -35,10 +47,10 @@ public record RagQueryResult(
             List<RetrievedChunk> retrievedChunks,
             long retrievalMs,
             long generationMs) {
-        this(answer, modulesApplied, retrievedChunks, retrievalMs, generationMs, 0L, TokenUsageDto.ZERO);
+        this(answer, modulesApplied, retrievedChunks, retrievalMs, generationMs, 0L, 0L, TokenUsageDto.ZERO);
     }
 
     public long totalLatencyMs() {
-        return retrievalMs + generationMs + expansionMs;
+        return retrievalMs + generationMs + expansionMs + rerankMs;
     }
 }

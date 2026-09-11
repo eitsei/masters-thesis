@@ -3,6 +3,7 @@ package com.dippa.ragbenchmark.infrastructure;
 import com.dippa.ragbenchmark.domain.Reranker;
 import java.util.List;
 import org.springframework.ai.document.Document;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
@@ -14,10 +15,19 @@ import org.springframework.stereotype.Component;
  * in their original order, so that a real re-ranker (M2) is a true drop-in replacement later.
  */
 @Component
+@ConditionalOnProperty(name = "rag.reranker.provider", havingValue = "noop", matchIfMissing = true)
 public class NoOpReranker implements Reranker {
 
     @Override
     public List<Document> rerank(String query, List<Document> candidates) {
-        return candidates;
+        return candidates != null ? candidates : List.of();
+    }
+
+    @Override
+    public List<Document> rerank(String query, List<Document> candidates, int topN) {
+        if (candidates == null || candidates.isEmpty() || topN <= 0) {
+            return List.of();
+        }
+        return candidates.stream().limit(topN).toList();
     }
 }

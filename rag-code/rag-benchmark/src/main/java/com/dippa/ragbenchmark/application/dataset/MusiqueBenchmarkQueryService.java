@@ -100,6 +100,7 @@ public class MusiqueBenchmarkQueryService {
                 modulesApplied,
                 queryResult.retrievedChunks(),
                 queryResult.retrievalMs(),
+                queryResult.rerankMs(),
                 queryResult.generationMs(),
                 queryResult.expansionMs(),
                 totalLatencyMs,

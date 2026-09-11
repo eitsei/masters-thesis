@@ -52,6 +52,18 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", "parent_expansion_failed", "message", exception.getMessage()));
     }
 
+    @ExceptionHandler(com.dippa.ragbenchmark.domain.RerankingException.class)
+    public ResponseEntity<Map<String, Object>> handleReranking(com.dippa.ragbenchmark.domain.RerankingException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("error", "reranking_failed", "message", exception.getMessage()));
+    }
+
+    @ExceptionHandler(com.dippa.ragbenchmark.domain.RerankingConfigurationException.class)
+    public ResponseEntity<Map<String, Object>> handleRerankingConfiguration(com.dippa.ragbenchmark.domain.RerankingConfigurationException exception) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("error", "reranking_not_configured", "message", exception.getMessage()));
+    }
+
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(NoSuchElementException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

@@ -29,4 +29,28 @@ class NoOpRerankerTest {
 
         assertThat(result).isEmpty();
     }
+
+    @Test
+    void rerank_withTopN_limitsCandidatesToTopN() {
+        NoOpReranker reranker = new NoOpReranker();
+        Document first = Document.builder().id("1").text("a").build();
+        Document second = Document.builder().id("2").text("b").build();
+        Document third = Document.builder().id("3").text("c").build();
+        List<Document> candidates = List.of(first, second, third);
+
+        List<Document> result = reranker.rerank("query", candidates, 2);
+
+        assertThat(result).containsExactly(first, second);
+    }
+
+    @Test
+    void rerank_withTopNGreaterThanSize_returnsAllCandidates() {
+        NoOpReranker reranker = new NoOpReranker();
+        Document first = Document.builder().id("1").text("a").build();
+        List<Document> candidates = List.of(first);
+
+        List<Document> result = reranker.rerank("query", candidates, 5);
+
+        assertThat(result).containsExactly(first);
+    }
 }

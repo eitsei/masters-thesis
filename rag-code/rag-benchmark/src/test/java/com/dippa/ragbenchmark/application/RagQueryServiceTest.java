@@ -13,7 +13,9 @@ import com.dippa.ragbenchmark.api.TokenUsageDto;
 import com.dippa.ragbenchmark.domain.ModuleId;
 import com.dippa.ragbenchmark.domain.ModuleNotImplementedException;
 import com.dippa.ragbenchmark.domain.Reranker;
+import com.dippa.ragbenchmark.domain.RerankingConfigurationException;
 import com.dippa.ragbenchmark.domain.RetrievalExpander;
+import com.dippa.ragbenchmark.infrastructure.NoOpReranker;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
@@ -193,11 +195,11 @@ class RagQueryServiceTest {
 
     @Test
     void requestedModules_failsFastBeforeTouchingAnyDependency() {
-        assertThatThrownBy(() -> ragQueryService.query("query", Set.of(ModuleId.M2)))
+        assertThatThrownBy(() -> ragQueryService.query("query", Set.of(ModuleId.M3)))
                 .isInstanceOf(ModuleNotImplementedException.class)
                 .satisfies(exception -> {
                     ModuleNotImplementedException moduleException = (ModuleNotImplementedException) exception;
-                    assertThat(moduleException.getModules()).containsExactly(ModuleId.M2);
+                    assertThat(moduleException.getModules()).containsExactly(ModuleId.M3);
                 });
 
         verifyNoInteractions(vectorStore, chatModel, reranker);
@@ -205,14 +207,86 @@ class RagQueryServiceTest {
 
     @Test
     void multipleRequestedModules_areAllCarriedByTheException() {
-        assertThatThrownBy(() -> ragQueryService.query("query", Set.of(ModuleId.M2, ModuleId.M3)))
+        assertThatThrownBy(() -> ragQueryService.query("query", Set.of(ModuleId.M3, ModuleId.M4)))
                 .isInstanceOf(ModuleNotImplementedException.class)
                 .satisfies(exception -> {
                     ModuleNotImplementedException moduleException = (ModuleNotImplementedException) exception;
-                    assertThat(moduleException.getModules()).containsExactlyInAnyOrder(ModuleId.M2, ModuleId.M3);
+                    assertThat(moduleException.getModules()).containsExactlyInAnyOrder(ModuleId.M3, ModuleId.M4);
                 });
 
         verify(vectorStore, never()).similaritySearch(any(SearchRequest.class));
+    }
+
+    @Test
+    void m2HappyPath_retrievesCandidatePoolAndReranksTopK() {
+        Document candidate1 = Document.builder().id("c1").text("Text 1").build();
+        Document candidate2 = Document.builder().id("c2").text("Text 2").build();
+        List<Document> retrievedPool = List.of(candidate1, candidate2);
+        Document reranked1 = Document.builder().id("c2").text("Text 2").metadata("rerank_score", 0.99).build();
+        List<Document> rerankedDocs = List.of(reranked1);
+
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(retrievedPool);
+        when(reranker.rerank("test query", retrievedPool, 5)).thenReturn(rerankedDocs);
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Reranked answer", null));
+
+        RagQueryResult result = ragQueryService.query("test query", Set.of(ModuleId.M2));
+
+        assertThat(result.answer()).isEqualTo("Reranked answer");
+        assertThat(result.modulesApplied()).containsExactly(ModuleId.M2);
+        assertThat(result.retrievedChunks()).hasSize(1);
+        assertThat(result.retrievedChunks().get(0).id()).isEqualTo("c2");
+        assertThat(result.rerankMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.rerankMs() + result.generationMs());
+
+        ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStore).similaritySearch(captor.capture());
+        assertThat(captor.getValue().getTopK()).isEqualTo(50); // candidatePoolSize default 50
+        verify(reranker).rerank("test query", retrievedPool, 5);
+        assertThat(meterRegistry.find("rag.pipeline.rerank").timer()).isNotNull();
+    }
+
+    @Test
+    void m1PlusM2Combined_retrievesCandidatesReranksThenExpandsToParents() {
+        Document child1 = Document.builder().id("child1").text("child text 1").build();
+        Document child2 = Document.builder().id("child2").text("child text 2").build();
+        List<Document> childPool = List.of(child1, child2);
+
+        Document winningChild = Document.builder().id("child2").text("child text 2").metadata("rerank_score", 0.95).build();
+        List<Document> rerankedChildren = List.of(winningChild);
+
+        Document parentDoc = Document.builder().id("parent2").text("full parent text 2").build();
+        List<Document> expandedParents = List.of(parentDoc);
+
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(childPool);
+        when(reranker.rerank("combined query", childPool, 5)).thenReturn(rerankedChildren);
+        when(retrievalExpander.expand(rerankedChildren, "vector_store_test_large")).thenReturn(expandedParents);
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Combined answer", null));
+
+        RagQueryResult result = ragQueryService.query("combined query", Set.of(ModuleId.M1, ModuleId.M2));
+
+        assertThat(result.answer()).isEqualTo("Combined answer");
+        assertThat(result.modulesApplied()).containsExactlyInAnyOrder(ModuleId.M1, ModuleId.M2);
+        assertThat(result.retrievedChunks()).hasSize(1);
+        assertThat(result.retrievedChunks().get(0).id()).isEqualTo("parent2");
+        assertThat(result.rerankMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.expansionMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.rerankMs() + result.expansionMs() + result.generationMs());
+
+        verify(reranker).rerank("combined query", childPool, 5);
+        verify(retrievalExpander).expand(rerankedChildren, "vector_store_test_large");
+    }
+
+    @Test
+    void m2Requested_whenRerankerIsNoOp_failsFastWithConfigurationException() {
+        RagQueryService serviceWithNoOp = new RagQueryService(
+                vectorStore, chatModel, new NoOpReranker(), retrievalExpander, meterRegistry,
+                Integer.MAX_VALUE, 5, new ClassPathResource("prompts/answer-generation.st"));
+
+        assertThatThrownBy(() -> serviceWithNoOp.query("query", Set.of(ModuleId.M2)))
+                .isInstanceOf(RerankingConfigurationException.class)
+                .hasMessageContaining("rag.reranker.provider");
+
+        verifyNoInteractions(vectorStore, chatModel);
     }
 
     @Test

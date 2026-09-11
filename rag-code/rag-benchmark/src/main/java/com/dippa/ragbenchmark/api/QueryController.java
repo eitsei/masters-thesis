@@ -38,7 +38,7 @@ public class QueryController {
         List<String> modulesApplied = result.modulesApplied().stream()
                 .map(Enum::name)
                 .toList();
-        TimingsDto timings = new TimingsDto(result.retrievalMs(), result.generationMs(), result.expansionMs());
+        TimingsDto timings = new TimingsDto(result.retrievalMs(), result.rerankMs(), result.generationMs(), result.expansionMs());
 
         return ResponseEntity.ok(
                 new QueryResponse(

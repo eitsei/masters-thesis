@@ -1,6 +1,7 @@
 package com.dippa.ragbenchmark;
 
 import com.dippa.ragbenchmark.infrastructure.config.ModelCatalogProperties;
+import com.dippa.ragbenchmark.infrastructure.config.RerankerProperties;
 import com.dippa.ragbenchmark.infrastructure.dataset.MusiqueDatasetProperties;
 import com.dippa.ragbenchmark.ingest.nordea.NordeaIngestionProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,7 +12,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
-@EnableConfigurationProperties({ModelCatalogProperties.class, NordeaIngestionProperties.class, MusiqueDatasetProperties.class})
+@EnableConfigurationProperties({ModelCatalogProperties.class, RerankerProperties.class, NordeaIngestionProperties.class, MusiqueDatasetProperties.class})
 public class RagBenchmarkApplication {
 
     public static void main(String[] args) {

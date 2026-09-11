@@ -31,8 +31,8 @@ spring:
         # your env (see .env.example), and run
         # `gcloud auth application-default login` first.
         api-key: ${GOOGLE_AI_API_KEY:}
-        # project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
-        # location: ${GOOGLE_CLOUD_LOCATION:us-central1}
+        project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
+        location: ${GOOGLE_CLOUD_LOCATION:global}
         chat:
           # Defaults to the catalog's "flash" tier (rag.models.google-genai.flash,
           # below) so there's one place that literal is written; GOOGLE_GENAI_CHAT_MODEL
@@ -64,7 +64,7 @@ spring:
           # this placeholder is overridden by it.
           api-key: ${GOOGLE_AI_API_KEY:unset-see-application-yml}
           # project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
-          # location: ${GOOGLE_CLOUD_LOCATION:us-central1}
+          # location: ${GOOGLE_CLOUD_LOCATION:global}
           text:
             # NOTE: the model property lives one level deeper than the chat one --
             # spring.ai.google.genai.embedding.text.model, NOT
@@ -146,12 +146,20 @@ rag:
     # Integer.MAX_VALUE is used here to mean "never truncate, always show the whole chunk"
     # rather than guessing a character number that happens to be big enough. Lower this (e.g.
     # to 200) to get short previews back instead.
-    snippet-length-chars: 2147483647
+    snippet-length-chars: 100
     # Number of chunks retrieved from vector_store_test per query, before reranking (the M0
     # baseline's Reranker is a no-op, so this is also how many chunks end up in the prompt and
     # in retrievedChunks). Read directly by RagQueryService via @Value, same as
     # snippet-length-chars above.
     top-k: 5
+  reranker:
+    provider: ${RAG_RERANKER_PROVIDER:noop}
+    candidate-pool-size: ${RAG_RERANKER_CANDIDATE_POOL_SIZE:50}
+    model: ${RAG_RERANKER_MODEL:${rag.models.reranker.vertex-default}}
+    vertex:
+      project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
+      location: ${RAG_RERANKER_VERTEX_LOCATION:global}
+      ranking-config: ${RAG_RERANKER_VERTEX_RANKING_CONFIG:default_ranking_config}
   models:
     google-genai:
       flash-lite: gemini-3.5-flash-lite

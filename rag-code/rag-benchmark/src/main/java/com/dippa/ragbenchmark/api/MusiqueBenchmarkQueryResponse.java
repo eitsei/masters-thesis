@@ -63,7 +63,7 @@ public record MusiqueBenchmarkQueryResponse(
                 result.generatedAnswer(),
                 result.modulesApplied(),
                 result.retrievedChunks(),
-                new TimingsDto(result.retrievalMs(), result.generationMs(), result.expansionMs()),
+                new TimingsDto(result.retrievalMs(), result.rerankMs(), result.generationMs(), result.expansionMs()),
                 result.totalLatencyMs(),
                 result.tokenUsage(),
                 result.tableNameUsed(),
