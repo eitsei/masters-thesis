@@ -234,7 +234,7 @@ public class RagQueryService {
             logger.info("Reranked {} candidate(s) to {} chunk(s) in {} ms.",
                     retrieved.size(), reranked.size(), rerankMs);
         } else {
-            reranked = reranker.rerank(query, retrieved);
+            reranked = retrieved;
         }
 
         List<Document> contextDocuments = reranked;

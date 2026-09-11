@@ -86,13 +86,12 @@ class RagQueryServiceTest {
     }
 
     @Test
-    void m0HappyPath_retrievesRerankAndGeneratesAnswerWithUsage() {
+    void m0HappyPath_retrievesAndGeneratesAnswerWithoutReranking() {
         Document chunkOne = Document.builder().id("chunk-1").text("Paris is the capital of France.").build();
         Document chunkTwo = Document.builder().id("chunk-2").text("It is known for the Eiffel Tower.").build();
         List<Document> retrieved = List.of(chunkOne, chunkTwo);
 
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(retrieved);
-        when(reranker.rerank("What is the capital of France?", retrieved)).thenReturn(retrieved);
         Usage usage = new DefaultUsage(120, 30, 150, null, 25L, 0L);
         when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Paris.", usage));
 
@@ -105,12 +104,13 @@ class RagQueryServiceTest {
         assertThat(result.retrievedChunks().get(0).snippet()).isEqualTo("Paris is the capital of France.");
         assertThat(result.retrievedChunks().get(0).text()).isEqualTo("Paris is the capital of France.");
         assertThat(result.retrievalMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.rerankMs()).isZero();
         assertThat(result.generationMs()).isGreaterThanOrEqualTo(0);
         assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.generationMs());
         assertThat(result.tokenUsage()).isEqualTo(new TokenUsageDto(120, 30, 150, 25));
 
         verify(vectorStore).similaritySearch(any(SearchRequest.class));
-        verify(reranker).rerank("What is the capital of France?", retrieved);
+        verifyNoInteractions(reranker);
         verify(chatModel).call(any(Prompt.class));
 
         assertThat(meterRegistry.find("rag.pipeline.retrieval").timer()).isNotNull();
@@ -120,7 +120,6 @@ class RagQueryServiceTest {
     @Test
     void nullMetadataOrUsage_safelyDefaultsTokenUsageToZero() {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
-        when(reranker.rerank(anyString(), any())).thenReturn(List.of());
         ChatResponse responseWithoutUsage = new ChatResponse(List.of(new Generation(new AssistantMessage("answer"))));
         when(chatModel.call(any(Prompt.class))).thenReturn(responseWithoutUsage);
 
@@ -133,7 +132,6 @@ class RagQueryServiceTest {
     @Test
     void partialUsageWithNullValues_safelyDefaultsNullsToZero() {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
-        when(reranker.rerank(anyString(), any())).thenReturn(List.of());
         Usage mockUsage = org.mockito.Mockito.mock(Usage.class);
         when(mockUsage.getPromptTokens()).thenReturn(null);
         when(mockUsage.getCompletionTokens()).thenReturn(null);
@@ -152,7 +150,6 @@ class RagQueryServiceTest {
     @Test
     void topKOverride_isUsedInSearchRequest() {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
-        when(reranker.rerank(anyString(), any())).thenReturn(List.of());
         when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("ans", null));
 
         ragQueryService.query("query", Set.of(), null, 15);
@@ -165,7 +162,6 @@ class RagQueryServiceTest {
     @Test
     void dynamicTable_withNonPgVectorStore_fallsBackGracefullyToDefaultStore() {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
-        when(reranker.rerank(anyString(), any())).thenReturn(List.of());
         when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("ans", null));
 
         RagQueryResult result = ragQueryService.query("query", Set.of(), "other_table", 5);
@@ -184,7 +180,6 @@ class RagQueryServiceTest {
     @Test
     void nullModules_isTreatedAsEmptySet_andRunsBaselinePipeline() {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
-        when(reranker.rerank(anyString(), any())).thenReturn(List.of());
         when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("answer", null));
 
         RagQueryResult result = ragQueryService.query("query", null);
@@ -297,7 +292,6 @@ class RagQueryServiceTest {
         List<Document> expandedParents = List.of(parentDoc);
 
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(retrievedChildren);
-        when(reranker.rerank("Where is the Eiffel Tower?", retrievedChildren)).thenReturn(retrievedChildren);
         when(retrievalExpander.expand(any(), any())).thenReturn(expandedParents);
         when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("In Paris.", null));
 
@@ -309,8 +303,10 @@ class RagQueryServiceTest {
         assertThat(result.retrievedChunks().get(0).id()).isEqualTo("parent-1");
         assertThat(result.retrievedChunks().get(0).text()).isEqualTo("Paris is the capital of France and has the Eiffel Tower.");
         assertThat(result.expansionMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.rerankMs()).isZero();
         assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.generationMs() + result.expansionMs());
 
+        verifyNoInteractions(reranker);
         verify(retrievalExpander).expand(any(), any());
         assertThat(meterRegistry.find("rag.pipeline.expansion").timer()).isNotNull();
     }

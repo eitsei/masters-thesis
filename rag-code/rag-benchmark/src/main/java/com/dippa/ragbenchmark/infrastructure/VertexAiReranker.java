@@ -17,6 +17,7 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -38,15 +39,26 @@ public class VertexAiReranker implements Reranker {
     private final RerankerProperties properties;
     private final RestClient restClient;
     private final Supplier<String> tokenSupplier;
+    private final Supplier<String> projectIdSupplier;
 
+    @Autowired
     public VertexAiReranker(RerankerProperties properties, RestClient.Builder restClientBuilder) {
-        this(properties, restClientBuilder.build(), createDefaultTokenSupplier());
+        this(properties, restClientBuilder.build(), createDefaultTokenSupplier(), createDefaultProjectIdSupplier());
     }
 
     public VertexAiReranker(RerankerProperties properties, RestClient restClient, Supplier<String> tokenSupplier) {
+        this(properties, restClient, tokenSupplier, null);
+    }
+
+    public VertexAiReranker(
+            RerankerProperties properties,
+            RestClient restClient,
+            Supplier<String> tokenSupplier,
+            Supplier<String> projectIdSupplier) {
         this.properties = properties;
         this.restClient = restClient;
         this.tokenSupplier = tokenSupplier != null ? tokenSupplier : createDefaultTokenSupplier();
+        this.projectIdSupplier = projectIdSupplier;
     }
 
     @Override
@@ -61,11 +73,7 @@ public class VertexAiReranker implements Reranker {
         }
         int effectiveTopN = (topN > 0) ? topN : candidates.size();
 
-        String projectId = properties.vertex().projectId();
-        if (projectId == null || projectId.isBlank()) {
-            throw new RerankingException("GCP project ID is required for Vertex AI Ranking API. Set GOOGLE_CLOUD_PROJECT_ID in environment or rag.reranker.vertex.project-id in properties.");
-        }
-
+        String projectId = resolveProjectId();
         String location = properties.vertex().location();
         String rankingConfig = properties.vertex().rankingConfig();
         String url = String.format(DISCOVERY_ENGINE_ENDPOINT, projectId, location, rankingConfig);
@@ -137,6 +145,30 @@ public class VertexAiReranker implements Reranker {
         return title != null ? title.toString() : null;
     }
 
+    private String resolveProjectId() {
+        if (properties != null && properties.vertex() != null) {
+            String propProjectId = properties.vertex().projectId();
+            if (propProjectId != null && !propProjectId.isBlank()) {
+                return propProjectId.trim();
+            }
+        }
+        if (projectIdSupplier != null) {
+            String supplied = projectIdSupplier.get();
+            if (supplied != null && !supplied.isBlank()) {
+                return supplied.trim();
+            }
+        }
+        String envProject = System.getenv("GOOGLE_CLOUD_PROJECT_ID");
+        if (envProject != null && !envProject.isBlank()) {
+            return envProject.trim();
+        }
+        String gcpProject = System.getenv("GOOGLE_CLOUD_PROJECT");
+        if (gcpProject != null && !gcpProject.isBlank()) {
+            return gcpProject.trim();
+        }
+        throw new RerankingException("GCP project ID is required for Vertex AI Ranking API. Set GOOGLE_CLOUD_PROJECT_ID in environment or rag.reranker.vertex.project-id in properties.");
+    }
+
     private static Supplier<String> createDefaultTokenSupplier() {
         return () -> {
             try {
@@ -148,6 +180,20 @@ public class VertexAiReranker implements Reranker {
             } catch (IOException e) {
                 throw new RerankingException("Failed to obtain Application Default Credentials for Vertex AI Ranking API: " + e.getMessage(), e);
             }
+        };
+    }
+
+    private static Supplier<String> createDefaultProjectIdSupplier() {
+        return () -> {
+            try {
+                GoogleCredentials credentials = GoogleCredentials.getApplicationDefault();
+                if (credentials != null && credentials.getQuotaProjectId() != null && !credentials.getQuotaProjectId().isBlank()) {
+                    return credentials.getQuotaProjectId().trim();
+                }
+            } catch (Exception ignored) {
+                // Fall through to resolveProjectId exception
+            }
+            return null;
         };
     }
 
