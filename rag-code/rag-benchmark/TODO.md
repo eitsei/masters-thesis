@@ -8,7 +8,7 @@ yet; each item is a starting point for later work, not a spec.
   string at a time. The next step is loading the
   [MuSiQue](https://github.com/StonyBrookNLP/musique) multi-hop QA benchmark dataset
   and batch-ingesting it into the pgvector store.
-- **M1 — small-to-big retrieval.** `RetrievalExpander` (`domain/RetrievalExpander.java`)
+- **M1 — small-to-big retrieval.** Implemented through `RetrievalExpander` (`domain/RetrievalExpander.java`), including explicit parent-expansion failures and ranked parent deduplication. Integration benchmarking and full overlap-aware ingestion remain follow-up work.
   is defined but has no implementation or bean; child-chunk retrieval with parent-window
   expansion is not wired into `RagQueryService`.
 - **M2 — re-ranking.** Only `NoOpReranker` (`infrastructure/NoOpReranker.java`) exists.

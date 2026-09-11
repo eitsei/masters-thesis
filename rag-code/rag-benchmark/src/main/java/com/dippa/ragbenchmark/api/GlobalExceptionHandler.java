@@ -4,8 +4,10 @@ import com.dippa.ragbenchmark.domain.ChunkPersistenceException;
 import com.dippa.ragbenchmark.domain.InvalidModuleException;
 import com.dippa.ragbenchmark.domain.ModuleId;
 import com.dippa.ragbenchmark.domain.ModuleNotImplementedException;
+import com.dippa.ragbenchmark.domain.ParentExpansionException;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -42,5 +44,23 @@ public class GlobalExceptionHandler {
                 exception.getDocumentId(),
                 exception.getChunkIds());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+
+    @ExceptionHandler(ParentExpansionException.class)
+    public ResponseEntity<Map<String, Object>> handleParentExpansion(ParentExpansionException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("error", "parent_expansion_failed", "message", exception.getMessage()));
+    }
+
+    @ExceptionHandler(NoSuchElementException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFound(NoSuchElementException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "not_found", "message", exception.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException exception) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("error", "bad_request", "message", exception.getMessage()));
     }
 }

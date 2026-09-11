@@ -43,18 +43,20 @@ class PgVectorRetrievalExpanderTest {
     }
 
     @Test
-    void expand_noParentIdInMetadata_returnsChildChunksAsIs() {
+    void expand_noParentIdInMetadata_failsExplicitly() {
         Document child = new Document("c1", "text", Map.of("key", "val"));
-        List<Document> result = expander.expand(List.of(child), "vector_store_musique_large");
-        assertThat(result).containsExactly(child);
+        assertThatThrownBy(() -> expander.expand(List.of(child), "vector_store_musique_large"))
+                .isInstanceOf(com.dippa.ragbenchmark.domain.ParentExpansionException.class)
+                .hasMessageContaining("does not contain a parent_id");
         verifyNoInteractions(jdbcTemplate);
     }
 
     @Test
-    void expand_noParentTable_returnsChildChunksAsIs() {
+    void expand_noParentTable_failsExplicitly() {
         Document child = new Document("c1", "text", Map.of("parent_id", UUID.randomUUID().toString()));
-        List<Document> result = expander.expand(List.of(child), null);
-        assertThat(result).containsExactly(child);
+        assertThatThrownBy(() -> expander.expand(List.of(child), null))
+                .isInstanceOf(com.dippa.ragbenchmark.domain.ParentExpansionException.class)
+                .hasMessageContaining("No parent table specified");
         verifyNoInteractions(jdbcTemplate);
     }
 

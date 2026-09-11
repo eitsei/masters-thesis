@@ -2,7 +2,6 @@ package com.dippa.ragbenchmark.infrastructure;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -19,8 +18,6 @@ import org.springframework.stereotype.Component;
 public class PgVectorStoreFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(PgVectorStoreFactory.class);
-    private static final Pattern TABLE_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_]+$");
-
     private final VectorStore defaultVectorStore;
     private final JdbcTemplate jdbcTemplate;
     private final EmbeddingModel embeddingModel;
@@ -39,9 +36,7 @@ public class PgVectorStoreFactory {
         if (tableName == null || tableName.isBlank()) {
             return defaultVectorStore;
         }
-        if (!TABLE_NAME_PATTERN.matcher(tableName).matches()) {
-            throw new IllegalArgumentException("Invalid table name: " + tableName);
-        }
+        TableNameValidator.requireValid(tableName, "table");
         if (!(defaultVectorStore instanceof PgVectorStore)) {
             logger.warn("Default store is not PgVectorStore. Returning default store for table '{}'", tableName);
             return defaultVectorStore;

@@ -23,7 +23,9 @@ public record MusiqueBenchmarkQueryResult(
         TokenUsageDto tokenUsage,
         String tableNameUsed,
         List<String> expectedSupportingTitles,
-        boolean supportingEvidenceFound
+        boolean supportingEvidenceFound,
+        int supportingTitlesFound,
+        boolean allSupportingEvidenceFound
 ) {
     public MusiqueBenchmarkQueryResult(
             String questionId,
@@ -57,6 +59,8 @@ public record MusiqueBenchmarkQueryResult(
                 tokenUsage,
                 tableNameUsed,
                 expectedSupportingTitles,
+                supportingEvidenceFound,
+                supportingEvidenceFound ? 1 : 0,
                 supportingEvidenceFound);
     }
 
@@ -89,6 +93,8 @@ public record MusiqueBenchmarkQueryResult(
                 TokenUsageDto.ZERO,
                 "vector_store_test",
                 expectedSupportingTitles,
+                supportingEvidenceFound,
+                supportingEvidenceFound ? 1 : 0,
                 supportingEvidenceFound);
     }
 }

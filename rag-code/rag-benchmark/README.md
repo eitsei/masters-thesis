@@ -158,12 +158,12 @@ GOOGLE_AI_API_KEY=<your key from https://aistudio.google.com/apikey>
 then export the updated `.env` and re-run `mvn spring-boot:run`. No code or config
 file changes are needed for this switch — only environment variables.
 
-## What's implemented (M0) vs. stubbed (M1-M4)
+## What's implemented (M0/M1) vs. stubbed (M2-M4)
 
 | Module | Status |
 |---|---|
 | M0 — baseline retrieve-then-generate pipeline | Implemented (`RagQueryService`) |
-| M1 — small-to-big retrieval expansion | Not implemented; requesting it returns `501` |
+| M1 — small-to-big retrieval expansion | Implemented with child-table retrieval, parent-table expansion, ranked deduplication, and explicit failure responses |
 | M2 — re-ranking | Not implemented; a `Reranker` port exists with a `NoOpReranker` default; requesting it via the API returns `501` |
 | M3 — prompt / context caching | Not implemented; requesting it returns `501` |
 | M4 — model routing / cascading | Not implemented; a `ModelRouter` port exists but has no implementation wired up; requesting it returns `501` |

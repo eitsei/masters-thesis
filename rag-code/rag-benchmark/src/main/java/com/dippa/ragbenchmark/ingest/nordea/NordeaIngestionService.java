@@ -320,7 +320,10 @@ public class NordeaIngestionService {
         for (int i = 0; i < chunks.size(); i++) {
             String deterministicId = UUID.nameUUIDFromBytes((sourceUrl + "#" + i).getBytes(StandardCharsets.UTF_8))
                     .toString();
-            withDeterministicIds.add(chunks.get(i).mutate().id(deterministicId).build());
+            Map<String, Object> chunkMetadata = new HashMap<>(chunks.get(i).getMetadata());
+            chunkMetadata.put("chunk_index", i);
+            chunkMetadata.put("chunk_type", "baseline");
+            withDeterministicIds.add(new Document(deterministicId, chunks.get(i).getText(), chunkMetadata));
         }
         return withDeterministicIds;
     }

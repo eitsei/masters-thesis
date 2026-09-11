@@ -5,6 +5,7 @@ import com.dippa.ragbenchmark.domain.ModuleId;
 import com.dippa.ragbenchmark.domain.ModuleNotImplementedException;
 import com.dippa.ragbenchmark.domain.Reranker;
 import com.dippa.ragbenchmark.domain.RetrievalExpander;
+import com.dippa.ragbenchmark.infrastructure.TableNameValidator;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.List;
@@ -13,7 +14,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,8 +43,6 @@ import org.springframework.stereotype.Service;
 public class RagQueryService {
 
     private static final Logger logger = LoggerFactory.getLogger(RagQueryService.class);
-    private static final Pattern TABLE_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_]+$");
-
     private static final java.util.concurrent.ScheduledExecutorService PROGRESS_SCHEDULER = java.util.concurrent.Executors
             .newSingleThreadScheduledExecutor(runnable -> {
                 Thread thread = new Thread(runnable, "rag-progress-logger");
@@ -192,7 +190,7 @@ public class RagQueryService {
             if (baseTable.equalsIgnoreCase("vector_store_musique")) {
                 searchTable = "vector_store_musique_small";
                 resolvedParentTable = (parentTableName != null && !parentTableName.isBlank()) ? parentTableName : "vector_store_musique_large";
-            } else if (baseTable.equalsIgnoreCase("vector_store_nordea") || baseTable.equalsIgnoreCase("vector_store_test")) {
+            } else if (baseTable.equalsIgnoreCase("vector_store_nordea")) {
                 searchTable = "vector_store_nordea_small";
                 resolvedParentTable = (parentTableName != null && !parentTableName.isBlank()) ? parentTableName : "vector_store_nordea_large";
             } else if (baseTable.endsWith("_small")) {
@@ -210,7 +208,10 @@ public class RagQueryService {
         }
 
         VectorStore storeToUse = resolveVectorStore(searchTable);
-        int effectiveTopK = (topKOverride != null && topKOverride > 0) ? topKOverride : this.topK;
+        if (topKOverride != null && topKOverride <= 0) {
+            throw new IllegalArgumentException("topK must be greater than zero");
+        }
+        int effectiveTopK = topKOverride != null ? topKOverride : this.topK;
 
         logger.info("Executing RAG query: \"{}\" (searchTable={}, parentTable={}, topK={}, modules={})",
                 query, searchTable, resolvedParentTable, effectiveTopK, modules);
@@ -282,9 +283,7 @@ public class RagQueryService {
         if (tableName == null || tableName.isBlank() || tableName.equals(defaultTableName)) {
             return this.vectorStore;
         }
-        if (!TABLE_NAME_PATTERN.matcher(tableName).matches()) {
-            throw new IllegalArgumentException("Invalid table name: " + tableName);
-        }
+        TableNameValidator.requireValid(tableName, "table");
         if (!(this.vectorStore instanceof PgVectorStore)) {
             logger.warn("Dynamic table '{}' requested, but vectorStore is not PgVectorStore. Falling back to default store.", tableName);
             return this.vectorStore;

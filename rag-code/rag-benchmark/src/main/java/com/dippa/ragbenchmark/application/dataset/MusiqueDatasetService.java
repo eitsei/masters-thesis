@@ -61,6 +61,15 @@ public class MusiqueDatasetService {
      * Retrieves questions with optional filtering by hop count, sampling mode, and pagination.
      */
     public List<MusiqueQuestion> getQuestions(int offset, int limit, Integer hopFilter, boolean sampleOnly) {
+        if (offset < 0) {
+            throw new IllegalArgumentException("offset must not be negative");
+        }
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be greater than zero");
+        }
+        if (hopFilter != null && (hopFilter < 2 || hopFilter > 4)) {
+            throw new IllegalArgumentException("hops must be between 2 and 4");
+        }
         List<MusiqueQuestion> source = sampleOnly ? reader.getCanonicalBenchmarkSample() : reader.loadAll();
 
         return source.stream()
@@ -122,6 +131,9 @@ public class MusiqueDatasetService {
         if ("s2b".equalsIgnoreCase(mode) || "small-to-big".equalsIgnoreCase(mode)) {
             return ingestSmallToBig(sampleOnly, sampleSize);
         }
+        if (mode != null && !"original".equalsIgnoreCase(mode)) {
+            throw new IllegalArgumentException("Unsupported MuSiQue ingestion mode: " + mode);
+        }
         return ingestOriginal(sampleOnly, sampleSize);
     }
 
@@ -169,15 +181,12 @@ public class MusiqueDatasetService {
             documents.add(new Document(deterministicId, text, metadata));
         }
 
+        VectorStore targetStore = (vectorStoreFactory != null)
+                ? vectorStoreFactory.getStore("vector_store_musique")
+                : this.vectorStore;
+
         int batchSize = properties.batchSize() > 0 ? properties.batchSize() : 100;
-        int batchCount = 0;
-        for (int i = 0; i < documents.size(); i += batchSize) {
-            int toIndex = Math.min(i + batchSize, documents.size());
-            List<Document> batch = documents.subList(i, toIndex);
-            vectorStore.add(batch);
-            batchCount++;
-            logger.info("Ingested batch {}/{} ({} chunks)", batchCount, (documents.size() + batchSize - 1) / batchSize, batch.size());
-        }
+        int batchCount = addInBatches(targetStore, documents, batchSize);
 
         long durationMs = System.currentTimeMillis() - startTime;
         logger.info("Completed MuSiQue ingestion: {} unique paragraphs across {} questions in {} ms ({} batches)",

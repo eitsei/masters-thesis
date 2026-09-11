@@ -54,27 +54,34 @@ public class MusiqueBenchmarkQueryService {
                 ? requestedTable
                 : (modules.contains(ModuleId.M1) ? "vector_store_musique_small -> vector_store_musique_large" : ragQueryService.getDefaultTableName());
         Integer topK = request != null ? request.topK() : null;
+        if (topK != null && topK <= 0) {
+            throw new IllegalArgumentException("topK must be greater than zero");
+        }
 
         RagQueryResult queryResult = (parentTable != null)
                 ? ragQueryService.query(question.question(), modules, requestedTable, parentTable, topK)
                 : ragQueryService.query(question.question(), modules, requestedTable, topK);
 
         List<String> expectedTitles = question.getSupportingTitles();
-        boolean supportingFound = false;
+        int supportingTitleCount = 0;
 
         if (queryResult.retrievedChunks() != null && expectedTitles != null) {
-            for (RetrievedChunk chunk : queryResult.retrievedChunks()) {
-                String snippet = chunk.snippet();
-                String text = chunk.text();
-                for (String title : expectedTitles) {
-                    if ((snippet != null && snippet.contains(title)) || (text != null && text.contains(title))) {
-                        supportingFound = true;
-                        break;
-                    }
+            for (String title : expectedTitles) {
+                boolean found = queryResult.retrievedChunks().stream().anyMatch(chunk -> {
+                    String snippet = chunk.snippet();
+                    String text = chunk.text();
+                    return (snippet != null && snippet.contains(title))
+                            || (text != null && text.contains(title));
+                });
+                if (found) {
+                    supportingTitleCount++;
                 }
-                if (supportingFound) break;
             }
         }
+        boolean supportingFound = supportingTitleCount > 0;
+        boolean allSupportingFound = expectedTitles != null
+                && !expectedTitles.isEmpty()
+                && supportingTitleCount == expectedTitles.size();
 
         List<String> modulesApplied = queryResult.modulesApplied() != null
                 ? queryResult.modulesApplied().stream().map(ModuleId::name).toList()
@@ -99,7 +106,9 @@ public class MusiqueBenchmarkQueryService {
                 tokenUsage,
                 tableNameUsed,
                 expectedTitles != null ? expectedTitles : List.of(),
-                supportingFound
+                supportingFound,
+                supportingTitleCount,
+                allSupportingFound
         );
     }
 
@@ -108,14 +117,38 @@ public class MusiqueBenchmarkQueryService {
      */
     public MusiqueBatchQueryResult evaluateBatch(BenchmarkBatchQueryRequest request) {
         long startTime = System.currentTimeMillis();
+        if (request != null) {
+            if (request.limit() != null && request.limit() <= 0) {
+                throw new IllegalArgumentException("limit must be greater than zero");
+            }
+            if (request.offset() != null && request.offset() < 0) {
+                throw new IllegalArgumentException("offset must not be negative");
+            }
+            if (request.hops() != null && (request.hops() < 2 || request.hops() > 4)) {
+                throw new IllegalArgumentException("hops must be between 2 and 4");
+            }
+            if (request.topK() != null && request.topK() <= 0) {
+                throw new IllegalArgumentException("topK must be greater than zero");
+            }
+        }
 
         List<MusiqueQuestion> questionsToEvaluate;
         if (request != null && request.questionIds() != null && !request.questionIds().isEmpty()) {
+            List<String> missingIds = new ArrayList<>();
             questionsToEvaluate = request.questionIds().stream()
-                    .map(datasetService::getQuestionById)
+                    .map(id -> {
+                        Optional<MusiqueQuestion> question = datasetService.getQuestionById(id);
+                        if (question.isEmpty()) {
+                            missingIds.add(id);
+                        }
+                        return question;
+                    })
                     .filter(Optional::isPresent)
                     .map(Optional::get)
                     .toList();
+            if (!missingIds.isEmpty()) {
+                throw new NoSuchElementException("MuSiQue question(s) not found: " + missingIds);
+            }
         } else {
             int offset = request != null && request.offset() != null ? request.offset() : 0;
             int limit = request != null && request.limit() != null ? request.limit() : 20;

@@ -224,6 +224,8 @@ def run(
         collector = BenchmarkCollector(client=client, output_dir=Path("runs"), debug=debug, console=console)
         if sample:
             questions = client.get_canonical_sample()
+            if limit is not None and limit > 0:
+                questions = questions[:limit]
         else:
             questions = client.get_questions(limit=limit or 20, hops=hops)
         raw_results = collector.collect(
@@ -256,6 +258,8 @@ def run(
             collector = BenchmarkCollector(client=client, output_dir=Path("runs"), debug=debug, console=console)
             if sample:
                 questions = client.get_canonical_sample()
+                if limit is not None and limit > 0:
+                    questions = questions[:limit]
             else:
                 questions = client.get_questions(limit=limit or 20, hops=hops)
             raw_results = collector.collect(

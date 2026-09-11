@@ -74,3 +74,17 @@ com.dippa.ragbenchmark
 - **Telemetry (RQ1 & RQ2):** Micrometer timers for micro-phases ($T_{\text{embed}}, T_{\text{route}}, T_{\text{ret}}, T_{\text{rerank}}, T_{\text{expand}}, T_{\text{cache}}, T_{\text{stream}}$). Time to First Token $\text{TTFT} = T_{\text{total}} - T_{\text{stream}}$. Token costs reflect a 90% discount on cached tokens.
 - **Quality (RQ3):** RAGAS metrics evaluated offline with Claude Sonnet 5 ($T=0.0$) as independent judge.
 - **Testing:** Unit test all logic with Mockito (`mvn test`). Use Testcontainers for pgvector integration tests.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in GitHub Issues and are managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default labels `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository: read root `CONTEXT.md` and relevant ADRs under `docs/adr/`. See `docs/agents/domain.md`.
