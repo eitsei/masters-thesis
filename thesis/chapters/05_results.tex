@@ -252,7 +252,8 @@
 % =========================================================================
 % DRAFT NOTES: 5.4.2 Latency Deconstruction (RQ1)
 % 1. Embed Figure 5.1 (figures/latency_breakdown.pdf):
-%    - Deconstruct retrieval duration (T_ret) vs generation duration (T_gen).
+%    - Deconstruct micro-phase durations: retrieval (T_ret), re-ranking (T_rerank),
+%      expansion (T_expand), and generation (T_gen).
 % 2. Directly resolve RQ1:
 %    - Contrast user-perceived Time to First Token (TTFT) against streaming generation.
 %    - S2B (M1) and Re-ranking (M2) introduce computational latency overhead (T_expand, T_rerank).
@@ -263,7 +264,7 @@
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/latency_breakdown.pdf}
-\caption[End-to-end latency micro-phase breakdown]{End-to-end latency micro-phase breakdown isolating retrieval duration ($T_{\text{ret}}$) and generation duration ($T_{\text{gen}}$) across pipeline configurations \textbf{[PLACEHOLDER VISUALIZATION]}. Execution latencies reflect steady-state observations.}
+\caption[End-to-end latency micro-phase breakdown]{End-to-end latency micro-phase breakdown isolating vector retrieval ($T_{\text{ret}}$), semantic re-ranking ($T_{\text{rerank}}$), context expansion ($T_{\text{expand}}$), and generation ($T_{\text{gen}}$) durations across pipeline configurations. Execution latencies reflect steady-state observations.}
 \label{fig:latency_breakdown}
 \end{figure}
 

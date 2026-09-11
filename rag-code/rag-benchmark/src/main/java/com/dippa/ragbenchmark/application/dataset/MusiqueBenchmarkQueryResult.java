@@ -2,6 +2,7 @@ package com.dippa.ragbenchmark.application.dataset;
 
 import com.dippa.ragbenchmark.api.TokenUsageDto;
 import com.dippa.ragbenchmark.application.RetrievedChunk;
+import com.dippa.ragbenchmark.domain.CacheStatus;
 import java.util.List;
 
 /**
@@ -20,6 +21,8 @@ public record MusiqueBenchmarkQueryResult(
         long rerankMs,
         long generationMs,
         long expansionMs,
+        long cacheMs,
+        CacheStatus cacheStatus,
         long totalLatencyMs,
         TokenUsageDto tokenUsage,
         String tableNameUsed,
@@ -28,6 +31,50 @@ public record MusiqueBenchmarkQueryResult(
         int supportingTitlesFound,
         boolean allSupportingEvidenceFound
 ) {
+    public MusiqueBenchmarkQueryResult(
+            String questionId,
+            String question,
+            String groundTruthAnswer,
+            List<String> groundTruthAliases,
+            int hopCount,
+            String generatedAnswer,
+            List<String> modulesApplied,
+            List<RetrievedChunk> retrievedChunks,
+            long retrievalMs,
+            long rerankMs,
+            long generationMs,
+            long expansionMs,
+            long totalLatencyMs,
+            TokenUsageDto tokenUsage,
+            String tableNameUsed,
+            List<String> expectedSupportingTitles,
+            boolean supportingEvidenceFound,
+            int supportingTitlesFound,
+            boolean allSupportingEvidenceFound) {
+        this(
+                questionId,
+                question,
+                groundTruthAnswer,
+                groundTruthAliases,
+                hopCount,
+                generatedAnswer,
+                modulesApplied,
+                retrievedChunks,
+                retrievalMs,
+                rerankMs,
+                generationMs,
+                expansionMs,
+                0L,
+                CacheStatus.NONE,
+                totalLatencyMs,
+                tokenUsage,
+                tableNameUsed,
+                expectedSupportingTitles,
+                supportingEvidenceFound,
+                supportingTitlesFound,
+                allSupportingEvidenceFound);
+    }
+
     public MusiqueBenchmarkQueryResult(
             String questionId,
             String question,
@@ -60,6 +107,8 @@ public record MusiqueBenchmarkQueryResult(
                 0L,
                 generationMs,
                 expansionMs,
+                0L,
+                CacheStatus.NONE,
                 totalLatencyMs,
                 tokenUsage,
                 tableNameUsed,
@@ -98,6 +147,8 @@ public record MusiqueBenchmarkQueryResult(
                 0L,
                 generationMs,
                 0L,
+                0L,
+                CacheStatus.NONE,
                 totalLatencyMs,
                 tokenUsage,
                 tableNameUsed,
@@ -131,13 +182,10 @@ public record MusiqueBenchmarkQueryResult(
                 retrievedChunks,
                 retrievalMs,
                 generationMs,
-                0L,
                 retrievalMs + generationMs,
                 TokenUsageDto.ZERO,
                 "vector_store_test",
                 expectedSupportingTitles,
-                supportingEvidenceFound,
-                supportingEvidenceFound ? 1 : 0,
                 supportingEvidenceFound);
     }
 }

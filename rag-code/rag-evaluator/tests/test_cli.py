@@ -159,6 +159,31 @@ def test_cli_export_thesis(tmp_path: Path, synthetic_run_data):
     assert (figures_dir / "ragas_metrics_radar.pdf").exists()
 
 
+def test_cli_export_thesis_with_subfolder(tmp_path: Path, synthetic_run_data):
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir()
+    c0_file = runs_dir / "run_C0_baseline.jsonl"
+    with c0_file.open("w", encoding="utf-8") as f:
+        for r in synthetic_run_data:
+            f.write(json.dumps(r) + "\n")
+
+    tables_dir = tmp_path / "thesis" / "tables"
+    figures_dir = tmp_path / "thesis" / "figures"
+
+    res = runner.invoke(app, [
+        "export-thesis",
+        "--input", str(runs_dir),
+        "--tables-dir", str(tables_dir),
+        "--figures-dir", str(figures_dir),
+        "--subfolder", "sample_runs",
+    ])
+
+    assert res.exit_code == 0
+    assert (tables_dir / "sample_runs" / "benchmark_summary.tex").exists()
+    assert (tables_dir / "sample_runs" / "hop_breakdown.tex").exists()
+    assert (figures_dir / "sample_runs" / "pareto_frontier.pdf").exists()
+
+
 @patch("src.cli.RagBenchmarkClient")
 def test_cli_run_mocked(mock_client_cls, tmp_path: Path, synthetic_run_data):
     mock_instance = MagicMock()

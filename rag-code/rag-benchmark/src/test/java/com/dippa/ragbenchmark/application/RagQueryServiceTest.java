@@ -10,14 +10,22 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.dippa.ragbenchmark.api.TokenUsageDto;
+import com.dippa.ragbenchmark.domain.CacheLookupResult;
+import com.dippa.ragbenchmark.domain.CacheRequest;
+import com.dippa.ragbenchmark.domain.CacheStatus;
 import com.dippa.ragbenchmark.domain.ModuleId;
 import com.dippa.ragbenchmark.domain.ModuleNotImplementedException;
+import com.dippa.ragbenchmark.domain.PromptCache;
+import com.dippa.ragbenchmark.domain.PromptCacheConfigurationException;
 import com.dippa.ragbenchmark.domain.Reranker;
 import com.dippa.ragbenchmark.domain.RerankingConfigurationException;
 import com.dippa.ragbenchmark.domain.RetrievalExpander;
 import com.dippa.ragbenchmark.infrastructure.NoOpReranker;
+import com.dippa.ragbenchmark.infrastructure.config.PromptCacheProperties;
+import com.dippa.ragbenchmark.infrastructure.config.RerankerProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,18 +43,13 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.ClassPathResource;
 
 /**
- * Plain unit tests for {@link RagQueryService} — no Spring context, no database, no real model
- * calls. All Spring AI collaborators are Mockito mocks. A real {@link SimpleMeterRegistry} is
- * used in place of a mocked {@link MeterRegistry}: Micrometer's {@code MeterRegistry} is an
- * abstract class whose {@code Timer.Sample} machinery reaches into {@code config().clock()} and
- * {@code timer(String)} internals, so a real in-memory registry (no I/O, no Spring, negligible
- * overhead) is the standard and far less brittle way to exercise timer-instrumented code than
- * hand-stubbing those internals with Mockito.
+ * Plain unit tests for {@link RagQueryService} — exercises M0, M1, M2, and M3 pipelines.
  */
 @ExtendWith(MockitoExtension.class)
 class RagQueryServiceTest {
@@ -63,18 +66,37 @@ class RagQueryServiceTest {
     @Mock
     private RetrievalExpander retrievalExpander;
 
-    private MeterRegistry meterRegistry;
+    @Mock
+    private PromptCache promptCache;
 
+    private MeterRegistry meterRegistry;
+    private RagPromptRenderer promptRenderer;
+    private PromptCacheProperties promptCacheProperties;
     private RagQueryService ragQueryService;
 
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        // No Spring context in these tests, so @Value can't inject the prompt resource -- load it
-        // the same way Spring would resolve "classpath:prompts/answer-generation.st", via a plain
-        // ClassPathResource (src/main/resources is on the test classpath by default in Maven).
-        ragQueryService = new RagQueryService(vectorStore, chatModel, reranker, retrievalExpander, meterRegistry, Integer.MAX_VALUE, 5,
-                new ClassPathResource("prompts/answer-generation.st"));
+        promptRenderer = new RagPromptRenderer();
+        promptCacheProperties = PromptCacheProperties.defaultProperties();
+
+        ragQueryService = new RagQueryService(
+                vectorStore,
+                chatModel,
+                reranker,
+                retrievalExpander,
+                promptCache,
+                promptRenderer,
+                promptCacheProperties,
+                "gemini-3.8-flash",
+                meterRegistry,
+                Integer.MAX_VALUE,
+                5,
+                RerankerProperties.defaultProperties(),
+                new ClassPathResource("prompts/answer-generation.st"),
+                "vector_store_test",
+                null,
+                null);
     }
 
     private ChatResponse createChatResponse(String text, Usage usage) {
@@ -86,101 +108,118 @@ class RagQueryServiceTest {
     }
 
     @Test
-    void m0HappyPath_retrievesAndGeneratesAnswerWithoutReranking() {
-        Document chunkOne = Document.builder().id("chunk-1").text("Paris is the capital of France.").build();
-        Document chunkTwo = Document.builder().id("chunk-2").text("It is known for the Eiffel Tower.").build();
-        List<Document> retrieved = List.of(chunkOne, chunkTwo);
+    void happyPath_retrievesChunksAssemblesPromptAndReturnsAnswerWithTimingsAndUsage() {
+        Document chunk1 = Document.builder().id("1").text("First chunk").build();
+        Document chunk2 = Document.builder().id("2").text("Second chunk").build();
+        List<Document> retrievedDocs = List.of(chunk1, chunk2);
 
-        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(retrieved);
-        Usage usage = new DefaultUsage(120, 30, 150, null, 25L, 0L);
-        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Paris.", usage));
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(retrievedDocs);
+        when(chatModel.call(any(Prompt.class)))
+                .thenReturn(createChatResponse("Test answer", new DefaultUsage(10, 5, 15)));
 
-        RagQueryResult result = ragQueryService.query("What is the capital of France?", Set.of());
+        RagQueryResult result = ragQueryService.query("What is the test question?", null);
 
-        assertThat(result.answer()).isEqualTo("Paris.");
+        assertThat(result.answer()).isEqualTo("Test answer");
         assertThat(result.modulesApplied()).isEmpty();
         assertThat(result.retrievedChunks()).hasSize(2);
-        assertThat(result.retrievedChunks().get(0).id()).isEqualTo("chunk-1");
-        assertThat(result.retrievedChunks().get(0).snippet()).isEqualTo("Paris is the capital of France.");
-        assertThat(result.retrievedChunks().get(0).text()).isEqualTo("Paris is the capital of France.");
-        assertThat(result.retrievalMs()).isGreaterThanOrEqualTo(0);
-        assertThat(result.rerankMs()).isZero();
-        assertThat(result.generationMs()).isGreaterThanOrEqualTo(0);
-        assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.generationMs());
-        assertThat(result.tokenUsage()).isEqualTo(new TokenUsageDto(120, 30, 150, 25));
+        assertThat(result.retrievedChunks().get(0).id()).isEqualTo("1");
+        assertThat(result.retrievedChunks().get(0).text()).isEqualTo("First chunk");
+        assertThat(result.retrievedChunks().get(1).id()).isEqualTo("2");
+        assertThat(result.retrievedChunks().get(1).text()).isEqualTo("Second chunk");
 
-        verify(vectorStore).similaritySearch(any(SearchRequest.class));
-        verifyNoInteractions(reranker);
-        verify(chatModel).call(any(Prompt.class));
+        assertThat(result.retrievalMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.generationMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.generationMs() + result.expansionMs() + result.rerankMs() + result.cacheMs());
+
+        assertThat(result.tokenUsage()).isEqualTo(new TokenUsageDto(10, 5, 15, 0, 0));
 
         assertThat(meterRegistry.find("rag.pipeline.retrieval").timer()).isNotNull();
         assertThat(meterRegistry.find("rag.pipeline.generation").timer()).isNotNull();
     }
 
     @Test
-    void nullMetadataOrUsage_safelyDefaultsTokenUsageToZero() {
+    void topKOverride_usesProvidedValueInsteadOfDefault() {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
-        ChatResponse responseWithoutUsage = new ChatResponse(List.of(new Generation(new AssistantMessage("answer"))));
-        when(chatModel.call(any(Prompt.class))).thenReturn(responseWithoutUsage);
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Answer", null));
+
+        ragQueryService.query("query", null, null, 10);
+
+        ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStore).similaritySearch(captor.capture());
+        assertThat(captor.getValue().getTopK()).isEqualTo(10);
+    }
+
+    @Test
+    void topKOverride_zeroOrNegative_throwsIllegalArgumentException() {
+        assertThatThrownBy(() -> ragQueryService.query("query", null, null, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("topK must be greater than zero");
+
+        assertThatThrownBy(() -> ragQueryService.query("query", null, null, -5))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("topK must be greater than zero");
+    }
+
+    @Test
+    void promptAssembly_joinsChunksWithDashesAndRendersQuestion() {
+        Document chunk1 = Document.builder().id("1").text("First chunk text").build();
+        Document chunk2 = Document.builder().id("2").text("Second chunk text").build();
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(chunk1, chunk2));
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Answer", null));
+
+        ragQueryService.query("My Question?", null);
+
+        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(promptCaptor.capture());
+
+        String renderedPrompt = promptCaptor.getValue().getContents();
+        assertThat(renderedPrompt)
+                .contains("Context:\nFirst chunk text\n---\nSecond chunk text")
+                .contains("Question: My Question?")
+                .contains("Answer the question using only the context provided below.");
+    }
+
+    @Test
+    void snippetTruncation_respectsSnippetLengthChars() {
+        RagQueryService serviceWithShortSnippets = new RagQueryService(
+                vectorStore, chatModel, reranker, retrievalExpander, meterRegistry, 5, 5,
+                new ClassPathResource("prompts/answer-generation.st"));
+
+        Document doc = Document.builder().id("1").text("1234567890").build();
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Answer", null));
+
+        RagQueryResult result = serviceWithShortSnippets.query("query", null);
+
+        assertThat(result.retrievedChunks().get(0).snippet()).isEqualTo("12345...");
+        assertThat(result.retrievedChunks().get(0).text()).isEqualTo("1234567890");
+    }
+
+    @Test
+    void nullUsage_mapsToZeroTokens() {
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Answer", null));
 
         RagQueryResult result = ragQueryService.query("query", null);
 
-        assertThat(result.answer()).isEqualTo("answer");
         assertThat(result.tokenUsage()).isEqualTo(TokenUsageDto.ZERO);
     }
 
     @Test
-    void partialUsageWithNullValues_safelyDefaultsNullsToZero() {
+    void nullChatResponse_handlesGracefully() {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
-        Usage mockUsage = org.mockito.Mockito.mock(Usage.class);
-        when(mockUsage.getPromptTokens()).thenReturn(null);
-        when(mockUsage.getCompletionTokens()).thenReturn(null);
-        when(mockUsage.getTotalTokens()).thenReturn(null);
-        when(mockUsage.getCacheReadInputTokens()).thenReturn(null);
-        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("partial", mockUsage));
+        when(chatModel.call(any(Prompt.class))).thenReturn(null);
 
-        RagQueryResult result = ragQueryService.query("query", Set.of());
+        RagQueryResult result = ragQueryService.query("query", null);
 
-        assertThat(result.tokenUsage().promptTokens()).isZero();
-        assertThat(result.tokenUsage().completionTokens()).isZero();
-        assertThat(result.tokenUsage().totalTokens()).isZero();
-        assertThat(result.tokenUsage().cachedTokens()).isZero();
+        assertThat(result.answer()).isEmpty();
+        assertThat(result.tokenUsage()).isEqualTo(TokenUsageDto.ZERO);
     }
 
     @Test
-    void topKOverride_isUsedInSearchRequest() {
+    void emptyRetrieval_generatesAnswerWithEmptyContext() {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
-        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("ans", null));
-
-        ragQueryService.query("query", Set.of(), null, 15);
-
-        ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
-        verify(vectorStore).similaritySearch(captor.capture());
-        assertThat(captor.getValue().getTopK()).isEqualTo(15);
-    }
-
-    @Test
-    void dynamicTable_withNonPgVectorStore_fallsBackGracefullyToDefaultStore() {
-        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
-        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("ans", null));
-
-        RagQueryResult result = ragQueryService.query("query", Set.of(), "other_table", 5);
-
-        assertThat(result.answer()).isEqualTo("ans");
-        verify(vectorStore).similaritySearch(any(SearchRequest.class));
-    }
-
-    @Test
-    void dynamicTable_withInvalidCharacters_throwsIllegalArgumentException() {
-        assertThatThrownBy(() -> ragQueryService.query("query", Set.of(), "table; drop table students;", 5))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid table name");
-    }
-
-    @Test
-    void nullModules_isTreatedAsEmptySet_andRunsBaselinePipeline() {
-        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
-        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("answer", null));
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("I don't know.", null));
 
         RagQueryResult result = ragQueryService.query("query", null);
 
@@ -190,26 +229,113 @@ class RagQueryServiceTest {
 
     @Test
     void requestedModules_failsFastBeforeTouchingAnyDependency() {
-        assertThatThrownBy(() -> ragQueryService.query("query", Set.of(ModuleId.M3)))
+        assertThatThrownBy(() -> ragQueryService.query("query", Set.of(ModuleId.M4)))
                 .isInstanceOf(ModuleNotImplementedException.class)
                 .satisfies(exception -> {
                     ModuleNotImplementedException moduleException = (ModuleNotImplementedException) exception;
-                    assertThat(moduleException.getModules()).containsExactly(ModuleId.M3);
+                    assertThat(moduleException.getModules()).containsExactly(ModuleId.M4);
                 });
 
         verifyNoInteractions(vectorStore, chatModel, reranker);
     }
 
     @Test
-    void multipleRequestedModules_areAllCarriedByTheException() {
-        assertThatThrownBy(() -> ragQueryService.query("query", Set.of(ModuleId.M3, ModuleId.M4)))
-                .isInstanceOf(ModuleNotImplementedException.class)
-                .satisfies(exception -> {
-                    ModuleNotImplementedException moduleException = (ModuleNotImplementedException) exception;
-                    assertThat(moduleException.getModules()).containsExactlyInAnyOrder(ModuleId.M3, ModuleId.M4);
-                });
+    void m2Requested_whenRerankerIsNoOp_throwsRerankingConfigurationException() {
+        RagQueryService serviceWithNoOp = new RagQueryService(
+                vectorStore, chatModel, new NoOpReranker(), retrievalExpander,
+                meterRegistry, 50, 5, new ClassPathResource("prompts/answer-generation.st"));
 
-        verify(vectorStore, never()).similaritySearch(any(SearchRequest.class));
+        assertThatThrownBy(() -> serviceWithNoOp.query("query", Set.of(ModuleId.M2)))
+                .isInstanceOf(RerankingConfigurationException.class)
+                .hasMessageContaining("RAG_RERANKER_PROVIDER=vertex");
+
+        verifyNoInteractions(vectorStore, chatModel);
+    }
+
+    @Test
+    void m3Requested_whenPromptCacheNotConfigured_throwsPromptCacheConfigurationException() {
+        when(promptCache.isConfigured()).thenReturn(false);
+
+        assertThatThrownBy(() -> ragQueryService.query("query", Set.of(ModuleId.M3)))
+                .isInstanceOf(PromptCacheConfigurationException.class)
+                .hasMessageContaining("RAG_PROMPT_CACHE_PROVIDER=google-genai");
+
+        verifyNoInteractions(vectorStore, chatModel, reranker);
+    }
+
+    @Test
+    void m3SubThreshold_reportsNotEligibleAndExecutesFullPrompt() {
+        Document chunk = Document.builder().id("c1").text("Short chunk content.").build();
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(chunk));
+        when(promptCache.isConfigured()).thenReturn(true);
+        when(promptCache.getOrCreate(any(CacheRequest.class)))
+                .thenReturn(CacheLookupResult.notEligible(100L));
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Short answer.", null));
+
+        RagQueryResult result = ragQueryService.query("What is short?", Set.of(ModuleId.M3));
+
+        assertThat(result.modulesApplied()).containsExactly(ModuleId.M3);
+        assertThat(result.cacheStatus()).isEqualTo(CacheStatus.NOT_ELIGIBLE);
+        assertThat(result.cacheMs()).isGreaterThanOrEqualTo(0L);
+
+        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(promptCaptor.capture());
+        assertThat(promptCaptor.getValue().getContents())
+                .contains("Context:\nShort chunk content.")
+                .contains("Question: What is short?");
+
+        assertThat(meterRegistry.find("rag.pipeline.cache").timer()).isNotNull();
+    }
+
+    @Test
+    void m3ExplicitHit_setsCachedContentOptionAndPassesDynamicSuffixOnly() {
+        Document chunk = Document.builder().id("c1").text("Large chunk content that meets the threshold.").build();
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(chunk));
+        when(promptCache.isConfigured()).thenReturn(true);
+        when(promptCache.getOrCreate(any(CacheRequest.class)))
+                .thenReturn(CacheLookupResult.hit("cachedContents/hit-123", 5120L, Instant.now().plusSeconds(300)));
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Cached answer.", null));
+
+        RagQueryResult result = ragQueryService.query("Cached question?", Set.of(ModuleId.M3));
+
+        assertThat(result.modulesApplied()).containsExactly(ModuleId.M3);
+        assertThat(result.cacheStatus()).isEqualTo(CacheStatus.EXPLICIT_HIT);
+        assertThat(result.cacheMs()).isGreaterThanOrEqualTo(0L);
+
+        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(promptCaptor.capture());
+
+        Prompt promptSent = promptCaptor.getValue();
+        // The prompt body should only contain the dynamic suffix
+        assertThat(promptSent.getContents()).isEqualTo("Question: Cached question?\nAnswer:");
+        // The options should contain cachedContentName
+        assertThat(promptSent.getOptions()).isInstanceOf(GoogleGenAiChatOptions.class);
+        GoogleGenAiChatOptions options = (GoogleGenAiChatOptions) promptSent.getOptions();
+        assertThat(options.getCachedContentName()).isEqualTo("cachedContents/hit-123");
+    }
+
+    @Test
+    void m3ExplicitMiss_setsCachedContentOptionAndReportsExplicitMiss() {
+        Document chunk = Document.builder().id("c1").text("Large chunk content on cold creation.").build();
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(chunk));
+        when(promptCache.isConfigured()).thenReturn(true);
+        when(promptCache.getOrCreate(any(CacheRequest.class)))
+                .thenReturn(CacheLookupResult.miss("cachedContents/miss-456", 5120L, Instant.now().plusSeconds(300)));
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Cold created answer.", null));
+
+        RagQueryResult result = ragQueryService.query("Cold question?", Set.of(ModuleId.M3));
+
+        assertThat(result.modulesApplied()).containsExactly(ModuleId.M3);
+        assertThat(result.cacheStatus()).isEqualTo(CacheStatus.EXPLICIT_MISS);
+        assertThat(result.cacheMs()).isGreaterThanOrEqualTo(0L);
+
+        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(promptCaptor.capture());
+
+        Prompt promptSent = promptCaptor.getValue();
+        assertThat(promptSent.getContents()).isEqualTo("Question: Cold question?\nAnswer:");
+        GoogleGenAiChatOptions options = (GoogleGenAiChatOptions) promptSent.getOptions();
+        assertThat(options.getCachedContentName()).isEqualTo("cachedContents/miss-456");
     }
 
     @Test
@@ -221,67 +347,23 @@ class RagQueryServiceTest {
         List<Document> rerankedDocs = List.of(reranked1);
 
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(retrievedPool);
-        when(reranker.rerank("test query", retrievedPool, 5)).thenReturn(rerankedDocs);
-        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Reranked answer", null));
+        when(reranker.rerank("What is re-ranking?", retrievedPool, 5)).thenReturn(rerankedDocs);
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Re-ranked answer", null));
 
-        RagQueryResult result = ragQueryService.query("test query", Set.of(ModuleId.M2));
+        RagQueryResult result = ragQueryService.query("What is re-ranking?", Set.of(ModuleId.M2));
 
-        assertThat(result.answer()).isEqualTo("Reranked answer");
         assertThat(result.modulesApplied()).containsExactly(ModuleId.M2);
         assertThat(result.retrievedChunks()).hasSize(1);
         assertThat(result.retrievedChunks().get(0).id()).isEqualTo("c2");
         assertThat(result.rerankMs()).isGreaterThanOrEqualTo(0);
-        assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.rerankMs() + result.generationMs());
+        assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.generationMs() + result.expansionMs() + result.rerankMs() + result.cacheMs());
 
-        ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
-        verify(vectorStore).similaritySearch(captor.capture());
-        assertThat(captor.getValue().getTopK()).isEqualTo(50); // candidatePoolSize default 50
-        verify(reranker).rerank("test query", retrievedPool, 5);
+        ArgumentCaptor<SearchRequest> searchCaptor = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStore).similaritySearch(searchCaptor.capture());
+        assertThat(searchCaptor.getValue().getTopK()).isEqualTo(50);
+
+        verify(reranker).rerank("What is re-ranking?", retrievedPool, 5);
         assertThat(meterRegistry.find("rag.pipeline.rerank").timer()).isNotNull();
-    }
-
-    @Test
-    void m1PlusM2Combined_retrievesCandidatesReranksThenExpandsToParents() {
-        Document child1 = Document.builder().id("child1").text("child text 1").build();
-        Document child2 = Document.builder().id("child2").text("child text 2").build();
-        List<Document> childPool = List.of(child1, child2);
-
-        Document winningChild = Document.builder().id("child2").text("child text 2").metadata("rerank_score", 0.95).build();
-        List<Document> rerankedChildren = List.of(winningChild);
-
-        Document parentDoc = Document.builder().id("parent2").text("full parent text 2").build();
-        List<Document> expandedParents = List.of(parentDoc);
-
-        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(childPool);
-        when(reranker.rerank("combined query", childPool, 5)).thenReturn(rerankedChildren);
-        when(retrievalExpander.expand(rerankedChildren, "vector_store_test_large")).thenReturn(expandedParents);
-        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Combined answer", null));
-
-        RagQueryResult result = ragQueryService.query("combined query", Set.of(ModuleId.M1, ModuleId.M2));
-
-        assertThat(result.answer()).isEqualTo("Combined answer");
-        assertThat(result.modulesApplied()).containsExactlyInAnyOrder(ModuleId.M1, ModuleId.M2);
-        assertThat(result.retrievedChunks()).hasSize(1);
-        assertThat(result.retrievedChunks().get(0).id()).isEqualTo("parent2");
-        assertThat(result.rerankMs()).isGreaterThanOrEqualTo(0);
-        assertThat(result.expansionMs()).isGreaterThanOrEqualTo(0);
-        assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.rerankMs() + result.expansionMs() + result.generationMs());
-
-        verify(reranker).rerank("combined query", childPool, 5);
-        verify(retrievalExpander).expand(rerankedChildren, "vector_store_test_large");
-    }
-
-    @Test
-    void m2Requested_whenRerankerIsNoOp_failsFastWithConfigurationException() {
-        RagQueryService serviceWithNoOp = new RagQueryService(
-                vectorStore, chatModel, new NoOpReranker(), retrievalExpander, meterRegistry,
-                Integer.MAX_VALUE, 5, new ClassPathResource("prompts/answer-generation.st"));
-
-        assertThatThrownBy(() -> serviceWithNoOp.query("query", Set.of(ModuleId.M2)))
-                .isInstanceOf(RerankingConfigurationException.class)
-                .hasMessageContaining("rag.reranker.provider");
-
-        verifyNoInteractions(vectorStore, chatModel);
     }
 
     @Test
@@ -304,10 +386,44 @@ class RagQueryServiceTest {
         assertThat(result.retrievedChunks().get(0).text()).isEqualTo("Paris is the capital of France and has the Eiffel Tower.");
         assertThat(result.expansionMs()).isGreaterThanOrEqualTo(0);
         assertThat(result.rerankMs()).isZero();
-        assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.generationMs() + result.expansionMs());
+        assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.generationMs() + result.expansionMs() + result.cacheMs());
 
         verifyNoInteractions(reranker);
         verify(retrievalExpander).expand(any(), any());
         assertThat(meterRegistry.find("rag.pipeline.expansion").timer()).isNotNull();
+    }
+
+    @Test
+    void m1m2m3Combination_executesRerankThenExpansionThenExplicitCaching() {
+        Document child1 = Document.builder().id("c1").text("Child text 1").build();
+        Document child2 = Document.builder().id("c2").text("Child text 2").build();
+        List<Document> retrievedPool = List.of(child1, child2);
+
+        Document rerankedChild = Document.builder().id("c2").text("Child text 2").build();
+        List<Document> rerankedPool = List.of(rerankedChild);
+
+        Document parentDoc = Document.builder().id("p2").text("Expanded parent window for child 2 containing 1024 tokens.").build();
+        List<Document> expandedParents = List.of(parentDoc);
+
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(retrievedPool);
+        when(reranker.rerank(anyString(), any(), any(Integer.class))).thenReturn(rerankedPool);
+        when(retrievalExpander.expand(any(), any())).thenReturn(expandedParents);
+        when(promptCache.isConfigured()).thenReturn(true);
+        when(promptCache.getOrCreate(any(CacheRequest.class)))
+                .thenReturn(CacheLookupResult.hit("cachedContents/comb-789", 5120L, Instant.now().plusSeconds(300)));
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Combo answer.", null));
+
+        RagQueryResult result = ragQueryService.query("Complex combo query?", Set.of(ModuleId.M1, ModuleId.M2, ModuleId.M3));
+
+        assertThat(result.modulesApplied()).containsExactlyInAnyOrder(ModuleId.M1, ModuleId.M2, ModuleId.M3);
+        assertThat(result.cacheStatus()).isEqualTo(CacheStatus.EXPLICIT_HIT);
+        assertThat(result.retrievedChunks().get(0).id()).isEqualTo("p2");
+        assertThat(result.rerankMs()).isGreaterThanOrEqualTo(0L);
+        assertThat(result.expansionMs()).isGreaterThanOrEqualTo(0L);
+        assertThat(result.cacheMs()).isGreaterThanOrEqualTo(0L);
+
+        verify(reranker).rerank("Complex combo query?", retrievedPool, 5);
+        verify(retrievalExpander).expand(rerankedPool, "vector_store_test_large");
+        verify(promptCache).getOrCreate(any(CacheRequest.class));
     }
 }

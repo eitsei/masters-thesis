@@ -176,51 +176,183 @@ def plot_latency_breakdown(
     data: dict[str, Sequence[Mapping[str, Any]]],
     output_path: Path | str = "thesis/figures/latency_breakdown.pdf",
 ) -> Path:
-    """Generates stacked bar chart isolating retrieval vs. generation latencies."""
+    """Generates stacked bar chart isolating all micro-phase latency components across configurations."""
     _set_publication_style()
     out_file = Path(output_path)
     out_file.parent.mkdir(parents=True, exist_ok=True)
 
     configs: list[str] = []
-    retrievals: list[float] = []
-    generations: list[float] = []
+    route_means: list[float] = []
+    embed_means: list[float] = []
+    ret_means: list[float] = []
+    rerank_means: list[float] = []
+    expand_means: list[float] = []
+    cache_means: list[float] = []
+    prefill_means: list[float] = []
+    stream_means: list[float] = []
+    gen_means: list[float] = []
+    other_means: list[float] = []
     totals: list[float] = []
+
+    has_split_generation = False
 
     for name, records in data.items():
         configs.append(name)
-        ret_vals = []
-        gen_vals = []
-        tot_vals = []
+        c_route, c_embed, c_ret, c_rerank = [], [], [], []
+        c_expand, c_cache = [], []
+        c_prefill, c_stream, c_gen = [], [], []
+        c_other, c_tot = [], []
+
         for r in records:
-            # Check timings object
-            t = r.get("timings", {})
-            ret = t.get("retrievalMs", r.get("retrieval_ms", 0.0))
-            gen = t.get("generationMs", r.get("generation_ms", 0.0))
-            tot = r.get("totalLatencyMs", r.get("total_latency_ms", ret + gen))
-            ret_vals.append(float(ret))
-            gen_vals.append(float(gen))
-            tot_vals.append(float(tot))
+            t = r.get("timings") if isinstance(r.get("timings"), dict) else {}
 
-        retrievals.append(float(np.mean(ret_vals)) if ret_vals else 0.0)
-        generations.append(float(np.mean(gen_vals)) if gen_vals else 0.0)
-        totals.append(float(np.mean(tot_vals)) if tot_vals else 0.0)
+            # 1. Routing
+            route = float(
+                t.get("routingMs") or t.get("routeMs") or t.get("routing_ms") or t.get("route_ms")
+                or r.get("routing_ms") or r.get("route_ms") or r.get("routingMs") or r.get("routeMs") or 0.0
+            )
+            # 2. Query Vector Embedding
+            embed = float(
+                t.get("embedMs") or t.get("embed_ms") or t.get("embeddingMs") or t.get("embedding_ms")
+                or r.get("embed_ms") or r.get("embedMs") or 0.0
+            )
+            # 3. Vector Retrieval
+            ret = float(
+                t.get("retrievalMs") or t.get("retrieval_ms")
+                or r.get("retrieval_ms") or r.get("retrievalMs") or 0.0
+            )
+            # 4. Semantic Re-ranking
+            rerank = float(
+                t.get("rerankMs") or t.get("rerank_ms") or t.get("rerankingMs") or t.get("reranking_ms")
+                or r.get("rerank_ms") or r.get("rerankMs") or 0.0
+            )
+            # 5. Context Expansion (Small-to-Big)
+            expand = float(
+                t.get("expansionMs") or t.get("expansion_ms")
+                or r.get("expansion_ms") or r.get("expansionMs") or 0.0
+            )
+            # 6. Context Cache Lookup
+            cache = float(
+                t.get("cacheMs") or t.get("cache_ms")
+                or r.get("cache_ms") or r.get("cacheMs") or 0.0
+            )
+            # 7. Generation (Prefill + Streaming if available, else Generation)
+            prefill = float(
+                t.get("prefillMs") or t.get("prefill_ms")
+                or r.get("prefill_ms") or r.get("prefillMs") or 0.0
+            )
+            stream = float(
+                t.get("streamMs") or t.get("stream_ms")
+                or r.get("stream_ms") or r.get("streamMs") or 0.0
+            )
+            gen = float(
+                t.get("generationMs") or t.get("generation_ms")
+                or r.get("generation_ms") or r.get("generationMs") or 0.0
+            )
 
-    fig, ax = plt.subplots(figsize=(8.5, 4.5), dpi=300)
+            if prefill > 0.0 or stream > 0.0:
+                has_split_generation = True
+
+            # Total reported latency
+            tot = float(
+                r.get("totalLatencyMs") or r.get("total_latency_ms")
+                or t.get("totalMs") or t.get("total_ms") or 0.0
+            )
+
+            if prefill > 0.0 or stream > 0.0:
+                sub_sum = route + embed + ret + rerank + expand + cache + prefill + stream
+            else:
+                sub_sum = route + embed + ret + rerank + expand + cache + gen
+
+            if tot <= 0.0:
+                tot = sub_sum
+
+            # Any residual pipeline/transport overhead
+            other = max(0.0, tot - sub_sum) if tot > (sub_sum + 0.5) else 0.0
+
+            c_route.append(route)
+            c_embed.append(embed)
+            c_ret.append(ret)
+            c_rerank.append(rerank)
+            c_expand.append(expand)
+            c_cache.append(cache)
+            c_prefill.append(prefill)
+            c_stream.append(stream)
+            c_gen.append(gen)
+            c_other.append(other)
+            c_tot.append(tot)
+
+        route_means.append(float(np.mean(c_route)) if c_route else 0.0)
+        embed_means.append(float(np.mean(c_embed)) if c_embed else 0.0)
+        ret_means.append(float(np.mean(c_ret)) if c_ret else 0.0)
+        rerank_means.append(float(np.mean(c_rerank)) if c_rerank else 0.0)
+        expand_means.append(float(np.mean(c_expand)) if c_expand else 0.0)
+        cache_means.append(float(np.mean(c_cache)) if c_cache else 0.0)
+        prefill_means.append(float(np.mean(c_prefill)) if c_prefill else 0.0)
+        stream_means.append(float(np.mean(c_stream)) if c_stream else 0.0)
+        gen_means.append(float(np.mean(c_gen)) if c_gen else 0.0)
+        other_means.append(float(np.mean(c_other)) if c_other else 0.0)
+        totals.append(float(np.mean(c_tot)) if c_tot else 0.0)
+
+    component_defs = [
+        {"key": "route", "label": "Routing ($T_{\\text{route}}$)", "color": "#8c564b", "values": route_means},
+        {"key": "embed", "label": "Embedding ($T_{\\text{embed}}$)", "color": "#5dade2", "values": embed_means},
+        {"key": "ret", "label": "Retrieval ($T_{\\text{ret}}$)", "color": "#2b5c8f", "values": ret_means},
+        {"key": "rerank", "label": "Re-ranking ($T_{\\text{rerank}}$)", "color": "#9b59b6", "values": rerank_means},
+        {"key": "expand", "label": "Expansion ($T_{\\text{expand}}$)", "color": "#1abc9c", "values": expand_means},
+        {"key": "cache", "label": "Cache Lookup ($T_{\\text{cache}}$)", "color": "#27ae60", "values": cache_means},
+    ]
+
+    if has_split_generation:
+        component_defs.extend([
+            {"key": "prefill", "label": "Prefill ($T_{\\text{prefill}}$)", "color": "#f39c12", "values": prefill_means},
+            {"key": "stream", "label": "Streaming ($T_{\\text{stream}}$)", "color": "#e67e22", "values": stream_means},
+        ])
+    else:
+        component_defs.append(
+            {"key": "gen", "label": "Generation ($T_{\\text{gen}}$)", "color": "#e67e22", "values": gen_means}
+        )
+
+    component_defs.append(
+        {"key": "other", "label": "Overhead ($T_{\\text{other}}$)", "color": "#95a5a6", "values": other_means}
+    )
+
+    # Filter out components that are negligible (< 0.1 ms) across all configurations
+    active_components = [
+        c for c in component_defs if any(val > 0.1 for val in c["values"])
+    ]
+    if not active_components:
+        active_components = [
+            {"key": "ret", "label": "Retrieval ($T_{\\text{ret}}$)", "color": "#2b5c8f", "values": ret_means},
+            {"key": "gen", "label": "Generation ($T_{\\text{gen}}$)", "color": "#e67e22", "values": gen_means},
+        ]
+
+    fig, ax = plt.subplots(figsize=(9.0, 4.8), dpi=300)
     x = np.arange(len(configs))
     width = 0.55
 
-    color_ret = "#2b5c8f"  # Deep blue for retrieval
-    color_gen = "#e67e22"  # Amber orange for generation
-
-    rects1 = ax.bar(x, retrievals, width, label="Retrieval ($T_{\\text{ret}}$)", color=color_ret, edgecolor="black", linewidth=0.5)
-    rects2 = ax.bar(x, generations, width, bottom=retrievals, label="Generation ($T_{\\text{gen}}$)", color=color_gen, edgecolor="black", linewidth=0.5)
+    bottom = np.zeros(len(configs))
+    for comp in active_components:
+        vals = np.array(comp["values"])
+        ax.bar(
+            x,
+            vals,
+            width,
+            bottom=bottom,
+            label=comp["label"],
+            color=comp["color"],
+            edgecolor="black",
+            linewidth=0.5,
+        )
+        bottom += vals
 
     # Label total latency on top of bars
+    max_tot = max(totals) if totals else 1.0
     for i, tot in enumerate(totals):
         ax.annotate(
             f"{tot:.0f} ms",
             xy=(x[i], tot),
-            xytext=(0, 3),
+            xytext=(0, 4),
             textcoords="offset points",
             ha="center",
             va="bottom",
@@ -231,8 +363,18 @@ def plot_latency_breakdown(
     ax.set_ylabel("Execution Latency (ms)")
     ax.set_title("End-to-End Latency Micro-Phase Breakdown", fontweight="bold")
     ax.set_xticks(x)
-    ax.set_xticklabels(configs, rotation=20, ha="right", fontsize=9)
-    ax.legend(loc="upper left")
+
+    display_labels = [c.replace("_", " ") for c in configs]
+    ax.set_xticklabels(display_labels, rotation=20, ha="right", fontsize=9)
+
+    ax.set_ylim(0, max_tot * 1.22)
+    ax.legend(
+        loc="upper left",
+        framealpha=0.92,
+        facecolor="white",
+        edgecolor="#cccccc",
+        fontsize=8.5,
+    )
     ax.grid(axis="y", alpha=0.4)
 
     plt.tight_layout()

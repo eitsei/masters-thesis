@@ -2,6 +2,7 @@ package com.dippa.ragbenchmark.api;
 
 import com.dippa.ragbenchmark.application.RetrievedChunk;
 import com.dippa.ragbenchmark.application.dataset.MusiqueBenchmarkQueryResult;
+import com.dippa.ragbenchmark.domain.CacheStatus;
 import java.util.List;
 
 public record MusiqueBenchmarkQueryResponse(
@@ -16,6 +17,7 @@ public record MusiqueBenchmarkQueryResponse(
         TimingsDto timings,
         long totalLatencyMs,
         TokenUsageDto tokenUsage,
+        CacheStatus cacheStatus,
         String tableNameUsed,
         List<String> expectedSupportingTitles,
         boolean supportingEvidenceFound,
@@ -44,8 +46,9 @@ public record MusiqueBenchmarkQueryResponse(
                 modulesApplied,
                 retrievedChunks,
                 timings,
-                timings != null ? timings.retrievalMs() + timings.generationMs() : 0L,
+                timings != null ? timings.totalMs() : 0L,
                 TokenUsageDto.ZERO,
+                CacheStatus.NONE,
                 null,
                 expectedSupportingTitles,
                 supportingEvidenceFound,
@@ -63,9 +66,10 @@ public record MusiqueBenchmarkQueryResponse(
                 result.generatedAnswer(),
                 result.modulesApplied(),
                 result.retrievedChunks(),
-                new TimingsDto(result.retrievalMs(), result.rerankMs(), result.generationMs(), result.expansionMs()),
+                new TimingsDto(result.retrievalMs(), result.rerankMs(), result.generationMs(), result.expansionMs(), result.cacheMs()),
                 result.totalLatencyMs(),
                 result.tokenUsage(),
+                result.cacheStatus(),
                 result.tableNameUsed(),
                 result.expectedSupportingTitles(),
                 result.supportingEvidenceFound(),

@@ -62,10 +62,11 @@ generate RAG pipeline against the thesis optimization modules.
   pipeline. MuSiQue endpoints and workflows are documented in `MUSIQUE_BENCHMARK.md`.
 
 The implemented baseline is M0. M1 is wired through the `RetrievalExpander` seam and
-uses small/large vector-store table conventions when requested. M2, M3, and M4 remain
-unsupported: requests containing them must produce `501 Not Implemented`, rather than
-being silently ignored. The domain ports and model catalog are intentional seams for
-future implementations.
+uses small/large vector-store table conventions when requested. M2 is implemented via
+`VertexAiReranker` (`semantic-ranker-default-004`). M3 is implemented via `GoogleGenAiPromptCache`
+with explicit Google GenAI context caching. M4 remains unsupported: requests containing M4 must
+produce `501 Not Implemented`, rather than being silently ignored. The domain ports and model
+catalog are intentional seams for future implementations.
 
 Provider selection is configuration-driven in `src/main/resources/application.yml`.
 The application uses Spring AI abstractions so Ollama and Google GenAI can be switched
@@ -98,8 +99,8 @@ pgvector with HNSW/COSINE and 768-dimensional embeddings.
   prompt resources with `ClassPathResource` when constructing services without a Spring
   context.
 - Preserve the benchmark's telemetry names and phase separation when changing the
-  pipeline (`rag.pipeline.retrieval`, `rag.pipeline.expansion`, and
-  `rag.pipeline.generation` are currently used).
+  pipeline (`rag.pipeline.retrieval`, `rag.pipeline.rerank`, `rag.pipeline.expansion`,
+  `rag.pipeline.cache`, and `rag.pipeline.generation` are currently used).
 - Keep ingestion and query table selection explicit. The configured pgvector table and
   dataset-specific tables are not interchangeable; use the request/configuration table
   parameters rather than assuming one global store.

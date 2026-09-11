@@ -8,6 +8,8 @@ import com.dippa.ragbenchmark.application.RagQueryService;
 import com.dippa.ragbenchmark.application.RetrievedChunk;
 import com.dippa.ragbenchmark.domain.ModuleId;
 import com.dippa.ragbenchmark.domain.dataset.MusiqueQuestion;
+import com.dippa.ragbenchmark.domain.PromptCache;
+import com.dippa.ragbenchmark.infrastructure.NoOpPromptCache;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -16,6 +18,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 /**
@@ -27,10 +30,21 @@ public class MusiqueBenchmarkQueryService {
 
     private final MusiqueDatasetService datasetService;
     private final RagQueryService ragQueryService;
+    private final PromptCache promptCache;
 
-    public MusiqueBenchmarkQueryService(MusiqueDatasetService datasetService, RagQueryService ragQueryService) {
+    public MusiqueBenchmarkQueryService(
+            MusiqueDatasetService datasetService,
+            RagQueryService ragQueryService,
+            ObjectProvider<PromptCache> promptCacheProvider) {
         this.datasetService = datasetService;
         this.ragQueryService = ragQueryService;
+        this.promptCache = promptCacheProvider != null && promptCacheProvider.getIfAvailable() != null
+                ? promptCacheProvider.getIfAvailable()
+                : new NoOpPromptCache();
+    }
+
+    public MusiqueBenchmarkQueryService(MusiqueDatasetService datasetService, RagQueryService ragQueryService) {
+        this(datasetService, ragQueryService, null);
     }
 
     /**
@@ -103,6 +117,8 @@ public class MusiqueBenchmarkQueryService {
                 queryResult.rerankMs(),
                 queryResult.generationMs(),
                 queryResult.expansionMs(),
+                queryResult.cacheMs(),
+                queryResult.cacheStatus(),
                 totalLatencyMs,
                 tokenUsage,
                 tableNameUsed,
@@ -118,6 +134,9 @@ public class MusiqueBenchmarkQueryService {
      */
     public MusiqueBatchQueryResult evaluateBatch(BenchmarkBatchQueryRequest request) {
         long startTime = System.currentTimeMillis();
+        if (request != null && Boolean.TRUE.equals(request.clearOwnedCachesBeforeRun()) && promptCache != null) {
+            promptCache.clearOwned();
+        }
         if (request != null) {
             if (request.limit() != null && request.limit() <= 0) {
                 throw new IllegalArgumentException("limit must be greater than zero");

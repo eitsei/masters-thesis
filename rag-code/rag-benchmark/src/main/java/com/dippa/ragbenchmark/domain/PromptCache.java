@@ -1,18 +1,31 @@
 package com.dippa.ragbenchmark.domain;
 
-import java.util.Optional;
-
 /**
- * Checks for and stores cached prompt/context content, keyed by an opaque cache key
- * (e.g. a hash of the prompt or retrieval context).
+ * Port for managing provider-level prompt and context caching (Module M3).
  *
- * <p>Spring AI has no built-in opinion on prompt/context caching, so this is a project-owned
- * port. Not needed by the M0 baseline — no bean is registered for it in v1. A real
- * implementation (M3) can satisfy this interface later.</p>
+ * <p>Pure domain interface with zero Spring AI or provider imports. Encapsulates
+ * capability reporting, lookup/creation of cached context resources, and explicit
+ * clearing of resources owned by the application instance.</p>
  */
 public interface PromptCache {
 
-    Optional<String> get(String key);
+    /**
+     * Indicates whether a real caching provider (e.g. Google GenAI / Vertex AI) is configured and active.
+     */
+    boolean isConfigured();
 
-    void put(String key, String value);
+    /**
+     * Looks up an existing cached context by request key or creates a new remote cache resource
+     * if the payload qualifies (e.g. meets the token threshold).
+     *
+     * @param request the cache request containing context payload and metadata
+     * @return result indicating cache status (EXPLICIT_HIT, EXPLICIT_MISS, NOT_ELIGIBLE, DISABLED) and metadata
+     */
+    CacheLookupResult getOrCreate(CacheRequest request);
+
+    /**
+     * Explicitly deletes all remote cached resources created by this benchmark application instance
+     * and clears local tracking state.
+     */
+    void clearOwned();
 }

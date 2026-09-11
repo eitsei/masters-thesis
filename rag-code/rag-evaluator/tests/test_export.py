@@ -115,6 +115,28 @@ def test_plot_latency_breakdown(tmp_path: Path, sample_benchmark_records):
     assert result_path.stat().st_size > 1000
 
 
+def test_plot_latency_breakdown_multicomponent(tmp_path: Path):
+    out_pdf = tmp_path / "latency_breakdown_multi.pdf"
+    data = {
+        "C0: Baseline": [
+            {"timings": {"retrievalMs": 80.0, "generationMs": 1500.0}, "totalLatencyMs": 1580.0}
+        ],
+        "C1: S2B": [
+            {"timings": {"retrievalMs": 85.0, "expansionMs": 15.0, "generationMs": 1450.0}, "totalLatencyMs": 1550.0}
+        ],
+        "C2: Re-rank": [
+            {"timings": {"retrievalMs": 80.0, "rerankMs": 220.0, "generationMs": 1300.0}, "totalLatencyMs": 1600.0}
+        ],
+        "C5: S2B+Re-rank": [
+            {"timings": {"retrievalMs": 85.0, "rerankMs": 210.0, "expansionMs": 12.0, "generationMs": 1280.0}, "totalLatencyMs": 1587.0}
+        ],
+    }
+
+    result_path = plot_latency_breakdown(data, output_path=out_pdf)
+    assert result_path.exists()
+    assert result_path.stat().st_size > 1000
+
+
 def test_plot_ragas_metrics_radar(tmp_path: Path, sample_benchmark_records):
     out_pdf = tmp_path / "ragas_metrics_radar.pdf"
     data = {

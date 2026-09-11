@@ -160,6 +160,12 @@ rag:
       project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
       location: ${RAG_RERANKER_VERTEX_LOCATION:global}
       ranking-config: ${RAG_RERANKER_VERTEX_RANKING_CONFIG:default_ranking_config}
+  prompt-cache:
+    provider: ${RAG_PROMPT_CACHE_PROVIDER:noop}
+    min-tokens: ${RAG_PROMPT_CACHE_MIN_TOKENS:4096}
+    ttl: ${RAG_PROMPT_CACHE_TTL:300s}
+    chars-per-token-estimate: 3.5
+    display-name-prefix: "rag-benchmark-"
   models:
     google-genai:
       flash-lite: gemini-3.5-flash-lite

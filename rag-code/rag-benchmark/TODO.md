@@ -1,7 +1,7 @@
 # TODO
 
-Scope tracking beyond the initial M0 baseline. M1 (Small-to-Big) and M2 (Semantic Re-ranking)
-are now implemented; remaining items are active starting points for ongoing work.
+Scope tracking beyond the initial M0 baseline. M1 (Small-to-Big), M2 (Semantic Re-ranking),
+and M3 (Prompt / Context Caching) are now implemented; remaining items are active starting points for ongoing work.
 
 - **Real dataset ingestion (MuSiQue).** v1 ships no sample data and no ingestion
   pipeline for a benchmark dataset — `POST /api/documents` only accepts one raw text
@@ -10,10 +10,7 @@ are now implemented; remaining items are active starting points for ongoing work
   and batch-ingesting it into the pgvector store.
 - **M1 — small-to-big retrieval.** Implemented through `RetrievalExpander` (`domain/RetrievalExpander.java`), including explicit parent-expansion failures and ranked parent deduplication. Integration benchmarking and full overlap-aware ingestion remain follow-up work.
 - **M2 — re-ranking.** Implemented via `VertexAiReranker` (`infrastructure/VertexAiReranker.java`) using GCP Vertex AI / Discovery Engine Ranking API (`semantic-ranker-default-004`), with `NoOpReranker` retained for baseline and non-M2 queries. Includes candidate pool retrieval (50 items), top-N ranking, metadata score attachment (`rerank_score`), and telemetry (`rag.pipeline.rerank`). Local TEI cross-encoder fallback remains a future addition.
-- **M3 — prompt/context caching.** `PromptCache` (`domain/PromptCache.java`) is defined
-  but has no implementation or bean. Needs a caching strategy and a decision on what's
-  cached (raw prompts vs. assembled context vs. provider-side cached content, e.g.
-  Gemini's `cached-content` support already present as chat properties).
+- **M3 — prompt/context caching.** Implemented via `GoogleGenAiPromptCache` (`infrastructure/GoogleGenAiPromptCache.java`) and `RagPromptRenderer` (`application/RagPromptRenderer.java`). Supports Google GenAI explicit Context Caching via `CachedContentService` for contexts >= 4096 tokens, thread-safe single-flight concurrency, TTL lifecycle tracking, owned resource cleanup (`POST /api/benchmark/cache/clear`), token usage accounting with cache-read/cache-write metrics, and timing telemetry (`rag.pipeline.cache`). `NoOpPromptCache` serves non-cached configurations.
 - **M4 — model routing / cascading.** `ModelRouter` (`domain/ModelRouter.java`) is
   defined but has no implementation or bean; there's no logic yet for routing a query
   to a cheaper/faster model vs. a larger one, or cascading between them. The three

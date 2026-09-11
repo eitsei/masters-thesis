@@ -389,6 +389,8 @@ def compare(
     display_comparison_table(comps, console=console)
 
     if output_latex:
+        if output_latex.is_dir() or output_latex.suffix != ".tex":
+            output_latex = output_latex / "wilcoxon_tests.tex"
         tex_content = export_wilcoxon_tests_latex(comps, output_latex)
         console.print(f"\n[bold green]✓ LaTeX comparison table exported to:[/bold green] [cyan]{output_latex}[/cyan]")
 
@@ -398,8 +400,21 @@ def export_thesis(
     input_target: str = typer.Option(..., "--input", "-i", help="Run JSONL file or directory containing run JSONL files"),
     tables_dir: Path = typer.Option(Path("thesis/tables"), "--tables-dir", help="Directory for thesis LaTeX tables"),
     figures_dir: Path = typer.Option(Path("thesis/figures"), "--figures-dir", help="Directory for publication PDF figures"),
+    subfolder: Optional[str] = typer.Option(
+        None,
+        "--subfolder",
+        "-s",
+        help="Optional subfolder inside tables-dir and figures-dir to isolate run outputs (e.g., 'sample_runs', 'musique', 'nordea', 'comparisons', 'runs/<run_name>')",
+    ),
 ) -> None:
     """Exports publication-ready LaTeX tables and vector PDF figures to the thesis directory."""
+    if subfolder:
+        tables_dir = tables_dir / subfolder
+        figures_dir = figures_dir / subfolder
+
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
     target_path = Path(input_target)
     run_dict: dict[str, list[dict[str, Any]]] = {}
 

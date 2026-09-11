@@ -5,10 +5,10 @@ A local-first Spring Boot application for benchmarking Retrieval-Augmented Gener
 thesis. It exposes a small REST API to ingest documents into a pgvector-backed store
 and to run a RAG query pipeline against them, against either a fully local model stack
 (Ollama) or a cloud one (Google Gemini via Spring AI's Google GenAI integration),
-switchable with a single environment variable. The current version implements only the
-**M0 baseline** pipeline (retrieve top-K chunks, generate an answer); the four
-optimization modules studied in the thesis (M1-M4, see below) exist as named seams in
-the domain model but are not implemented yet. The design and research questions this
+switchable with a single environment variable. The current version implements the
+**M0 baseline** pipeline along with **M1 (small-to-big retrieval expansion)**, **M2 (semantic re-ranking)**,
+and **M3 (prompt / context caching)**; module **M4 (model routing / cascading)** exists as a named seam in
+the domain model. The design and research questions this
 project supports are documented in
 [`/home/eitsei/dippa/thesis/chapters/04_research_methods.tex`](/home/eitsei/dippa/thesis/chapters/04_research_methods.tex).
 
@@ -158,14 +158,14 @@ GOOGLE_AI_API_KEY=<your key from https://aistudio.google.com/apikey>
 then export the updated `.env` and re-run `mvn spring-boot:run`. No code or config
 file changes are needed for this switch — only environment variables.
 
-## What's implemented (M0-M2) vs. stubbed (M3-M4)
+## What's implemented (M0-M3) vs. stubbed (M4)
 
 | Module | Status |
 |---|---|
 | M0 — baseline retrieve-then-generate pipeline | Implemented (`RagQueryService`) |
 | M1 — small-to-big retrieval expansion | Implemented with child-table retrieval, parent-table expansion, ranked deduplication, and explicit failure responses |
 | M2 — re-ranking | Implemented via `VertexAiReranker` (`semantic-ranker-default-004`), retrieving a candidate pool of 50 chunks, re-ranking down to top-N, and attaching score metadata (`rerank_score`); `NoOpReranker` serves the baseline |
-| M3 — prompt / context caching | Not implemented; requesting it returns `501` |
+| M3 — prompt / context caching | Implemented via `GoogleGenAiPromptCache` and `CachedContentService` for contexts meeting the 4096-token minimum threshold with single-flight concurrency, TTL lifecycle, and clear-down endpoint; `NoOpPromptCache` serves non-cached configurations |
 | M4 — model routing / cascading | Not implemented; a `ModelRouter` port exists but has no implementation wired up; requesting it returns `501` |
 
 See `TODO.md` for what's deferred beyond the module stubs (dataset ingestion,

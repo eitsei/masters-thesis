@@ -1,13 +1,20 @@
 package com.dippa.ragbenchmark.application;
 
 import com.dippa.ragbenchmark.api.TokenUsageDto;
+import com.dippa.ragbenchmark.domain.CacheLookupResult;
+import com.dippa.ragbenchmark.domain.CacheRequest;
+import com.dippa.ragbenchmark.domain.CacheStatus;
 import com.dippa.ragbenchmark.domain.ModuleId;
 import com.dippa.ragbenchmark.domain.ModuleNotImplementedException;
+import com.dippa.ragbenchmark.domain.PromptCache;
+import com.dippa.ragbenchmark.domain.PromptCacheConfigurationException;
 import com.dippa.ragbenchmark.domain.Reranker;
 import com.dippa.ragbenchmark.domain.RerankingConfigurationException;
 import com.dippa.ragbenchmark.domain.RetrievalExpander;
+import com.dippa.ragbenchmark.infrastructure.NoOpPromptCache;
 import com.dippa.ragbenchmark.infrastructure.NoOpReranker;
 import com.dippa.ragbenchmark.infrastructure.TableNameValidator;
+import com.dippa.ragbenchmark.infrastructure.config.PromptCacheProperties;
 import com.dippa.ragbenchmark.infrastructure.config.RerankerProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -27,6 +34,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
@@ -39,8 +47,9 @@ import org.springframework.stereotype.Service;
 
 /**
  * Orchestrates the RAG pipeline: retrieves chunks, passes them through the
- * {@link Reranker} seam, expands small-to-big contexts via {@link RetrievalExpander} when M1 is active,
- * assembles a prompt, and generates an answer.
+ * {@link Reranker} seam (M2), expands small-to-big contexts via {@link RetrievalExpander} (M1),
+ * applies prompt/context caching via {@link PromptCache} (M3),
+ * assembles the prompt, and generates an answer.
  */
 @Service
 public class RagQueryService {
@@ -57,6 +66,10 @@ public class RagQueryService {
     private final ChatModel chatModel;
     private final Reranker reranker;
     private final RetrievalExpander retrievalExpander;
+    private final PromptCache promptCache;
+    private final RagPromptRenderer promptRenderer;
+    private final PromptCacheProperties promptCacheProperties;
+    private final String chatModelName;
     private final MeterRegistry meterRegistry;
     private final int snippetLengthChars;
     private final int topK;
@@ -80,12 +93,20 @@ public class RagQueryService {
             @Value("${spring.ai.vectorstore.pgvector.table-name:vector_store_test}") String defaultTableName,
             ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
             ObjectProvider<EmbeddingModel> embeddingModelProvider,
-            ObjectProvider<RetrievalExpander> retrievalExpanderProvider) {
+            ObjectProvider<RetrievalExpander> retrievalExpanderProvider,
+            ObjectProvider<PromptCache> promptCacheProvider,
+            ObjectProvider<RagPromptRenderer> promptRendererProvider,
+            ObjectProvider<PromptCacheProperties> promptCachePropertiesProvider,
+            @Value("${spring.ai.google.genai.chat.model:gemini-3.8-flash}") String chatModelName) {
         this(
                 vectorStore,
                 chatModel,
                 reranker,
                 retrievalExpanderProvider != null ? retrievalExpanderProvider.getIfAvailable() : null,
+                promptCacheProvider != null ? promptCacheProvider.getIfAvailable() : null,
+                promptRendererProvider != null ? promptRendererProvider.getIfAvailable() : null,
+                promptCachePropertiesProvider != null ? promptCachePropertiesProvider.getIfAvailable() : null,
+                chatModelName,
                 meterRegistry,
                 snippetLengthChars,
                 topK,
@@ -105,7 +126,8 @@ public class RagQueryService {
             int snippetLengthChars,
             int topK,
             Resource answerPromptResource) {
-        this(vectorStore, chatModel, reranker, retrievalExpander, meterRegistry, snippetLengthChars, topK,
+        this(vectorStore, chatModel, reranker, retrievalExpander, null, null, null, null,
+                meterRegistry, snippetLengthChars, topK,
                 RerankerProperties.defaultProperties(), answerPromptResource, "vector_store_test", null, null);
     }
 
@@ -119,7 +141,8 @@ public class RagQueryService {
             int topK,
             RerankerProperties rerankerProperties,
             Resource answerPromptResource) {
-        this(vectorStore, chatModel, reranker, retrievalExpander, meterRegistry, snippetLengthChars, topK,
+        this(vectorStore, chatModel, reranker, retrievalExpander, null, null, null, null,
+                meterRegistry, snippetLengthChars, topK,
                 rerankerProperties, answerPromptResource, "vector_store_test", null, null);
     }
 
@@ -136,10 +159,36 @@ public class RagQueryService {
             String defaultTableName,
             JdbcTemplate jdbcTemplate,
             EmbeddingModel embeddingModel) {
+        this(vectorStore, chatModel, reranker, retrievalExpander, null, null, null, null,
+                meterRegistry, snippetLengthChars, topK,
+                rerankerProperties, answerPromptResource, defaultTableName, jdbcTemplate, embeddingModel);
+    }
+
+    public RagQueryService(
+            VectorStore vectorStore,
+            ChatModel chatModel,
+            Reranker reranker,
+            RetrievalExpander retrievalExpander,
+            PromptCache promptCache,
+            RagPromptRenderer promptRenderer,
+            PromptCacheProperties promptCacheProperties,
+            String chatModelName,
+            MeterRegistry meterRegistry,
+            int snippetLengthChars,
+            int topK,
+            RerankerProperties rerankerProperties,
+            Resource answerPromptResource,
+            String defaultTableName,
+            JdbcTemplate jdbcTemplate,
+            EmbeddingModel embeddingModel) {
         this.vectorStore = vectorStore;
         this.chatModel = chatModel;
         this.reranker = reranker;
         this.retrievalExpander = retrievalExpander != null ? retrievalExpander : childChunks -> childChunks;
+        this.promptCache = promptCache != null ? promptCache : new NoOpPromptCache();
+        this.promptRenderer = promptRenderer != null ? promptRenderer : new RagPromptRenderer();
+        this.promptCacheProperties = promptCacheProperties != null ? promptCacheProperties : PromptCacheProperties.defaultProperties();
+        this.chatModelName = (chatModelName != null && !chatModelName.isBlank()) ? chatModelName : "gemini-3.8-flash";
         this.meterRegistry = meterRegistry;
         this.snippetLengthChars = snippetLengthChars;
         this.topK = topK;
@@ -170,7 +219,7 @@ public class RagQueryService {
             Integer topKOverride) {
         Set<ModuleId> modules = requestedModules == null ? Set.of() : requestedModules;
         Set<ModuleId> unsupported = modules.stream()
-                .filter(m -> m != ModuleId.M1 && m != ModuleId.M2)
+                .filter(m -> m != ModuleId.M1 && m != ModuleId.M2 && m != ModuleId.M3)
                 .collect(Collectors.toSet());
         if (!unsupported.isEmpty()) {
             throw new ModuleNotImplementedException(unsupported);
@@ -180,6 +229,12 @@ public class RagQueryService {
             throw new RerankingConfigurationException(
                     "Module M2 was requested, but 'rag.reranker.provider' is configured as 'noop'. "
                     + "Set RAG_RERANKER_PROVIDER=vertex in your environment or properties to enable M2 semantic re-ranking.");
+        }
+
+        if (modules.contains(ModuleId.M3) && !this.promptCache.isConfigured()) {
+            throw new PromptCacheConfigurationException(
+                    "Module M3 was requested, but prompt caching provider is not configured or inactive. "
+                    + "Set RAG_PROMPT_CACHE_PROVIDER=google-genai and configure Google GenAI credentials to enable M3 prompt caching.");
         }
 
         String searchTable;
@@ -248,6 +303,51 @@ public class RagQueryService {
                     reranked.size(), contextDocuments.size(), expansionMs);
         }
 
+        long cacheMs = 0L;
+        CacheStatus cacheStatus = CacheStatus.NONE;
+        Prompt promptToSend;
+
+        if (modules.contains(ModuleId.M3)) {
+            Timer.Sample cacheSample = Timer.start(meterRegistry);
+            String contextContent = promptRenderer.renderContext(contextDocuments);
+            long estimatedTokens = promptRenderer.estimateTokens(
+                    contextContent, promptCacheProperties.charsPerTokenEstimate());
+            String cacheKey = promptRenderer.computeCanonicalCacheKey(
+                    promptCacheProperties.provider().name().toLowerCase(),
+                    this.chatModelName,
+                    searchTable,
+                    promptRenderer.getSystemInstruction(),
+                    contextDocuments);
+
+            CacheRequest cacheRequest = new CacheRequest(
+                    cacheKey,
+                    this.chatModelName,
+                    promptRenderer.getSystemInstruction(),
+                    contextContent,
+                    estimatedTokens);
+
+            CacheLookupResult cacheResult = promptCache.getOrCreate(cacheRequest);
+            long cacheNanos = cacheSample.stop(meterRegistry.timer("rag.pipeline.cache"));
+            cacheMs = TimeUnit.NANOSECONDS.toMillis(cacheNanos);
+            cacheStatus = cacheResult.status();
+
+            if (cacheResult.isExplicitlyCached()) {
+                String dynamicSuffix = promptRenderer.renderDynamicSuffix(query);
+                GoogleGenAiChatOptions chatOptions = GoogleGenAiChatOptions.builder()
+                        .cachedContentName(cacheResult.cacheId())
+                        .build();
+                promptToSend = new Prompt(dynamicSuffix, chatOptions);
+                logger.info("Explicit prompt cache {} (id={}) evaluated in {} ms",
+                        cacheStatus, cacheResult.cacheId(), cacheMs);
+            } else {
+                String fullPrompt = promptRenderer.renderFullPrompt(query, contextDocuments);
+                promptToSend = new Prompt(fullPrompt);
+                logger.info("Prompt cache evaluated in {} ms (status={})", cacheMs, cacheStatus);
+            }
+        } else {
+            promptToSend = new Prompt(buildPrompt(query, contextDocuments));
+        }
+
         long startGenTime = System.currentTimeMillis();
         java.util.concurrent.ScheduledFuture<?> progressTask = PROGRESS_SCHEDULER.scheduleAtFixedRate(() -> {
             long elapsedSeconds = (System.currentTimeMillis() - startGenTime) / 1000;
@@ -258,8 +358,7 @@ public class RagQueryService {
         ChatResponse chatResponse;
         long generationNanos;
         try {
-            Prompt prompt = new Prompt(buildPrompt(query, contextDocuments));
-            chatResponse = chatModel.call(prompt);
+            chatResponse = chatModel.call(promptToSend);
         } finally {
             progressTask.cancel(false);
             generationNanos = generationSample.stop(meterRegistry.timer("rag.pipeline.generation"));
@@ -289,6 +388,8 @@ public class RagQueryService {
                 generationMs,
                 expansionMs,
                 rerankMs,
+                cacheMs,
+                cacheStatus,
                 tokenUsage);
     }
 
@@ -334,7 +435,8 @@ public class RagQueryService {
         long completionTokens = usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : 0L;
         long totalTokens = usage.getTotalTokens() != null ? usage.getTotalTokens().longValue() : 0L;
         long cachedTokens = usage.getCacheReadInputTokens() != null ? usage.getCacheReadInputTokens().longValue() : 0L;
-        return new TokenUsageDto(promptTokens, completionTokens, totalTokens, cachedTokens);
+        long cacheWriteTokens = usage.getCacheWriteInputTokens() != null ? usage.getCacheWriteInputTokens().longValue() : 0L;
+        return new TokenUsageDto(promptTokens, completionTokens, totalTokens, cachedTokens, cacheWriteTokens);
     }
 
     private String buildPrompt(String query, List<Document> chunks) {

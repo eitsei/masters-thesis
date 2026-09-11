@@ -64,6 +64,18 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", "reranking_not_configured", "message", exception.getMessage()));
     }
 
+    @ExceptionHandler(com.dippa.ragbenchmark.domain.PromptCacheConfigurationException.class)
+    public ResponseEntity<Map<String, Object>> handlePromptCacheConfiguration(com.dippa.ragbenchmark.domain.PromptCacheConfigurationException exception) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("error", "prompt_cache_not_configured", "message", exception.getMessage()));
+    }
+
+    @ExceptionHandler(com.dippa.ragbenchmark.domain.PromptCacheUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handlePromptCacheUnavailable(com.dippa.ragbenchmark.domain.PromptCacheUnavailableException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("error", "prompt_cache_unavailable", "message", exception.getMessage()));
+    }
+
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(NoSuchElementException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
