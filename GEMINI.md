@@ -43,6 +43,9 @@ Your primary objective is to process academic papers to extract technical data r
 6. **Git Conflict Resolution & Safety (CRITICAL):**
     - **Never** resolve git merge conflicts or execute automatic conflict resolutions (like choosing one side automatically) on your own.
     - If a merge conflict occurs during `git subtree pull`, `git merge`, or any other git operation, you **must** stop, present the conflicting diff to the user, and ask them explicitly how they want the conflict to be resolved.
+7. **Thesis Compilation & Artifact Cleanup (CRITICAL):**
+    - Whenever you compile the LaTeX thesis (e.g., `thesis/_main.tex` using `pdflatex`, `latexmk`, or any LaTeX toolchain), you **must always** immediately delete all intermediate auxiliary compilation files (`.aux`, `.bbl`, `.blg`, `.fdb_latexmk`, `.fls`, `.log`, `.lot`, `.lof`, `.out`, `.toc`, `.xmpdata`, `*.xmpi`, `pdfa.xmpi`, `.synctex.gz`, etc.).
+    - **Only the resulting `.pdf` file (e.g., `_main.pdf`) may be left behind.** Never leave auxiliary compilation files in the workspace or git tree.
 
 ---
 

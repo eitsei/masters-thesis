@@ -144,11 +144,14 @@ PRICING_CATALOG: dict[str, PricingTier] = {
         embed_price_per_million=0.025,
     ),
     # Gemini 3.8 Flash (Latest generation workhorse)
+    # Official pricing through Dec 31, 2026:
+    # Input: $0.75/1M, Output: $3.75/1M, Context Cache Read: $0.075/1M (90% discount)
+    # Storage: $0.50/1M tokens/hr ($1.50/$7.50/$0.15 starting Jan 1, 2027)
     "gemini-3.8-flash": PricingTier(
         name="gemini-3.8-flash",
-        prompt_price_per_million=0.15,
-        comp_price_per_million=0.60,
-        cached_price_per_million=0.0375,
+        prompt_price_per_million=0.75,
+        comp_price_per_million=3.75,
+        cached_price_per_million=0.075,
         rerank_price_per_doc=0.0001,
         embed_price_per_million=0.025,
     ),
@@ -199,10 +202,10 @@ PRICING_CATALOG: dict[str, PricingTier] = {
 }
 
 
-def get_pricing_tier(tier: PricingTier | str | None) -> PricingTier:
+def get_pricing_tier(tier: PricingTier | str | None = "gemini-3.8-flash") -> PricingTier:
     """Resolves a pricing tier name or object to a PricingTier instance."""
     if tier is None:
-        return PRICING_CATALOG["gemini-2.5-flash"]
+        return PRICING_CATALOG["gemini-3.8-flash"]
     if isinstance(tier, PricingTier):
         return tier
     tier_key = str(tier).strip().lower()
@@ -213,7 +216,7 @@ def get_pricing_tier(tier: PricingTier | str | None) -> PricingTier:
         if tier_key in k or k in tier_key:
             return v
     # Fallback to default
-    return PRICING_CATALOG["gemini-2.5-flash"]
+    return PRICING_CATALOG["gemini-3.8-flash"]
 
 
 def compute_cost(
@@ -222,7 +225,7 @@ def compute_cost(
     cached_tokens: int = 0,
     rerank_docs: int = 0,
     embed_tokens: int = 0,
-    tier: PricingTier | str | None = "gemini-2.5-flash",
+    tier: PricingTier | str | None = "gemini-3.8-flash",
     prompt_is_uncached: bool = True,
 ) -> float:
     """Computes query operational execution cost (Thesis Eq. 178 / 181).
@@ -347,7 +350,7 @@ def compute_composite_quality(
     context_recall: float,
     faithfulness: float,
     answer_relevancy: float,
-    epsilon: float = 1e-6,
+    epsilon: float = 1e-4,
 ) -> float:
     """Computes regularized harmonic Composite Quality Score Q(q) (Thesis Eq. 238).
 

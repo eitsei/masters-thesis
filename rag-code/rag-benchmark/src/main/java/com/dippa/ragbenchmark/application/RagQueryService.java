@@ -313,8 +313,10 @@ public class RagQueryService {
 
         List<Document> reranked;
         long rerankMs = 0L;
+        int rerankDocsCount = 0;
         if (modules.contains(ModuleId.M2)) {
             Timer.Sample rerankSample = Timer.start(meterRegistry);
+            rerankDocsCount = retrieved.size();
             reranked = reranker.rerank(query, retrieved, effectiveTopK);
             long rerankNanos = rerankSample.stop(meterRegistry.timer("rag.pipeline.rerank"));
             rerankMs = TimeUnit.NANOSECONDS.toMillis(rerankNanos);
@@ -416,7 +418,8 @@ public class RagQueryService {
         }
         logger.info("Answer generated in {} ms ({} chars)", generationMs, answer.length());
 
-        TokenUsageDto tokenUsage = extractTokenUsage(chatResponse, cacheResult);
+        int embedTokens = Math.max(1, (int) Math.ceil(query.trim().length() / 3.5));
+        TokenUsageDto tokenUsage = extractTokenUsage(chatResponse, cacheResult, rerankDocsCount, embedTokens);
 
         List<RetrievedChunk> retrievedChunks = contextDocuments.stream()
                 .map(document -> new RetrievedChunk(document.getId(), snippet(document.getText()), document.getText()))
@@ -482,6 +485,14 @@ public class RagQueryService {
     }
 
     private TokenUsageDto extractTokenUsage(ChatResponse chatResponse, CacheLookupResult cacheResult) {
+        return extractTokenUsage(chatResponse, cacheResult, 0, 0);
+    }
+
+    private TokenUsageDto extractTokenUsage(
+            ChatResponse chatResponse,
+            CacheLookupResult cacheResult,
+            int rerankDocs,
+            int embedTokens) {
         if (chatResponse == null || chatResponse.getMetadata() == null || chatResponse.getMetadata().getUsage() == null) {
             return TokenUsageDto.ZERO;
         }
@@ -499,7 +510,9 @@ public class RagQueryService {
                 cacheWriteTokens = cacheResult.tokenCount();
             }
         }
-        return new TokenUsageDto(promptTokens, completionTokens, totalTokens, cachedTokens, cacheWriteTokens);
+        return new TokenUsageDto(
+                promptTokens, completionTokens, totalTokens, cachedTokens, cacheWriteTokens,
+                rerankDocs, embedTokens, 0);
     }
 
     private String snippet(String text) {

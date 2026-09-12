@@ -349,6 +349,7 @@ def test_process_item_metrics_caching_attribution():
     from src.cli import _process_item_metrics
 
     # 1. Non-M3 item with implicit server cache: cached_tokens must be ignored (0)
+    # Default pricing_tier is gemini-3.8-flash ($0.75 prompt, $3.75 comp, $0.075 cached - 90% discount)
     non_m3_item = {
         "question": "What is RAG?",
         "generatedAnswer": "Retrieval Augmented Generation",
@@ -357,8 +358,8 @@ def test_process_item_metrics_caching_attribution():
         "tokenUsage": {"promptTokens": 1000, "completionTokens": 50, "cachedTokens": 800},
     }
     res_non_m3 = _process_item_metrics(non_m3_item)
-    # 1000 uncached prompt * 0.15/1M + 50 comp * 0.60/1M = 0.00015 + 0.00003 = 0.00018
-    assert res_non_m3["cost_usd"] == pytest.approx(0.00018, rel=1e-4)
+    # 1000 uncached prompt * 0.75/1M + 50 comp * 3.75/1M + 3 embed * 0.025/1M = 0.000937575
+    assert res_non_m3["cost_usd"] == pytest.approx(0.000937575, rel=1e-5)
 
     # 2. M3 item with cache miss (cachedTokens 0, but cacheWriteTokens 4000)
     m3_item = {
@@ -369,9 +370,14 @@ def test_process_item_metrics_caching_attribution():
         "tokenUsage": {"promptTokens": 25, "completionTokens": 50, "cachedTokens": 0, "cacheWriteTokens": 4000},
     }
     res_m3 = _process_item_metrics(m3_item)
-    # 25 prompt * 0.15/1M + 4000 cached * 0.0375/1M + 50 comp * 0.60/1M
-    # = 0.00000375 + 0.00015 + 0.00003 = 0.00018375
-    assert res_m3["cost_usd"] == pytest.approx(0.00018375, rel=1e-4)
+    # 25 prompt * 0.75/1M + 4000 cached * 0.075/1M (90% discount) + 50 comp * 3.75/1M + 3 embed * 0.025/1M
+    # = 0.00001875 + 0.000300 + 0.0001875 + 0.000000075 = 0.000506325
+    assert res_m3["cost_usd"] == pytest.approx(0.000506325, rel=1e-5)
+
+    # 3. Explicit legacy tier check (gemini-2.5-flash)
+    # 1000 prompt * 0.15/1M + 50 comp * 0.60/1M + 3 embed * 0.025/1M = 0.000180075
+    res_legacy = _process_item_metrics(non_m3_item, pricing_tier="gemini-2.5-flash")
+    assert res_legacy["cost_usd"] == pytest.approx(0.000180075, rel=1e-5)
 
 
 

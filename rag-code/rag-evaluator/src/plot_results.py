@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 - registers 3d projection
 import numpy as np
 
-from src.metrics import get_pricing_tier
+from src.metrics import PRICING_CATALOG, get_pricing_tier
 from src.reporter import summarize_run_records
 
 
@@ -683,7 +683,7 @@ def plot_pareto_frontier_3d(
 def plot_cost_breakdown(
     data: dict[str, Sequence[Mapping[str, Any]]],
     output_path: Path | str = "thesis/figures/cost_breakdown.pdf",
-    pricing_tier: str = "gemini-2.5-flash",
+    pricing_tier: str = "gemini-3.8-flash",
 ) -> Path:
     """Generates stacked bar chart isolating all micro-phase operational cost components across configurations.
 
@@ -750,16 +750,51 @@ def plot_cost_breakdown(
             c_comp = (comp_tok * tier.comp_price_per_million) / 1_000_000.0
 
             # 2. Semantic Re-ranking (if explicit rerank candidate count or price is recorded)
-            rerank_docs = float(r.get("rerankDocs") or r.get("rerank_docs") or 0.0)
+            rerank_docs = float(
+                r.get("rerankDocs")
+                or r.get("rerank_docs")
+                or tu.get("rerankDocs")
+                or tu.get("rerank_docs")
+                or 0.0
+            )
+            if rerank_docs == 0.0 and (
+                "M2" in modules
+                or "SR" in modules
+                or "m2" in str(name).lower()
+                or (isinstance(r.get("runName"), str) and "m2" in r["runName"].lower())
+            ):
+                rerank_docs = 50.0  # Candidate pool size per Thesis Table 4.1
+
             c_rerank = rerank_docs * tier.rerank_price_per_doc
 
             # 3. Query Vectorization Embedding (if explicit embed tokens recorded)
-            embed_tok = float(r.get("embedTokens") or r.get("embed_tokens") or 0.0)
+            embed_tok = float(
+                r.get("embedTokens")
+                or r.get("embed_tokens")
+                or tu.get("embedTokens")
+                or tu.get("embed_tokens")
+                or 0.0
+            )
+            if embed_tok == 0.0:
+                q_text = str(r.get("question") or r.get("query") or "")
+                embed_tok = float(max(1, len(q_text.split()))) if q_text else 20.0
+
             c_embed = (embed_tok * tier.embed_price_per_million) / 1_000_000.0
 
             # 4. Dynamic Routing Classifier (if explicit routing tokens recorded)
-            route_tok = float(r.get("routingTokens") or r.get("route_tokens") or 0.0)
-            c_route = (route_tok * 0.075) / 1_000_000.0 if route_tok > 0 else 0.0
+            route_tok = float(
+                r.get("routingTokens")
+                or r.get("route_tokens")
+                or tu.get("routingTokens")
+                or tu.get("route_tokens")
+                or 0.0
+            )
+            router_tier = PRICING_CATALOG.get("gemini-3.5-flash-lite")
+            c_route = (
+                (route_tok * router_tier.prompt_price_per_million) / 1_000_000.0
+                if route_tok > 0 and router_tier
+                else 0.0
+            )
 
             sub_sum = c_prompt + c_cache + c_comp + c_rerank + c_embed + c_route
 

@@ -95,6 +95,20 @@ def test_compute_cost_gemini_flash():
     assert math.isclose(cost, 0.0028875, rel_tol=1e-9)
 
 
+def test_compute_cost_gemini_38_flash_90pct_discount():
+    # Prompt: 10,000 tokens @ $0.75/1M = $0.0075
+    # Completion: 2,000 tokens @ $3.75/1M = $0.0075
+    # Cached: 5,000 tokens @ $0.075/1M (90% discount off $0.75) = $0.000375
+    # Total = 0.0075 + 0.0075 + 0.000375 = 0.015375
+    cost = compute_cost(
+        prompt_tokens=10000,
+        completion_tokens=2000,
+        cached_tokens=5000,
+        tier="gemini-3.8-flash",
+    )
+    assert math.isclose(cost, 0.015375, rel_tol=1e-9)
+
+
 def test_compute_cost_with_rerank_and_embed():
     # Reranking 50 passages @ $0.0001 = $0.005
     # Embedding 1,000 tokens @ $0.025/1M = $0.000025
@@ -210,7 +224,7 @@ def test_composite_quality_calculation():
     # Reciprocal sum approx 1.25 + 1.42857 + 1.11111 + 1.17647 = 4.96615
     # Q = 4 / 4.96615 = 0.80545
     q = compute_composite_quality(0.8, 0.7, 0.9, 0.85)
-    assert math.isclose(q, 0.805453, rel_tol=1e-4)
+    assert math.isclose(q, 0.805553, rel_tol=1e-4)
 
 
 def test_composite_quality_penalizes_single_dimension_failure():

@@ -80,7 +80,7 @@ Tests are conducted independently across each evaluation metric using a two-tail
 
 The experimental testbed is built upon a production-grade enterprise software stack. The application is implemented in Java 21 LTS using Spring Boot 4.1.0 and Spring AI version 2.0.0. Relational metadata and vector embeddings are managed in PostgreSQL version 16 with the \texttt{pgvector} extension (version 0.8.0), utilizing Hierarchical Navigable Small World (HNSW) indexing with cosine distance~\citep{lewis2020rag}. The index uses standard parameters ($M = 16$, $ef\_construction = 64$, $ef\_search = 40$) to achieve high retrieval recall with sub-5\,ms search latency. The software stack is deployed on Google Cloud Platform (GCP), with the database hosted on fully managed Google Cloud SQL instances to replicate a realistic enterprise production environment. Services are co-located within a dedicated Virtual Private Cloud (VPC) using private IP peering in the \texttt{europe-north1} region to minimize round-trip time (RTT) and eliminate network latency variance. 
 
-The primary foundation model for generation is Google Gemini 3.7 Flash; for model cascading ($M_4$), Gemini 3.5 Flash-Lite and Gemini 3.1 Pro are utilized as low-latency and high-capacity tiers, respectively. Dense vector representations are generated using \texttt{gemini-embedding-2}, configured with an output dimensionality of 768 via Matryoshka Representation Learning (MRL)~\citep{MRL2022} to balance retrieval efficiency with storage requirements. For two-stage semantic re-ranking ($M_2$), Google Cloud's Vertex AI Ranking API with the \texttt{semantic-ranker-default-004} cross-encoder model is employed.
+The primary foundation model for generation is Google Gemini 3.8 Flash; for model cascading ($M_4$), Gemini 3.5 Flash-Lite and Gemini 3.1 Pro are utilized as low-latency and high-capacity tiers, respectively. Dense vector representations are generated using \texttt{gemini-embedding-2}, configured with an output dimensionality of 768 via Matryoshka Representation Learning (MRL)~\citep{MRL2022} to balance retrieval efficiency with storage requirements. For two-stage semantic re-ranking ($M_2$), Google Cloud's Vertex AI Ranking API with the \texttt{semantic-ranker-default-004} cross-encoder model is employed.
 
 \subsection{Optimization Pipeline}
 \label{subsec:opt_pipeline}
@@ -113,7 +113,7 @@ Each optimization method encompasses a broad architectural design space. For exa
        \\
     \addlinespace
     \textbf{$M_4$} & Hybrid Model Routing
-      & Routing targets: Router/1-hop $\to$ Gemini 3.5 Flash-Lite;  2-hop $\to$ Gemini 3.7 Flash; 3/4-hop $\to$ Gemini 3.1 Pro.
+      & Routing targets: Router/1-hop $\to$ Gemini 3.5 Flash-Lite;  2-hop $\to$ Gemini 3.8 Flash; 3/4-hop $\to$ Gemini 3.1 Pro.
 \\
     \bottomrule
     \end{tabularx}
@@ -132,7 +132,7 @@ The candidate retrieval pool for $M_2$ is generated using dense vector embedding
 A minimum threshold of 4096 tokens is selected to satisfy the operational boundary of Google Cloud Vertex AI Context Caching for static system instructions and pre-indexed knowledge corpora. In addition, dynamically retrieved chunks and conversational turns benefit from automatic KV cache prefix reuse across sequential interactions.
 
 \paragraph{Hybrid Model Routing ($M_4$).}
-To replicate real-world enterprise deployments where query complexity is unknown a priori, an automated zero-shot classifier powered by Gemini 3.5 Flash-Lite dynamically evaluates incoming queries. Straightforward single-hop requests are handled directly by Gemini 3.5 Flash-Lite, intermediate queries requiring multi-passage synthesis are escalated to Gemini 3.7 Flash, and complex multi-hop reasoning tasks are routed to Gemini 3.1 Pro. The latency overhead ($T_{\text{route}}$) and token costs of the classifier are explicitly recorded in the evaluation.
+To replicate real-world enterprise deployments where query complexity is unknown a priori, an automated zero-shot classifier powered by Gemini 3.5 Flash-Lite dynamically evaluates incoming queries. Straightforward single-hop requests are handled directly by Gemini 3.5 Flash-Lite, intermediate queries requiring multi-passage synthesis are escalated to Gemini 3.8 Flash, and complex multi-hop reasoning tasks are routed to Gemini 3.1 Pro. The latency overhead ($T_{\text{route}}$) and token costs of the classifier are explicitly recorded in the evaluation.
 
 \subsection{Benchmark Datasets}
 \label{subsec:bench_datasets}
@@ -181,7 +181,7 @@ Operational expenditure constitutes a critical bottleneck for enterprise RAG ado
 \end{split}
 \end{equation}
 
-where $m(q) \in \{\text{Flash-Lite}, \text{Flash}, \text{Pro}\}$ represents the active generative model tier selected for query $q$, $N_{\text{embed}}$ is the number of query tokens vectorized at unit rate $P_{\text{embed}}$, $N_{\text{uncached}}$ and $N_{\text{cached}}$ represent uncached and cached prompt tokens billed at tier-specific rates $P_{\text{prompt}}^{(m(q))}$ and $P_{\text{cached}}^{(m(q))}$ (reflecting the 90\% discount applied to cached input context), $N_{\text{comp}}$ denotes the generated completion tokens billed at rate $P_{\text{comp}}^{(m(q))}$, and $N_{\text{rerank}}$ represents the count of candidate passages evaluated by the cross-encoder at per-document rate $P_{\text{rerank}}$. Fixed persistent infrastructure expenses, such as base Cloud SQL hosting, are invariant across configurations and therefore excluded from per-query operational cost calculations.
+where $m(q) \in \{\text{Flash-Lite}, \text{Flash}, \text{Pro}\}$ represents the active generative model tier selected for query $q$, $N_{\text{embed}}$ is the number of query tokens vectorized at unit rate $P_{\text{embed}}$, $N_{\text{uncached}}$ and $N_{\text{cached}}$ represent uncached and cached prompt tokens billed at tier-specific rates $P_{\text{prompt}}^{(m(q))}$ and $P_{\text{cached}}^{(m(q))}$ (reflecting the 90\% discount applied to cached input context), $N_{\text{comp}}$ denotes the generated completion tokens billed at rate $P_{\text{comp}}^{(m(q))}$, and $N_{\text{rerank}}$ represents the count of candidate passages evaluated by the cross-encoder at per-document rate $P_{\text{rerank}}$. Fixed persistent infrastructure expenses, such as base Cloud SQL hosting, are invariant across configurations and therefore excluded from per-query operational cost calculations. The complete unit tariff schedule, encompassing all evaluated generative model tiers, cross-encoder ranking services, and embedding models alongside official vendor documentation references and acquisition timestamps (September 2026), is detailed in Appendix~\ref{sec:appendix_pricing} (Table~\ref{tab:pricing_catalog}).
 
 Because individual execution expenditures in highly optimized or cached architectures are fractional (frequently falling below $\$0.001$ per request), presenting single-query costs directly introduces significant rounding truncation in empirical summaries. Consequently, operational expenditures in benchmark summary tables and Pareto frontier analyses are normalized and reported per 1,000 queries:
 

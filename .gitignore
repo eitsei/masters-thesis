@@ -6,3 +6,19 @@ target/
 *.iml
 data/
 rag-benchmark/data/
+
+# LaTeX compilation auxiliary files
+thesis/*.aux
+thesis/*.bbl
+thesis/*.blg
+thesis/*.fdb_latexmk
+thesis/*.fls
+thesis/*.log
+thesis/*.lot
+thesis/*.lof
+thesis/*.out
+thesis/*.toc
+thesis/*.xmpdata
+thesis/*.xmpi
+thesis/pdfa.xmpi
+thesis/*.synctex.gz

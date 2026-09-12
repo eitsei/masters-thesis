@@ -132,7 +132,7 @@ class RagQueryServiceTest {
         assertThat(result.generationMs()).isGreaterThanOrEqualTo(0);
         assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.generationMs() + result.expansionMs() + result.rerankMs() + result.cacheMs());
 
-        assertThat(result.tokenUsage()).isEqualTo(new TokenUsageDto(10, 5, 15, 0, 0));
+        assertThat(result.tokenUsage()).isEqualTo(new TokenUsageDto(10, 5, 15, 0, 0, 0, 8, 0));
 
         assertThat(meterRegistry.find("rag.pipeline.retrieval").timer()).isNotNull();
         assertThat(meterRegistry.find("rag.pipeline.generation").timer()).isNotNull();

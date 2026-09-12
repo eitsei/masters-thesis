@@ -93,7 +93,7 @@ def _save_jsonl(records: list[dict[str, Any]], file_path: Path | str) -> Path:
 def _process_item_metrics(
     item: dict[str, Any],
     ragas_evaluator: RagasEvaluatorWrapper | None = None,
-    pricing_tier: str = "gemini-2.5-flash",
+    pricing_tier: str = "gemini-3.8-flash",
 ) -> dict[str, Any]:
     """Enriches a benchmark result item with EM, F1, Cost, RAGAS scores, and Composite Q."""
     question = item.get("question") or item.get("query") or ""
@@ -137,10 +137,44 @@ def _process_item_metrics(
     total_tokens = prompt_tokens + completion_tokens + cached_tokens
     item["total_tokens"] = total_tokens
 
+    rerank_docs = int(
+        item.get("rerankDocs")
+        or item.get("rerank_docs")
+        or tu.get("rerankDocs")
+        or tu.get("rerank_docs")
+        or 0
+    )
+    if rerank_docs == 0 and ("M2" in modules or "SR" in modules or any("m2" in str(m).lower() for m in modules)):
+        rerank_docs = 50  # Default candidate pool size per Thesis Table 4.1
+
+    embed_tokens = int(
+        item.get("embedTokens")
+        or item.get("embed_tokens")
+        or tu.get("embedTokens")
+        or tu.get("embed_tokens")
+        or 0
+    )
+    if embed_tokens == 0:
+        embed_tokens = max(1, len(question.split())) if question else 20
+
+    route_tokens = int(
+        item.get("routingTokens")
+        or item.get("route_tokens")
+        or tu.get("routingTokens")
+        or tu.get("route_tokens")
+        or 0
+    )
+
+    item["rerank_docs"] = rerank_docs
+    item["embed_tokens"] = embed_tokens
+    item["routing_tokens"] = route_tokens
+
     cost = compute_cost(
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         cached_tokens=cached_tokens,
+        rerank_docs=rerank_docs,
+        embed_tokens=embed_tokens,
         tier=pricing_tier,
         prompt_is_uncached=True,
     )

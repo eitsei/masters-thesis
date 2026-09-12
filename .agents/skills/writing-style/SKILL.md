@@ -71,6 +71,7 @@ Maintain explicit alignment with the four core thesis research questions:
   * *Pattern:* *"The rest of the chapter/thesis is structured as follows: Section~\ref{...} reviews..., while Section~\ref{...} examines..."*
 * **Footnote Usage:** Reserve `\footnote{...}` for context (e.g., prior publications, empirical survey statistics, platform details).
 * **Inline Draft & Outline Notes:** Use `% NOTE:` or `% DRAFT NOTES:` comment blocks in `.tex` files to structure quantitative benchmarks and research notes above written prose.
+* **Compilation Artifact Cleanup:** Whenever compiling LaTeX documents, immediately remove all intermediate auxiliary compilation files (`*.aux`, `*.bbl`, `*.blg`, `*.fdb_latexmk`, `*.fls`, `*.log`, `*.lot`, `*.lof`, `*.out`, `*.toc`, `*.xmpdata`, `*.xmpi`, `pdfa.xmpi`, `*.synctex.gz`). Only the final `.pdf` file may be retained.
 
 ---
 
