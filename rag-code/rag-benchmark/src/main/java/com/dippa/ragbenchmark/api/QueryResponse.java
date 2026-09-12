@@ -14,7 +14,20 @@ public record QueryResponse(
         TimingsDto timingsMs,
         TokenUsageDto tokenUsage,
         CacheStatus cacheStatus,
+        CacheMetadataDto cacheMetadata,
         long totalLatencyMs) {
+
+    public QueryResponse(
+            String answer,
+            List<String> modulesApplied,
+            List<RetrievedChunk> retrievedChunks,
+            TimingsDto timingsMs,
+            TokenUsageDto tokenUsage,
+            CacheStatus cacheStatus,
+            long totalLatencyMs) {
+        this(answer, modulesApplied, retrievedChunks, timingsMs, tokenUsage, cacheStatus,
+                new CacheMetadataDto(cacheStatus, null, null, null), totalLatencyMs);
+    }
 
     public QueryResponse(
             String answer,

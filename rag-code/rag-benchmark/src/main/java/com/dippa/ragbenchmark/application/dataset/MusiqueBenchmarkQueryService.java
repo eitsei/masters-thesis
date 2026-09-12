@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -32,6 +33,7 @@ public class MusiqueBenchmarkQueryService {
     private final RagQueryService ragQueryService;
     private final PromptCache promptCache;
 
+    @Autowired
     public MusiqueBenchmarkQueryService(
             MusiqueDatasetService datasetService,
             RagQueryService ragQueryService,
@@ -119,6 +121,7 @@ public class MusiqueBenchmarkQueryService {
                 queryResult.expansionMs(),
                 queryResult.cacheMs(),
                 queryResult.cacheStatus(),
+                queryResult.cacheMetadata(),
                 totalLatencyMs,
                 tokenUsage,
                 tableNameUsed,
@@ -186,6 +189,7 @@ public class MusiqueBenchmarkQueryService {
         long totalCompletionTokens = 0;
         long totalTokens = 0;
         long totalCachedTokens = 0;
+        long totalCacheWriteTokens = 0;
         int supportingEvidenceFoundCount = 0;
 
         for (MusiqueQuestion question : questionsToEvaluate) {
@@ -200,13 +204,15 @@ public class MusiqueBenchmarkQueryService {
                 totalCompletionTokens += result.tokenUsage().completionTokens();
                 totalTokens += result.tokenUsage().totalTokens();
                 totalCachedTokens += result.tokenUsage().cachedTokens();
+                totalCacheWriteTokens += result.tokenUsage().cacheWriteTokens();
             }
         }
 
         long totalExecutionTimeMs = System.currentTimeMillis() - startTime;
         double averageLatencyMs = results.isEmpty() ? 0.0
                 : (double) results.stream().mapToLong(MusiqueBenchmarkQueryResult::totalLatencyMs).sum() / results.size();
-        TokenUsageDto aggregateUsage = new TokenUsageDto(totalPromptTokens, totalCompletionTokens, totalTokens, totalCachedTokens);
+        TokenUsageDto aggregateUsage = new TokenUsageDto(
+                totalPromptTokens, totalCompletionTokens, totalTokens, totalCachedTokens, totalCacheWriteTokens);
 
         return new MusiqueBatchQueryResult(
                 results.size(),

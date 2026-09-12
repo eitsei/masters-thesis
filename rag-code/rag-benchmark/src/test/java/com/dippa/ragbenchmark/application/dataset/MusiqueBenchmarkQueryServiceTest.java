@@ -91,7 +91,7 @@ class MusiqueBenchmarkQueryServiceTest {
     void evaluateBatch_aggregatesTimingsAndTokens() {
         when(datasetService.getQuestionById("2hop__123")).thenReturn(Optional.of(sampleQuestion));
 
-        TokenUsageDto usage = new TokenUsageDto(50, 20, 70, 5);
+        TokenUsageDto usage = new TokenUsageDto(50, 20, 70, 5, 12);
         RetrievedChunk chunk = new RetrievedChunk("c1", "J.R.R. Tolkien", "full text");
         RagQueryResult queryResult = new RagQueryResult(
                 "Bloemfontein",
@@ -124,6 +124,7 @@ class MusiqueBenchmarkQueryServiceTest {
         assertThat(batchResult.totalTokenUsage().completionTokens()).isEqualTo(20L);
         assertThat(batchResult.totalTokenUsage().totalTokens()).isEqualTo(70L);
         assertThat(batchResult.totalTokenUsage().cachedTokens()).isEqualTo(5L);
+        assertThat(batchResult.totalTokenUsage().cacheWriteTokens()).isEqualTo(12L);
         assertThat(batchResult.results()).hasSize(1);
     }
 

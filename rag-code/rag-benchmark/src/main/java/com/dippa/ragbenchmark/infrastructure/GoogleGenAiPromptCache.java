@@ -8,6 +8,8 @@ import com.dippa.ragbenchmark.infrastructure.config.PromptCacheProperties;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -16,8 +18,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.google.genai.GoogleGenAiChatModel;
 import org.springframework.ai.google.genai.cache.CachedContentRequest;
 import org.springframework.ai.google.genai.cache.GoogleGenAiCachedContent;
 import org.springframework.ai.google.genai.cache.GoogleGenAiCachedContentService;
@@ -28,13 +32,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Production prompt cache adapter integrating with Google GenAI / Vertex AI Context Caching.
+ * Adapter implementing {@link PromptCache} via Spring AI Google GenAI {@link GoogleGenAiCachedContentService}.
  *
- * <p>Provides:
+ * <p>Supports Module M3 explicit prompt/context caching with:
  * <ul>
  *   <li>Single-flight concurrency to guarantee only one remote cache is created per unique key</li>
  *   <li>Local TTL and expiration tracking to prevent stale cache reuse</li>
  *   <li>Application-instance ownership tracking for safe, targeted cleanup</li>
+ *   <li>Race-free cache invalidation across clear boundaries ensuring no remote resources are orphaned</li>
  *   <li>Automatic resource cleanup on application shutdown via {@link DisposableBean}</li>
  * </ul>
  * </p>
@@ -45,13 +50,20 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
 
     private static final Logger logger = LoggerFactory.getLogger(GoogleGenAiPromptCache.class);
 
-    private final GoogleGenAiCachedContentService cachedContentService;
+    private final ObjectProvider<GoogleGenAiCachedContentService> serviceProvider;
+    private final ObjectProvider<GoogleGenAiChatModel> chatModelProvider;
+    private final GoogleGenAiCachedContentService directService;
     private final PromptCacheProperties properties;
     private final String instanceId;
+    private volatile GoogleGenAiCachedContentService resolvedService;
 
     private final ConcurrentMap<String, CacheEntry> localEntries = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, CompletableFuture<CacheEntry>> inFlightCreations = new ConcurrentHashMap<>();
     private final Set<String> ownedResourceNames = ConcurrentHashMap.newKeySet();
+
+    private final AtomicLong clearEpoch = new AtomicLong(0);
+    private final Object registrationLock = new Object();
+    private volatile boolean isClosed = false;
 
     public record CacheEntry(String cacheId, long tokenCount, Instant expiresAt) {
         public boolean isExpired() {
@@ -62,8 +74,19 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
     @Autowired
     public GoogleGenAiPromptCache(
             ObjectProvider<GoogleGenAiCachedContentService> serviceProvider,
+            ObjectProvider<GoogleGenAiChatModel> chatModelProvider,
             PromptCacheProperties properties) {
-        this(serviceProvider != null ? serviceProvider.getIfAvailable() : null, properties);
+        this.serviceProvider = serviceProvider;
+        this.chatModelProvider = chatModelProvider;
+        this.directService = null;
+        this.properties = properties != null ? properties : PromptCacheProperties.defaultProperties();
+        this.instanceId = UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    public GoogleGenAiPromptCache(
+            ObjectProvider<GoogleGenAiCachedContentService> serviceProvider,
+            PromptCacheProperties properties) {
+        this(serviceProvider, null, properties);
     }
 
     public GoogleGenAiPromptCache(
@@ -76,13 +99,46 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
             GoogleGenAiCachedContentService cachedContentService,
             PromptCacheProperties properties,
             String instanceId) {
-        this.cachedContentService = cachedContentService;
+        this.serviceProvider = null;
+        this.chatModelProvider = null;
+        this.directService = cachedContentService;
         this.properties = properties != null ? properties : PromptCacheProperties.defaultProperties();
         this.instanceId = instanceId != null ? instanceId : UUID.randomUUID().toString().substring(0, 8);
     }
 
+    private GoogleGenAiCachedContentService getCachedContentService() {
+        if (this.directService != null) {
+            return this.directService;
+        }
+        if (this.resolvedService != null) {
+            return this.resolvedService;
+        }
+        if (this.serviceProvider != null) {
+            GoogleGenAiCachedContentService service = this.serviceProvider.getIfAvailable();
+            if (service != null) {
+                this.resolvedService = service;
+                return service;
+            }
+        }
+        if (this.chatModelProvider != null) {
+            GoogleGenAiChatModel chatModel = this.chatModelProvider.getIfAvailable();
+            if (chatModel != null) {
+                GoogleGenAiCachedContentService service = chatModel.getCachedContentService();
+                if (service != null) {
+                    this.resolvedService = service;
+                    return service;
+                }
+            }
+        }
+        return null;
+    }
+
     public String getInstanceId() {
         return instanceId;
+    }
+
+    public int getOwnedCount() {
+        return ownedResourceNames.size();
     }
 
     public Set<String> getOwnedResourceNames() {
@@ -91,14 +147,14 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
 
     @Override
     public boolean isConfigured() {
-        return cachedContentService != null;
+        return getCachedContentService() != null;
     }
 
     @Override
     public CacheLookupResult getOrCreate(CacheRequest request) {
         Objects.requireNonNull(request, "request must not be null");
 
-        if (!isConfigured()) {
+        if (!isConfigured() || isClosed) {
             return CacheLookupResult.disabled();
         }
 
@@ -109,6 +165,7 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
         }
 
         String key = request.cacheKey();
+        long requestEpoch = clearEpoch.get();
 
         // 1. Check local cache and evict if expired
         CacheEntry existingEntry = localEntries.get(key);
@@ -142,8 +199,33 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
         // 3. First thread: perform remote creation
         try {
             CacheEntry createdEntry = doCreate(request);
-            localEntries.put(key, createdEntry);
-            ownedResourceNames.add(createdEntry.cacheId());
+
+            boolean registered = false;
+            synchronized (registrationLock) {
+                if (requestEpoch == clearEpoch.get() && !isClosed) {
+                    localEntries.put(key, createdEntry);
+                    ownedResourceNames.add(createdEntry.cacheId());
+                    registered = true;
+                }
+            }
+
+            if (!registered) {
+                logger.info("Cache creation for key '{}' completed across clearOwned boundary; deleting orphaned remote resource '{}'",
+                        key, createdEntry.cacheId());
+                try {
+                    GoogleGenAiCachedContentService service = getCachedContentService();
+                    if (service != null) {
+                        service.delete(createdEntry.cacheId());
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to delete orphaned resource '{}': {}", createdEntry.cacheId(), e.getMessage());
+                }
+                PromptCacheUnavailableException invalidated = new PromptCacheUnavailableException(
+                        "Cache creation was invalidated by a concurrent clearOwned() operation");
+                promise.completeExceptionally(invalidated);
+                return CacheLookupResult.notEligible(createdEntry.tokenCount());
+            }
+
             promise.complete(createdEntry);
             logger.info("Created explicit Google GenAI cache for key '{}' -> cacheId={}, tokens={}, expiresAt={}",
                     key, createdEntry.cacheId(), createdEntry.tokenCount(), createdEntry.expiresAt());
@@ -155,7 +237,7 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
             }
             throw new PromptCacheUnavailableException("Failed to create Google GenAI cached content: " + t.getMessage(), t);
         } finally {
-            inFlightCreations.remove(key);
+            inFlightCreations.remove(key, promise);
         }
     }
 
@@ -175,7 +257,11 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
                     .ttl(properties.ttl())
                     .build();
 
-            GoogleGenAiCachedContent cachedContent = cachedContentService.create(createRequest);
+            GoogleGenAiCachedContentService service = getCachedContentService();
+            if (service == null) {
+                throw new PromptCacheUnavailableException("Google GenAI cached content service is not available");
+            }
+            GoogleGenAiCachedContent cachedContent = service.create(createRequest);
             String cacheId = cachedContent.getName();
             long tokenCount = request.estimatedTokens();
             if (cachedContent.getUsageMetadata() != null
@@ -200,24 +286,46 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
         if (!isConfigured()) {
             return;
         }
-        logger.info("Clearing {} owned cached content resource(s) for instance '{}'",
-                ownedResourceNames.size(), instanceId);
+        // Advance clear epoch to invalidate any creations currently in progress
+        clearEpoch.incrementAndGet();
 
-        for (String resourceName : ownedResourceNames) {
+        // Drain and wait for in-flight creations WITHOUT holding registrationLock
+        List<CompletableFuture<CacheEntry>> pending = new ArrayList<>(inFlightCreations.values());
+        for (CompletableFuture<CacheEntry> future : pending) {
             try {
-                boolean deleted = cachedContentService.delete(resourceName);
-                logger.info("Deleted remote cached content resource '{}': success={}", resourceName, deleted);
+                future.join();
+            } catch (Exception ignored) {
+                // Creation failure or invalidation handled by creator thread
+            }
+        }
+        inFlightCreations.clear();
+
+        Set<String> toDelete;
+        synchronized (registrationLock) {
+            toDelete = new HashSet<>(ownedResourceNames);
+            ownedResourceNames.clear();
+            localEntries.clear();
+        }
+
+        logger.info("Clearing {} owned cached content resource(s) for instance '{}'",
+                toDelete.size(), instanceId);
+
+        GoogleGenAiCachedContentService service = getCachedContentService();
+        for (String resourceName : toDelete) {
+            try {
+                if (service != null) {
+                    boolean deleted = service.delete(resourceName);
+                    logger.info("Deleted remote cached content resource '{}': success={}", resourceName, deleted);
+                }
             } catch (Exception e) {
                 logger.warn("Failed to delete remote cached content resource '{}': {}", resourceName, e.getMessage());
             }
         }
-        ownedResourceNames.clear();
-        localEntries.clear();
-        inFlightCreations.clear();
     }
 
     @Override
     public void destroy() {
+        isClosed = true;
         clearOwned();
     }
 }

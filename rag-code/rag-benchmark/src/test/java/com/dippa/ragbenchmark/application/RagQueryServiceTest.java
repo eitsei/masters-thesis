@@ -21,6 +21,7 @@ import com.dippa.ragbenchmark.domain.Reranker;
 import com.dippa.ragbenchmark.domain.RerankingConfigurationException;
 import com.dippa.ragbenchmark.domain.RetrievalExpander;
 import com.dippa.ragbenchmark.infrastructure.NoOpReranker;
+import com.dippa.ragbenchmark.infrastructure.config.GenerationProperties;
 import com.dippa.ragbenchmark.infrastructure.config.PromptCacheProperties;
 import com.dippa.ragbenchmark.infrastructure.config.RerankerProperties;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -300,6 +301,8 @@ class RagQueryServiceTest {
 
         assertThat(result.modulesApplied()).containsExactly(ModuleId.M3);
         assertThat(result.cacheStatus()).isEqualTo(CacheStatus.EXPLICIT_HIT);
+        assertThat(result.cacheMetadata().cacheId()).isEqualTo("cachedContents/hit-123");
+        assertThat(result.cacheMetadata().tokenCount()).isEqualTo(5120L);
         assertThat(result.cacheMs()).isGreaterThanOrEqualTo(0L);
 
         ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
@@ -312,6 +315,8 @@ class RagQueryServiceTest {
         assertThat(promptSent.getOptions()).isInstanceOf(GoogleGenAiChatOptions.class);
         GoogleGenAiChatOptions options = (GoogleGenAiChatOptions) promptSent.getOptions();
         assertThat(options.getCachedContentName()).isEqualTo("cachedContents/hit-123");
+        assertThat(options.getThinkingBudget()).isEqualTo(0);
+        assertThat(options.getIncludeExtendedUsageMetadata()).isTrue();
     }
 
     @Test
@@ -336,6 +341,45 @@ class RagQueryServiceTest {
         assertThat(promptSent.getContents()).isEqualTo("Question: Cold question?\nAnswer:");
         GoogleGenAiChatOptions options = (GoogleGenAiChatOptions) promptSent.getOptions();
         assertThat(options.getCachedContentName()).isEqualTo("cachedContents/miss-456");
+        assertThat(options.getThinkingBudget()).isEqualTo(0);
+        assertThat(options.getIncludeExtendedUsageMetadata()).isTrue();
+    }
+
+    @Test
+    void customThinkingBudget_appliesToPromptOptions() {
+        RagQueryService customService = new RagQueryService(
+                vectorStore,
+                chatModel,
+                reranker,
+                retrievalExpander,
+                promptCache,
+                promptRenderer,
+                promptCacheProperties,
+                new GenerationProperties(256),
+                "gemini-3.8-flash",
+                meterRegistry,
+                Integer.MAX_VALUE,
+                5,
+                RerankerProperties.defaultProperties(),
+                new ClassPathResource("prompts/answer-generation.st"),
+                "vector_store_test",
+                null,
+                null);
+
+        Document chunk = Document.builder().id("c1").text("Sample text.").build();
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(chunk));
+        when(promptCache.isConfigured()).thenReturn(true);
+        when(promptCache.getOrCreate(any(CacheRequest.class)))
+                .thenReturn(CacheLookupResult.hit("cachedContents/hit-custom", 5120L, Instant.now().plusSeconds(300)));
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Custom answer.", null));
+
+        customService.query("Custom question?", Set.of(ModuleId.M3));
+
+        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(promptCaptor.capture());
+
+        GoogleGenAiChatOptions options = (GoogleGenAiChatOptions) promptCaptor.getValue().getOptions();
+        assertThat(options.getThinkingBudget()).isEqualTo(256);
     }
 
     @Test

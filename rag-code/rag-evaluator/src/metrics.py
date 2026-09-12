@@ -414,9 +414,15 @@ class RagasEvaluatorWrapper:
     4. Answer Relevancy (semantic directness to query)
     """
 
-    def __init__(self, llm: Any = None, embeddings: Any = None) -> None:
+    def __init__(
+        self,
+        llm: Any = None,
+        embeddings: Any = None,
+        delay_seconds: float = 0.0,
+    ) -> None:
         self.llm = llm
         self.embeddings = embeddings
+        self.delay_seconds = delay_seconds
 
     def evaluate_sample(
         self,
@@ -458,12 +464,15 @@ class RagasEvaluatorWrapper:
                 ContextPrecision(llm=self.llm),
                 ContextRecall(llm=self.llm),
             ]
-            for m in metrics:
+            for idx, m in enumerate(metrics):
                 try:
                     score = m.single_turn_score(sample)
                     scores[m.name] = float(score) if score is not None else 0.0
                 except Exception:
                     scores[m.name] = 0.0
+                if self.delay_seconds > 0 and idx < len(metrics) - 1:
+                    import time
+                    time.sleep(self.delay_seconds)
         except Exception:
             scores = {
                 "faithfulness": 0.0,

@@ -8,14 +8,14 @@
 \begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l r r r r r r r r r r r @{}}
 \toprule
 \textbf{Reasoning Tier} & \textbf{$N$} & \textbf{$P_{50}$} & \textbf{$P_{95}$} & \textbf{Tokens} & \textbf{Cost (\$)} & \textbf{EM (\%)} & \textbf{F1 (\%)} & \textbf{Faith} & \textbf{AR} & \textbf{CP} & \textbf{Comp $Q$} \\
- & & \scriptsize{(ms)} & \scriptsize{(ms)} & \scriptsize{avg} & \scriptsize{per q} & & & & & & \scriptsize{$[0,1]$} \\
+ & & \scriptsize{(ms)} & \scriptsize{(ms)} & \scriptsize{avg} & \scriptsize{per 1k q} & & & & & & \scriptsize{$[0,1]$} \\
 \midrule
-2-Hop Reasoning & 5 & 3022.0 & 4508.2 & 923 & \$0.0001 & 0.0\% & 10.8\% & 0.300 & 0.231 & 0.500 & \textbf{0.2790} \\
+2-Hop Reasoning & 5 & 3022.0 & 4508.2 & 923 & \$0.100 & 0.0\% & 10.8\% & 0.300 & 0.231 & 0.500 & \textbf{0.2790} \\
 \midrule
-\textbf{Combined Corpus} & 5 & 3022.0 & 4508.2 & 923 & \$0.0001 & 0.0\% & 10.8\% & 0.300 & 0.231 & 0.500 & \textbf{0.2790} \\
+\textbf{Combined Corpus} & 5 & 3022.0 & 4508.2 & 923 & \$0.100 & 0.0\% & 10.8\% & 0.300 & 0.231 & 0.500 & \textbf{0.2790} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
 \parbox{\textwidth}{\footnotesize
-\textbf{Notes:} Evaluated over the MuSiQue multi-hop benchmark sample partitioned across 2-hop, 3-hop, and 4-hop questions. Metrics follow Chapter 4 definitions.}
+\textbf{Notes:} Evaluated over the MuSiQue multi-hop benchmark sample partitioned across 2-hop, 3-hop, and 4-hop questions. Costs reflect Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. Metrics follow Chapter 4 definitions.}
 \end{table*}

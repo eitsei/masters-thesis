@@ -1,5 +1,6 @@
 package com.dippa.ragbenchmark;
 
+import com.dippa.ragbenchmark.infrastructure.config.GenerationProperties;
 import com.dippa.ragbenchmark.infrastructure.config.ModelCatalogProperties;
 import com.dippa.ragbenchmark.infrastructure.config.PromptCacheProperties;
 import com.dippa.ragbenchmark.infrastructure.config.RerankerProperties;
@@ -17,6 +18,7 @@ import org.springframework.context.annotation.Bean;
         ModelCatalogProperties.class,
         RerankerProperties.class,
         PromptCacheProperties.class,
+        GenerationProperties.class,
         NordeaIngestionProperties.class,
         MusiqueDatasetProperties.class
 })

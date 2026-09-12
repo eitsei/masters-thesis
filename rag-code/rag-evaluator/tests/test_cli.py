@@ -155,7 +155,9 @@ def test_cli_export_thesis(tmp_path: Path, synthetic_run_data):
     assert (tables_dir / "hop_breakdown.tex").exists()
     assert (tables_dir / "wilcoxon_tests.tex").exists()
     assert (figures_dir / "pareto_frontier.pdf").exists()
+    assert (figures_dir / "pareto_frontier_3d.pdf").exists()
     assert (figures_dir / "latency_breakdown.pdf").exists()
+    assert (figures_dir / "cost_breakdown.pdf").exists()
     assert (figures_dir / "ragas_metrics_radar.pdf").exists()
 
 
@@ -182,6 +184,8 @@ def test_cli_export_thesis_with_subfolder(tmp_path: Path, synthetic_run_data):
     assert (tables_dir / "sample_runs" / "benchmark_summary.tex").exists()
     assert (tables_dir / "sample_runs" / "hop_breakdown.tex").exists()
     assert (figures_dir / "sample_runs" / "pareto_frontier.pdf").exists()
+    assert (figures_dir / "sample_runs" / "pareto_frontier_3d.pdf").exists()
+    assert (figures_dir / "sample_runs" / "cost_breakdown.pdf").exists()
 
 
 @patch("src.cli.RagBenchmarkClient")
@@ -210,6 +214,44 @@ def test_cli_run_mocked(mock_client_cls, tmp_path: Path, synthetic_run_data):
     assert res.exit_code == 0
     assert out_file.exists()
     assert mock_instance.batch_query.called
+
+
+@patch("src.cli.RagBenchmarkClient")
+def test_cli_run_streaming_mocked(mock_client_cls, tmp_path: Path):
+    mock_instance = MagicMock()
+    mock_client_cls.return_value = mock_instance
+    mock_instance.health_check.return_value = True
+    mock_instance.get_canonical_sample.return_value = [
+        {"id": "q1", "question": "What is M3?"},
+    ]
+    mock_instance.query_question.return_value = {
+        "questionId": "q1",
+        "question": "What is M3?",
+        "groundTruthAnswer": "Prompt caching",
+        "generatedAnswer": "Prompt caching is M3.",
+        "retrievedChunks": [],
+        "timings": {"retrievalMs": 10.0, "generationMs": 20.0},
+        "totalLatencyMs": 30.0,
+        "tokenUsage": {"promptTokens": 100, "completionTokens": 10, "cachedTokens": 0},
+    }
+
+    out_file = tmp_path / "stream_run.jsonl"
+    res = runner.invoke(app, [
+        "run",
+        "--url", "http://localhost:8080",
+        "--sample",
+        "--limit", "1",
+        "--stream",
+        "--judge", "none",
+        "--warmup", "0",
+        "--output", str(out_file),
+    ])
+
+    assert res.exit_code == 0
+    assert out_file.exists()
+    assert mock_instance.query_question.called
+
+
 
 
 @patch("src.cli.RagBenchmarkClient")
@@ -276,4 +318,60 @@ def test_cli_run_questions_mocked(mock_client_cls, tmp_path: Path):
     assert res.exit_code == 0
     assert out_file.exists()
     assert mock_instance.query.called
+
+
+@patch("src.cli.RagBenchmarkClient")
+def test_cli_run_with_judge_delay(mock_client_cls, tmp_path: Path, synthetic_run_data):
+    mock_instance = MagicMock()
+    mock_client_cls.return_value = mock_instance
+    mock_instance.health_check.return_value = True
+    mock_instance.batch_query.return_value = {
+        "totalQuestions": 2,
+        "results": synthetic_run_data[:2],
+    }
+
+    out_file = tmp_path / "run_delay_output.jsonl"
+    res = runner.invoke(app, [
+        "run",
+        "--url", "http://localhost:8080",
+        "--limit", "2",
+        "--judge", "none",
+        "--judge-delay", "0.1",
+        "--warmup", "0",
+        "--output", str(out_file),
+    ])
+
+    assert res.exit_code == 0
+    assert out_file.exists()
+
+
+def test_process_item_metrics_caching_attribution():
+    from src.cli import _process_item_metrics
+
+    # 1. Non-M3 item with implicit server cache: cached_tokens must be ignored (0)
+    non_m3_item = {
+        "question": "What is RAG?",
+        "generatedAnswer": "Retrieval Augmented Generation",
+        "groundTruthAnswer": "Retrieval Augmented Generation",
+        "modulesApplied": [],
+        "tokenUsage": {"promptTokens": 1000, "completionTokens": 50, "cachedTokens": 800},
+    }
+    res_non_m3 = _process_item_metrics(non_m3_item)
+    # 1000 uncached prompt * 0.15/1M + 50 comp * 0.60/1M = 0.00015 + 0.00003 = 0.00018
+    assert res_non_m3["cost_usd"] == pytest.approx(0.00018, rel=1e-4)
+
+    # 2. M3 item with cache miss (cachedTokens 0, but cacheWriteTokens 4000)
+    m3_item = {
+        "question": "What is RAG?",
+        "generatedAnswer": "Retrieval Augmented Generation",
+        "groundTruthAnswer": "Retrieval Augmented Generation",
+        "modulesApplied": ["M3"],
+        "tokenUsage": {"promptTokens": 25, "completionTokens": 50, "cachedTokens": 0, "cacheWriteTokens": 4000},
+    }
+    res_m3 = _process_item_metrics(m3_item)
+    # 25 prompt * 0.15/1M + 4000 cached * 0.0375/1M + 50 comp * 0.60/1M
+    # = 0.00000375 + 0.00015 + 0.00003 = 0.00018375
+    assert res_m3["cost_usd"] == pytest.approx(0.00018375, rel=1e-4)
+
+
 

@@ -1,5 +1,6 @@
 package com.dippa.ragbenchmark.application;
 
+import com.dippa.ragbenchmark.api.CacheMetadataDto;
 import com.dippa.ragbenchmark.api.TokenUsageDto;
 import com.dippa.ragbenchmark.domain.CacheLookupResult;
 import com.dippa.ragbenchmark.domain.CacheRequest;
@@ -14,6 +15,7 @@ import com.dippa.ragbenchmark.domain.RetrievalExpander;
 import com.dippa.ragbenchmark.infrastructure.NoOpPromptCache;
 import com.dippa.ragbenchmark.infrastructure.NoOpReranker;
 import com.dippa.ragbenchmark.infrastructure.TableNameValidator;
+import com.dippa.ragbenchmark.infrastructure.config.GenerationProperties;
 import com.dippa.ragbenchmark.infrastructure.config.PromptCacheProperties;
 import com.dippa.ragbenchmark.infrastructure.config.RerankerProperties;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -34,6 +36,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.google.genai.GoogleGenAiChatModel;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -69,12 +72,12 @@ public class RagQueryService {
     private final PromptCache promptCache;
     private final RagPromptRenderer promptRenderer;
     private final PromptCacheProperties promptCacheProperties;
+    private final GenerationProperties generationProperties;
     private final String chatModelName;
     private final MeterRegistry meterRegistry;
     private final int snippetLengthChars;
     private final int topK;
     private final int candidatePoolSize;
-    private final PromptTemplate answerPromptTemplate;
     private final String defaultTableName;
     private final JdbcTemplate jdbcTemplate;
     private final EmbeddingModel embeddingModel;
@@ -97,6 +100,7 @@ public class RagQueryService {
             ObjectProvider<PromptCache> promptCacheProvider,
             ObjectProvider<RagPromptRenderer> promptRendererProvider,
             ObjectProvider<PromptCacheProperties> promptCachePropertiesProvider,
+            ObjectProvider<GenerationProperties> generationPropertiesProvider,
             @Value("${spring.ai.google.genai.chat.model:gemini-3.8-flash}") String chatModelName) {
         this(
                 vectorStore,
@@ -106,6 +110,7 @@ public class RagQueryService {
                 promptCacheProvider != null ? promptCacheProvider.getIfAvailable() : null,
                 promptRendererProvider != null ? promptRendererProvider.getIfAvailable() : null,
                 promptCachePropertiesProvider != null ? promptCachePropertiesProvider.getIfAvailable() : null,
+                generationPropertiesProvider != null ? generationPropertiesProvider.getIfAvailable() : null,
                 chatModelName,
                 meterRegistry,
                 snippetLengthChars,
@@ -126,7 +131,7 @@ public class RagQueryService {
             int snippetLengthChars,
             int topK,
             Resource answerPromptResource) {
-        this(vectorStore, chatModel, reranker, retrievalExpander, null, null, null, null,
+        this(vectorStore, chatModel, reranker, retrievalExpander, null, null, null, null, null,
                 meterRegistry, snippetLengthChars, topK,
                 RerankerProperties.defaultProperties(), answerPromptResource, "vector_store_test", null, null);
     }
@@ -141,7 +146,7 @@ public class RagQueryService {
             int topK,
             RerankerProperties rerankerProperties,
             Resource answerPromptResource) {
-        this(vectorStore, chatModel, reranker, retrievalExpander, null, null, null, null,
+        this(vectorStore, chatModel, reranker, retrievalExpander, null, null, null, null, null,
                 meterRegistry, snippetLengthChars, topK,
                 rerankerProperties, answerPromptResource, "vector_store_test", null, null);
     }
@@ -159,7 +164,7 @@ public class RagQueryService {
             String defaultTableName,
             JdbcTemplate jdbcTemplate,
             EmbeddingModel embeddingModel) {
-        this(vectorStore, chatModel, reranker, retrievalExpander, null, null, null, null,
+        this(vectorStore, chatModel, reranker, retrievalExpander, null, null, null, null, null,
                 meterRegistry, snippetLengthChars, topK,
                 rerankerProperties, answerPromptResource, defaultTableName, jdbcTemplate, embeddingModel);
     }
@@ -181,22 +186,49 @@ public class RagQueryService {
             String defaultTableName,
             JdbcTemplate jdbcTemplate,
             EmbeddingModel embeddingModel) {
+        this(vectorStore, chatModel, reranker, retrievalExpander, promptCache, promptRenderer, promptCacheProperties, null,
+                chatModelName, meterRegistry, snippetLengthChars, topK, rerankerProperties, answerPromptResource,
+                defaultTableName, jdbcTemplate, embeddingModel);
+    }
+
+    public RagQueryService(
+            VectorStore vectorStore,
+            ChatModel chatModel,
+            Reranker reranker,
+            RetrievalExpander retrievalExpander,
+            PromptCache promptCache,
+            RagPromptRenderer promptRenderer,
+            PromptCacheProperties promptCacheProperties,
+            GenerationProperties generationProperties,
+            String chatModelName,
+            MeterRegistry meterRegistry,
+            int snippetLengthChars,
+            int topK,
+            RerankerProperties rerankerProperties,
+            Resource answerPromptResource,
+            String defaultTableName,
+            JdbcTemplate jdbcTemplate,
+            EmbeddingModel embeddingModel) {
         this.vectorStore = vectorStore;
         this.chatModel = chatModel;
         this.reranker = reranker;
         this.retrievalExpander = retrievalExpander != null ? retrievalExpander : childChunks -> childChunks;
         this.promptCache = promptCache != null ? promptCache : new NoOpPromptCache();
-        this.promptRenderer = promptRenderer != null ? promptRenderer : new RagPromptRenderer();
+        this.promptRenderer = promptRenderer != null ? promptRenderer : new RagPromptRenderer(answerPromptResource);
         this.promptCacheProperties = promptCacheProperties != null ? promptCacheProperties : PromptCacheProperties.defaultProperties();
+        this.generationProperties = generationProperties != null ? generationProperties : GenerationProperties.defaultProperties();
         this.chatModelName = (chatModelName != null && !chatModelName.isBlank()) ? chatModelName : "gemini-3.8-flash";
         this.meterRegistry = meterRegistry;
         this.snippetLengthChars = snippetLengthChars;
         this.topK = topK;
         this.candidatePoolSize = rerankerProperties != null ? rerankerProperties.candidatePoolSize() : 50;
-        this.answerPromptTemplate = new PromptTemplate(answerPromptResource);
         this.defaultTableName = (defaultTableName != null && !defaultTableName.isBlank()) ? defaultTableName : "vector_store_test";
         this.jdbcTemplate = jdbcTemplate;
         this.embeddingModel = embeddingModel;
+    }
+
+    public GenerationProperties getGenerationProperties() {
+        return generationProperties;
     }
 
     public String getDefaultTableName() {
@@ -305,47 +337,57 @@ public class RagQueryService {
 
         long cacheMs = 0L;
         CacheStatus cacheStatus = CacheStatus.NONE;
+        CacheMetadataDto cacheMetadata = CacheMetadataDto.NONE;
+        CacheLookupResult cacheResult = null;
         Prompt promptToSend;
 
         if (modules.contains(ModuleId.M3)) {
             Timer.Sample cacheSample = Timer.start(meterRegistry);
             String contextContent = promptRenderer.renderContext(contextDocuments);
+            String systemInstruction = promptRenderer.getSystemInstruction();
+            String fullCacheableContent = (systemInstruction != null && !systemInstruction.isBlank())
+                    ? systemInstruction + "\n\n" + contextContent
+                    : contextContent;
             long estimatedTokens = promptRenderer.estimateTokens(
-                    contextContent, promptCacheProperties.charsPerTokenEstimate());
+                    fullCacheableContent, promptCacheProperties.charsPerTokenEstimate());
             String cacheKey = promptRenderer.computeCanonicalCacheKey(
                     promptCacheProperties.provider().name().toLowerCase(),
                     this.chatModelName,
                     searchTable,
-                    promptRenderer.getSystemInstruction(),
+                    systemInstruction,
                     contextDocuments);
 
             CacheRequest cacheRequest = new CacheRequest(
                     cacheKey,
                     this.chatModelName,
-                    promptRenderer.getSystemInstruction(),
+                    systemInstruction,
                     contextContent,
                     estimatedTokens);
 
-            CacheLookupResult cacheResult = promptCache.getOrCreate(cacheRequest);
+            cacheResult = promptCache.getOrCreate(cacheRequest);
             long cacheNanos = cacheSample.stop(meterRegistry.timer("rag.pipeline.cache"));
             cacheMs = TimeUnit.NANOSECONDS.toMillis(cacheNanos);
             cacheStatus = cacheResult.status();
+            cacheMetadata = CacheMetadataDto.fromDomain(cacheResult);
 
             if (cacheResult.isExplicitlyCached()) {
                 String dynamicSuffix = promptRenderer.renderDynamicSuffix(query);
-                GoogleGenAiChatOptions chatOptions = GoogleGenAiChatOptions.builder()
+                GoogleGenAiChatOptions.Builder chatOptionsBuilder = GoogleGenAiChatOptions.builder()
                         .cachedContentName(cacheResult.cacheId())
-                        .build();
-                promptToSend = new Prompt(dynamicSuffix, chatOptions);
+                        .includeExtendedUsageMetadata(true);
+                if (generationProperties.thinkingBudget() != null && generationProperties.thinkingBudget() >= 0) {
+                    chatOptionsBuilder.thinkingBudget(generationProperties.thinkingBudget());
+                }
+                promptToSend = new Prompt(dynamicSuffix, chatOptionsBuilder.build());
                 logger.info("Explicit prompt cache {} (id={}) evaluated in {} ms",
                         cacheStatus, cacheResult.cacheId(), cacheMs);
             } else {
                 String fullPrompt = promptRenderer.renderFullPrompt(query, contextDocuments);
-                promptToSend = new Prompt(fullPrompt);
+                promptToSend = createPromptWithGenerationOptions(fullPrompt);
                 logger.info("Prompt cache evaluated in {} ms (status={})", cacheMs, cacheStatus);
             }
         } else {
-            promptToSend = new Prompt(buildPrompt(query, contextDocuments));
+            promptToSend = createPromptWithGenerationOptions(promptRenderer.renderFullPrompt(query, contextDocuments));
         }
 
         long startGenTime = System.currentTimeMillis();
@@ -374,7 +416,7 @@ public class RagQueryService {
         }
         logger.info("Answer generated in {} ms ({} chars)", generationMs, answer.length());
 
-        TokenUsageDto tokenUsage = extractTokenUsage(chatResponse);
+        TokenUsageDto tokenUsage = extractTokenUsage(chatResponse, cacheResult);
 
         List<RetrievedChunk> retrievedChunks = contextDocuments.stream()
                 .map(document -> new RetrievedChunk(document.getId(), snippet(document.getText()), document.getText()))
@@ -390,6 +432,7 @@ public class RagQueryService {
                 rerankMs,
                 cacheMs,
                 cacheStatus,
+                cacheMetadata,
                 tokenUsage);
     }
 
@@ -426,7 +469,19 @@ public class RagQueryService {
         });
     }
 
-    private TokenUsageDto extractTokenUsage(ChatResponse chatResponse) {
+    private Prompt createPromptWithGenerationOptions(String promptContent) {
+        if (this.chatModel instanceof GoogleGenAiChatModel) {
+            GoogleGenAiChatOptions.Builder optionsBuilder = GoogleGenAiChatOptions.builder()
+                    .includeExtendedUsageMetadata(true);
+            if (generationProperties.thinkingBudget() != null && generationProperties.thinkingBudget() >= 0) {
+                optionsBuilder.thinkingBudget(generationProperties.thinkingBudget());
+            }
+            return new Prompt(promptContent, optionsBuilder.build());
+        }
+        return new Prompt(promptContent);
+    }
+
+    private TokenUsageDto extractTokenUsage(ChatResponse chatResponse, CacheLookupResult cacheResult) {
         if (chatResponse == null || chatResponse.getMetadata() == null || chatResponse.getMetadata().getUsage() == null) {
             return TokenUsageDto.ZERO;
         }
@@ -436,14 +491,15 @@ public class RagQueryService {
         long totalTokens = usage.getTotalTokens() != null ? usage.getTotalTokens().longValue() : 0L;
         long cachedTokens = usage.getCacheReadInputTokens() != null ? usage.getCacheReadInputTokens().longValue() : 0L;
         long cacheWriteTokens = usage.getCacheWriteInputTokens() != null ? usage.getCacheWriteInputTokens().longValue() : 0L;
-        return new TokenUsageDto(promptTokens, completionTokens, totalTokens, cachedTokens, cacheWriteTokens);
-    }
 
-    private String buildPrompt(String query, List<Document> chunks) {
-        String context = chunks.stream()
-                .map(Document::getText)
-                .collect(Collectors.joining("\n---\n"));
-        return answerPromptTemplate.render(Map.of("context", context, "question", query));
+        if (cacheResult != null && cacheResult.isExplicitlyCached()) {
+            if (cachedTokens == 0L && cacheResult.status() == CacheStatus.EXPLICIT_HIT) {
+                cachedTokens = cacheResult.tokenCount();
+            } else if (cacheWriteTokens == 0L && cacheResult.status() == CacheStatus.EXPLICIT_MISS) {
+                cacheWriteTokens = cacheResult.tokenCount();
+            }
+        }
+        return new TokenUsageDto(promptTokens, completionTokens, totalTokens, cachedTokens, cacheWriteTokens);
     }
 
     private String snippet(String text) {

@@ -244,4 +244,48 @@ class GoogleGenAiPromptCacheTest {
         verify(cachedContentService).delete("cachedContents/res-2");
         assertThat(promptCache.getOwnedResourceNames()).isEmpty();
     }
+
+    @Test
+    void inFlightCreation_completingAfterClearOwned_deletesOrphanedRemoteResource() throws Exception {
+        Instant expiry = Instant.now().plusSeconds(300);
+        GoogleGenAiCachedContent mockContent = mockCachedContent("cachedContents/orphaned-1", 5120, expiry);
+
+        CountDownLatch creationStarted = new CountDownLatch(1);
+        CountDownLatch allowCreationToFinish = new CountDownLatch(1);
+
+        when(cachedContentService.create(any(CachedContentRequest.class))).thenAnswer(invocation -> {
+            creationStarted.countDown();
+            allowCreationToFinish.await(5, TimeUnit.SECONDS);
+            return mockContent;
+        });
+        when(cachedContentService.delete("cachedContents/orphaned-1")).thenReturn(true);
+
+        ExecutorService creatorExecutor = Executors.newSingleThreadExecutor();
+        Future<CacheLookupResult> creatorFuture = creatorExecutor.submit(() ->
+                promptCache.getOrCreate(new CacheRequest("k-race", "model", "inst", "ctx", 5000L))
+        );
+
+        // Wait for doCreate to start executing remotely
+        assertThat(creationStarted.await(2, TimeUnit.SECONDS)).isTrue();
+
+        // Trigger clearOwned in background while creation is in-flight
+        ExecutorService clearExecutor = Executors.newSingleThreadExecutor();
+        Future<?> clearFuture = clearExecutor.submit(() -> promptCache.clearOwned());
+
+        // Wait a short moment to ensure clearOwned has advanced epoch and entered wait on in-flight creations
+        Thread.sleep(150);
+        allowCreationToFinish.countDown();
+
+        clearFuture.get(5, TimeUnit.SECONDS);
+        CacheLookupResult result = creatorFuture.get(5, TimeUnit.SECONDS);
+
+        // Verify remote delete was called for the orphaned resource
+        verify(cachedContentService).delete("cachedContents/orphaned-1");
+        // And local state is clean
+        assertThat(promptCache.getOwnedResourceNames()).isEmpty();
+        assertThat(result.isExplicitlyCached()).isFalse();
+
+        creatorExecutor.shutdownNow();
+        clearExecutor.shutdownNow();
+    }
 }

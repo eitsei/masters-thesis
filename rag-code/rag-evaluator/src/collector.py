@@ -236,6 +236,61 @@ class BenchmarkCollector:
             )
         return records
 
+    def run_benchmark_stream(
+        self,
+        run_name: str,
+        modules: Iterable[str] | None = None,
+        limit: int | None = None,
+        hops: int | None = None,
+        sample: bool = False,
+        table_name: str | None = None,
+        top_k: int | None = None,
+        warmup_queries: int = 0,
+        resume: bool = True,
+    ) -> Path:
+        """Fetch benchmark questions and stream query execution into a JSONL checkpoint.
+
+        Args:
+            run_name: Name of run; determines checkpoint output file (`<output_dir>/<run_name>.jsonl`).
+            modules: Optimization modules to activate (e.g. ['M1', 'M2']).
+            limit: Maximum number of questions to collect.
+            hops: Optional reasoning hop count filter.
+            sample: If True, fetches canonical benchmark sample; otherwise queries question index.
+            table_name: Vector store table override.
+            top_k: Retrieval top-k override.
+            warmup_queries: Number of unmeasured warm-up queries.
+            resume: If True, skips previously completed questions in checkpoint.
+
+        Returns:
+            Path to the saved JSONL checkpoint file.
+        """
+        if sample:
+            questions = self.client.get_canonical_sample()
+            if hops is not None:
+                questions = [
+                    q for q in questions
+                    if q.get("hops") == hops or q.get("hopCount") == hops
+                ]
+            if limit is not None and limit > 0:
+                questions = questions[:limit]
+        else:
+            questions = self.client.get_questions(
+                limit=limit or 20,
+                hops=hops,
+                sample=sample,
+            )
+
+        self.collect(
+            run_name=run_name,
+            questions=questions,
+            modules=modules,
+            table_name=table_name,
+            top_k=top_k,
+            warmup_queries=warmup_queries,
+            resume=resume,
+        )
+        return self.output_dir / f"{run_name}.jsonl"
+
     def _build_record(
         self,
         res: dict[str, Any],
@@ -325,3 +380,7 @@ def collect_run(
         warmup_queries=warmup_queries,
         resume=resume,
     )
+
+
+# Backwards compatibility alias
+StreamingBenchmarkCollector = BenchmarkCollector

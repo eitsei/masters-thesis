@@ -48,6 +48,7 @@ public class QueryController {
                         timings,
                         result.tokenUsage() != null ? result.tokenUsage() : TokenUsageDto.ZERO,
                         result.cacheStatus(),
+                        result.cacheMetadata(),
                         result.totalLatencyMs()));
     }
 

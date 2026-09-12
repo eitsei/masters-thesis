@@ -26,6 +26,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from src.client import RagBenchmarkClient
+from src.collector import BenchmarkCollector, StreamingBenchmarkCollector
 from src.export_latex import (
     export_benchmark_summary_latex,
     export_hop_breakdown_latex,
@@ -42,8 +43,10 @@ from src.metrics import (
     token_f1,
 )
 from src.plot_results import (
+    plot_cost_breakdown,
     plot_latency_breakdown,
     plot_pareto_frontier,
+    plot_pareto_frontier_3d,
     plot_ragas_metrics_radar,
 )
 from src.reporter import (
@@ -108,11 +111,30 @@ def _process_item_metrics(
     item["token_f1"] = f1
 
     # Token and cost accounting
+    modules = item.get("modulesApplied") or item.get("modulesRequested") or []
+    has_m3 = (
+        "M3" in modules
+        or "PC" in modules
+        or item.get("cacheStatus") in ("EXPLICIT_HIT", "EXPLICIT_MISS")
+        or (isinstance(item.get("runName"), str) and "m3" in item["runName"].lower())
+    )
+
     tu = item.get("tokenUsage", {})
-    prompt_tokens = tu.get("promptTokens", 0)
-    completion_tokens = tu.get("completionTokens", 0)
-    cached_tokens = tu.get("cachedTokens", 0)
-    total_tokens = tu.get("totalTokens", prompt_tokens + completion_tokens)
+    prompt_tokens = int(tu.get("promptTokens", 0))
+    completion_tokens = int(tu.get("completionTokens", 0))
+
+    if has_m3:
+        cached_tokens = int(tu.get("cachedTokens", 0))
+        if cached_tokens == 0:
+            cached_tokens = int(
+                tu.get("cacheWriteTokens", 0)
+                or (item.get("cacheMetadata", {}) or {}).get("tokenCount", 0)
+            )
+    else:
+        # Non-M3 runs represent naive baseline or non-cached variants; ignore transient server prefix cache
+        cached_tokens = 0
+
+    total_tokens = prompt_tokens + completion_tokens + cached_tokens
     item["total_tokens"] = total_tokens
 
     cost = compute_cost(
@@ -182,6 +204,11 @@ def run(
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Path to save evaluation results JSONL"),
     top_k: Optional[int] = typer.Option(None, "--top-k", help="Retrieval top-k override"),
     stream: bool = typer.Option(False, "--stream", help="Use client-side streaming query collector with real-time JSONL checkpointing"),
+    judge_delay: Optional[float] = typer.Option(
+        None,
+        "--judge-delay",
+        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Gemini/Claude, 0s for Ollama)",
+    ),
 ) -> None:
     """Executes a benchmark evaluation run against the Spring Boot RAG service."""
     rag_url = url or os.getenv("RAG_APP_URL", "http://localhost:8080")
@@ -213,80 +240,101 @@ def run(
                     client.query_question(sample_qs[0]["id"], modules=module_list)
             except Exception as e:
                 if debug:
-                    console.print(f"[dim yellow]Warm-up query {i+1} failed: {e}[/dim yellow]")
+                    console.print(f"[yellow]Warm-up query failed: {e}[/yellow]")
 
     # Query execution (Batch or Streaming Collector)
-    raw_results = []
+    raw_results: list[dict[str, Any]] = []
+    stream_output_dir = Path(output).parent if output else Path("runs")
+    stream_run_name = Path(output).stem if output else f"run_{module_label}"
+
     if stream:
         console.print("[bold green]Executing streaming benchmark query collection...[/bold green]")
-        from src.collector import BenchmarkCollector
-        run_name = Path(output).stem if output else f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        collector = BenchmarkCollector(client=client, output_dir=Path("runs"), debug=debug, console=console)
-        if sample:
-            questions = client.get_canonical_sample()
-            if limit is not None and limit > 0:
-                questions = questions[:limit]
-        else:
-            questions = client.get_questions(limit=limit or 20, hops=hops)
-        raw_results = collector.collect(
-            run_name=run_name,
-            questions=questions,
-            modules=module_list,
-            table_name=table_name,
-            top_k=top_k,
-            warmup_queries=0,  # already warmed up above
+        collector = StreamingBenchmarkCollector(
+            client=client,
+            output_dir=stream_output_dir,
+            debug=debug,
+            console=console,
         )
-    else:
-        console.print("[bold green]Executing benchmark query evaluation...[/bold green]")
-        t0 = time.perf_counter()
         try:
-            batch_resp = client.batch_query(
+            checkpoint_path = collector.run_benchmark_stream(
+                run_name=stream_run_name,
+                modules=module_list,
                 limit=limit,
                 hops=hops,
                 sample=sample,
-                modules=module_list,
-                table_name=table_name,
-                top_k=top_k,
-            )
-            raw_results = batch_resp.get("results", [])
-            elapsed_total = (time.perf_counter() - t0)
-            console.print(f"Received [bold]{len(raw_results)}[/bold] query results in {elapsed_total:.2f}s.")
-        except Exception as batch_err:
-            console.print(f"[yellow]Batch query encountered an issue ({batch_err}); falling back to streaming collection...[/yellow]")
-            from src.collector import BenchmarkCollector
-            run_name = Path(output).stem if output else f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            collector = BenchmarkCollector(client=client, output_dir=Path("runs"), debug=debug, console=console)
-            if sample:
-                questions = client.get_canonical_sample()
-                if limit is not None and limit > 0:
-                    questions = questions[:limit]
-            else:
-                questions = client.get_questions(limit=limit or 20, hops=hops)
-            raw_results = collector.collect(
-                run_name=run_name,
-                questions=questions,
-                modules=module_list,
                 table_name=table_name,
                 top_k=top_k,
                 warmup_queries=0,
             )
+            raw_results = _load_jsonl(checkpoint_path)
+        except Exception as exc:
+            console.print(f"[bold red]Streaming collection error: {exc}[/bold red]")
+            return
+    else:
+        try:
+            with console.status("[bold green]Executing batch queries against RAG service...[/bold green]"):
+                batch_res = client.batch_query(
+                    limit=limit,
+                    hops=hops,
+                    sample=sample,
+                    modules=module_list,
+                    table_name=table_name,
+                    top_k=top_k,
+                    warmup_queries=0,
+                )
+                raw_results = batch_res.get("results", [])
+        except Exception as batch_err:
+            console.print(f"[yellow]Batch query encountered an issue ({batch_err}); falling back to streaming collection...[/yellow]")
+            collector = StreamingBenchmarkCollector(
+                client=client,
+                output_dir=stream_output_dir,
+                debug=debug,
+                console=console,
+            )
+            checkpoint_path = collector.run_benchmark_stream(
+                run_name=stream_run_name,
+                modules=module_list,
+                limit=limit,
+                hops=hops,
+                sample=sample,
+                table_name=table_name,
+                top_k=top_k,
+                warmup_queries=0,
+            )
+            raw_results = _load_jsonl(checkpoint_path)
 
     if not raw_results:
         console.print("[red]No query results returned from RAG service.[/red]")
         return
 
+    # Determine effective pacing delay between judge requests to prevent 429 quota exhaustion
+    effective_delay: float
+    if judge_delay is not None:
+        effective_delay = max(0.0, judge_delay)
+    elif judge.lower() in ("gemini", "claude"):
+        effective_delay = 1.5
+    else:
+        effective_delay = 0.0
+
     # Initialize RAGAS judge if requested
     ragas_evaluator = None
     if judge.lower() not in ("none", "off", "disabled"):
         console.print(f"Initializing evaluation judge with provider [magenta]{judge}[/magenta]...")
+        if effective_delay > 0:
+            console.print(f"[dim]Pacing judge requests ({effective_delay:.1f}s delay) to avoid 429 rate limit errors...[/dim]")
         llm, emb = get_judge_components(provider=judge, model=judge_model)
-        ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb)
+        inter_metric_delay = min(0.8, effective_delay / 2) if effective_delay > 0 else 0.0
+        ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb, delay_seconds=inter_metric_delay)
 
     # Process metrics
     processed_records: list[dict[str, Any]] = []
-    for item in raw_results:
+    for idx, item in enumerate(raw_results, 1):
+        if ragas_evaluator:
+            console.print(f"[dim]Evaluating item [{idx}/{len(raw_results)}] with judge [{judge}]...[/dim]")
         processed = _process_item_metrics(item, ragas_evaluator=ragas_evaluator)
         processed_records.append(processed)
+        if ragas_evaluator and effective_delay > 0 and idx < len(raw_results):
+            time.sleep(effective_delay)
 
     # Display Rich Tables
     console.print()
@@ -347,21 +395,41 @@ def evaluate(
     judge: str = typer.Option("ollama", "--judge", "-j", help="Judge provider: ollama, gemini, claude, none"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSONL path for evaluated results"),
+    judge_delay: Optional[float] = typer.Option(
+        None,
+        "--judge-delay",
+        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Gemini/Claude, 0s for Ollama)",
+    ),
 ) -> None:
     """Computes EM, F1, RAGAS metrics, and Composite Q on previously gathered run records."""
     records = _load_jsonl(input_file)
     console.print(f"Loaded [bold]{len(records)}[/bold] records from [cyan]{input_file}[/cyan].")
 
+    effective_delay: float
+    if judge_delay is not None:
+        effective_delay = max(0.0, judge_delay)
+    elif judge.lower() in ("gemini", "claude"):
+        effective_delay = 1.5
+    else:
+        effective_delay = 0.0
+
     ragas_evaluator = None
     if judge.lower() not in ("none", "off", "disabled"):
         console.print(f"Initializing evaluation judge: [magenta]{judge}[/magenta]...")
+        if effective_delay > 0:
+            console.print(f"[dim]Pacing judge requests ({effective_delay:.1f}s delay) to avoid 429 rate limit errors...[/dim]")
         llm, emb = get_judge_components(provider=judge, model=judge_model)
-        ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb)
+        inter_metric_delay = min(0.8, effective_delay / 2) if effective_delay > 0 else 0.0
+        ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb, delay_seconds=inter_metric_delay)
 
     evaluated_records: list[dict[str, Any]] = []
-    for item in records:
+    for idx, item in enumerate(records, 1):
+        if ragas_evaluator:
+            console.print(f"[dim]Evaluating item [{idx}/{len(records)}] with judge [{judge}]...[/dim]")
         processed = _process_item_metrics(item, ragas_evaluator=ragas_evaluator)
         evaluated_records.append(processed)
+        if ragas_evaluator and effective_delay > 0 and idx < len(records):
+            time.sleep(effective_delay)
 
     config_name = input_file.stem
     display_summary_table({config_name: evaluated_records}, console=console)
@@ -395,6 +463,16 @@ def compare(
         console.print(f"\n[bold green]✓ LaTeX comparison table exported to:[/bold green] [cyan]{output_latex}[/cyan]")
 
 
+def _resolve_thesis_path(p: Path) -> Path:
+    if p.is_absolute():
+        return p
+    if p.parts and p.parts[0] == "thesis":
+        for base in [Path.cwd()] + list(Path(__file__).resolve().parents):
+            if (base / "thesis" / "_main.tex").exists():
+                return base / p
+    return p
+
+
 @app.command("export-thesis")
 def export_thesis(
     input_target: str = typer.Option(..., "--input", "-i", help="Run JSONL file or directory containing run JSONL files"),
@@ -408,6 +486,9 @@ def export_thesis(
     ),
 ) -> None:
     """Exports publication-ready LaTeX tables and vector PDF figures to the thesis directory."""
+    tables_dir = _resolve_thesis_path(tables_dir)
+    figures_dir = _resolve_thesis_path(figures_dir)
+
     if subfolder:
         tables_dir = tables_dir / subfolder
         figures_dir = figures_dir / subfolder
@@ -456,11 +537,17 @@ def export_thesis(
     p1 = plot_pareto_frontier(run_dict, figures_dir / "pareto_frontier.pdf")
     console.print(f"  [green]✓[/green] Figure: [cyan]{p1}[/cyan]")
 
-    p2 = plot_latency_breakdown(run_dict, figures_dir / "latency_breakdown.pdf")
+    p2 = plot_pareto_frontier_3d(run_dict, figures_dir / "pareto_frontier_3d.pdf")
     console.print(f"  [green]✓[/green] Figure: [cyan]{p2}[/cyan]")
 
-    p3 = plot_ragas_metrics_radar(run_dict, figures_dir / "ragas_metrics_radar.pdf")
+    p3 = plot_latency_breakdown(run_dict, figures_dir / "latency_breakdown.pdf")
     console.print(f"  [green]✓[/green] Figure: [cyan]{p3}[/cyan]")
+
+    p4 = plot_cost_breakdown(run_dict, figures_dir / "cost_breakdown.pdf")
+    console.print(f"  [green]✓[/green] Figure: [cyan]{p4}[/cyan]")
+
+    p5 = plot_ragas_metrics_radar(run_dict, figures_dir / "ragas_metrics_radar.pdf")
+    console.print(f"  [green]✓[/green] Figure: [cyan]{p5}[/cyan]")
 
     console.print("\n[bold green]All thesis tables and figures exported successfully![/bold green]")
 
@@ -560,6 +647,11 @@ def run_questions(
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSONL path for evaluated results"),
     url: Optional[str] = typer.Option(None, "--url", help="RAG service URL"),
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable verbose debug logging"),
+    judge_delay: Optional[float] = typer.Option(
+        None,
+        "--judge-delay",
+        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Gemini/Claude, 0s for Ollama)",
+    ),
 ) -> None:
     """Runs a batch of questions from a file against a vector store table and evaluates with RAGAS."""
     rag_url = url or os.getenv("RAG_APP_URL", "http://localhost:8080")
@@ -580,12 +672,23 @@ def run_questions(
     module_list = [m.strip() for m in modules.split(",") if m.strip()]
     module_label = "+".join(module_list) if module_list else "C0_Baseline"
 
+    effective_delay: float
+    if judge_delay is not None:
+        effective_delay = max(0.0, judge_delay)
+    elif judge.lower() in ("gemini", "claude"):
+        effective_delay = 1.5
+    else:
+        effective_delay = 0.0
+
     # Initialize judge if requested
     ragas_evaluator = None
     if judge.lower() not in ("none", "off", "disabled"):
         console.print(f"Initializing judge: [magenta]{judge}[/magenta]...")
+        if effective_delay > 0:
+            console.print(f"[dim]Pacing judge requests ({effective_delay:.1f}s delay) to avoid 429 rate limit errors...[/dim]")
         llm, emb = get_judge_components(provider=judge, model=judge_model)
-        ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb)
+        inter_metric_delay = min(0.8, effective_delay / 2) if effective_delay > 0 else 0.0
+        ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb, delay_seconds=inter_metric_delay)
 
     evaluated_records: list[dict[str, Any]] = []
     for i, rec in enumerate(records, 1):
@@ -611,8 +714,12 @@ def run_questions(
             "totalLatencyMs": resp.get("totalLatencyMs", elapsed),
             "tableNameUsed": table_name,
         }
+        if ragas_evaluator:
+            console.print(f"[dim]Evaluating question [{i}/{len(records)}] with judge [{judge}]...[/dim]")
         processed = _process_item_metrics(item, ragas_evaluator=ragas_evaluator)
         evaluated_records.append(processed)
+        if ragas_evaluator and effective_delay > 0 and i < len(records):
+            time.sleep(effective_delay)
 
     # Display Rich Summary Table
     display_summary_table({table_name: evaluated_records}, console=console)

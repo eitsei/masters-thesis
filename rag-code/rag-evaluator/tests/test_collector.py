@@ -196,3 +196,25 @@ class TestCollectorModes:
         mock_client.get_canonical_sample.assert_called_once()
         assert len(records) == 2
         assert mock_client.query_question.call_count == 2
+
+    def test_run_benchmark_stream_sample_filtering(self, tmp_path, mock_client):
+        from src.collector import StreamingBenchmarkCollector
+
+        collector = StreamingBenchmarkCollector(
+            client=mock_client,
+            output_dir=tmp_path,
+            debug=False,
+            console=Console(quiet=True),
+        )
+        checkpoint_path = collector.run_benchmark_stream(
+            run_name="stream_test",
+            sample=True,
+            limit=1,
+            warmup_queries=0,
+        )
+
+        assert checkpoint_path.exists()
+        assert checkpoint_path == tmp_path / "stream_test.jsonl"
+        with open(checkpoint_path) as f:
+            lines = [json.loads(l) for l in f if l.strip()]
+        assert len(lines) == 1

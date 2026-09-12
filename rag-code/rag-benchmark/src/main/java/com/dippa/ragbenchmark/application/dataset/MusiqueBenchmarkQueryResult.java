@@ -1,5 +1,6 @@
 package com.dippa.ragbenchmark.application.dataset;
 
+import com.dippa.ragbenchmark.api.CacheMetadataDto;
 import com.dippa.ragbenchmark.api.TokenUsageDto;
 import com.dippa.ragbenchmark.application.RetrievedChunk;
 import com.dippa.ragbenchmark.domain.CacheStatus;
@@ -23,6 +24,7 @@ public record MusiqueBenchmarkQueryResult(
         long expansionMs,
         long cacheMs,
         CacheStatus cacheStatus,
+        CacheMetadataDto cacheMetadata,
         long totalLatencyMs,
         TokenUsageDto tokenUsage,
         String tableNameUsed,
@@ -31,6 +33,53 @@ public record MusiqueBenchmarkQueryResult(
         int supportingTitlesFound,
         boolean allSupportingEvidenceFound
 ) {
+    public MusiqueBenchmarkQueryResult(
+            String questionId,
+            String question,
+            String groundTruthAnswer,
+            List<String> groundTruthAliases,
+            int hopCount,
+            String generatedAnswer,
+            List<String> modulesApplied,
+            List<RetrievedChunk> retrievedChunks,
+            long retrievalMs,
+            long rerankMs,
+            long generationMs,
+            long expansionMs,
+            long cacheMs,
+            CacheStatus cacheStatus,
+            long totalLatencyMs,
+            TokenUsageDto tokenUsage,
+            String tableNameUsed,
+            List<String> expectedSupportingTitles,
+            boolean supportingEvidenceFound,
+            int supportingTitlesFound,
+            boolean allSupportingEvidenceFound) {
+        this(
+                questionId,
+                question,
+                groundTruthAnswer,
+                groundTruthAliases,
+                hopCount,
+                generatedAnswer,
+                modulesApplied,
+                retrievedChunks,
+                retrievalMs,
+                rerankMs,
+                generationMs,
+                expansionMs,
+                cacheMs,
+                cacheStatus,
+                new CacheMetadataDto(cacheStatus, null, null, null),
+                totalLatencyMs,
+                tokenUsage,
+                tableNameUsed,
+                expectedSupportingTitles,
+                supportingEvidenceFound,
+                supportingTitlesFound,
+                allSupportingEvidenceFound);
+    }
+
     public MusiqueBenchmarkQueryResult(
             String questionId,
             String question,
@@ -66,6 +115,7 @@ public record MusiqueBenchmarkQueryResult(
                 expansionMs,
                 0L,
                 CacheStatus.NONE,
+                new CacheMetadataDto(CacheStatus.NONE, null, null, null),
                 totalLatencyMs,
                 tokenUsage,
                 tableNameUsed,
@@ -109,6 +159,7 @@ public record MusiqueBenchmarkQueryResult(
                 expansionMs,
                 0L,
                 CacheStatus.NONE,
+                new CacheMetadataDto(CacheStatus.NONE, null, null, null),
                 totalLatencyMs,
                 tokenUsage,
                 tableNameUsed,
@@ -149,6 +200,7 @@ public record MusiqueBenchmarkQueryResult(
                 0L,
                 0L,
                 CacheStatus.NONE,
+                new CacheMetadataDto(CacheStatus.NONE, null, null, null),
                 totalLatencyMs,
                 tokenUsage,
                 tableNameUsed,

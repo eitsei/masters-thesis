@@ -14,8 +14,10 @@ from src.export_latex import (
     export_wilcoxon_tests_latex,
 )
 from src.plot_results import (
+    plot_cost_breakdown,
     plot_latency_breakdown,
     plot_pareto_frontier,
+    plot_pareto_frontier_3d,
     plot_ragas_metrics_radar,
 )
 from src.stats import WilcoxonComparison
@@ -57,6 +59,8 @@ def test_export_benchmark_summary_latex(tmp_path: Path, sample_benchmark_records
     assert "\\bottomrule" in content
     assert "Naive Baseline" in content
     assert "\\label{tab:benchmark_summary}" in content
+    assert "per 1k q" in content
+    assert "\\$0.390" in content
 
 
 def test_export_hop_breakdown_latex(tmp_path: Path, sample_benchmark_records):
@@ -69,6 +73,8 @@ def test_export_hop_breakdown_latex(tmp_path: Path, sample_benchmark_records):
     assert "4-Hop Reasoning" in content
     assert "Combined Corpus" in content
     assert "\\begin{table*}" in content
+    assert "per 1k q" in content
+    assert "\\$0.390" in content
 
 
 def test_export_wilcoxon_tests_latex(tmp_path: Path):
@@ -147,3 +153,89 @@ def test_plot_ragas_metrics_radar(tmp_path: Path, sample_benchmark_records):
     result_path = plot_ragas_metrics_radar(data, output_path=out_pdf)
     assert result_path.exists()
     assert result_path.stat().st_size > 1000
+
+
+def test_plot_pareto_frontier_3d(tmp_path: Path, sample_benchmark_records):
+    out_pdf = tmp_path / "pareto_frontier_3d.pdf"
+    data = {
+        "C0: Baseline": sample_benchmark_records,
+        "C1: S2B": [
+            {**r, "total_latency_ms": r["total_latency_ms"] * 1.2, "composite_quality": 0.88, "cost_usd": 0.0004}
+            for r in sample_benchmark_records
+        ],
+        "C2: Re-rank": [
+            {**r, "total_latency_ms": r["total_latency_ms"] * 1.1, "composite_quality": 0.91, "cost_usd": 0.00035}
+            for r in sample_benchmark_records
+        ],
+        "C3: Prompt Caching": [
+            {**r, "total_latency_ms": r["total_latency_ms"] * 0.7, "composite_quality": 0.86, "cost_usd": 0.00005}
+            for r in sample_benchmark_records
+        ],
+    }
+
+    result_path = plot_pareto_frontier_3d(data, output_path=out_pdf, subtitle="Unit Test Surface")
+    assert result_path.exists()
+    assert result_path.stat().st_size > 1000
+
+
+def test_plot_pareto_frontier_3d_small_sample(tmp_path: Path, sample_benchmark_records):
+    out_pdf = tmp_path / "pareto_frontier_3d_small.pdf"
+    data = {
+        "C0: Baseline": sample_benchmark_records[:2],
+        "C1: S2B": sample_benchmark_records[:2],
+    }
+
+    # Should not crash when len < 3
+    result_path = plot_pareto_frontier_3d(data, output_path=out_pdf)
+    assert result_path.exists()
+    assert result_path.stat().st_size > 1000
+
+
+def test_plot_cost_breakdown(tmp_path: Path, sample_benchmark_records):
+    out_pdf = tmp_path / "cost_breakdown.pdf"
+    data = {
+        "C0: Baseline": sample_benchmark_records,
+        "C1: S2B": sample_benchmark_records,
+    }
+
+    result_path = plot_cost_breakdown(data, output_path=out_pdf)
+    assert result_path.exists()
+    assert result_path.stat().st_size > 1000
+
+
+def test_plot_cost_breakdown_multicomponent(tmp_path: Path):
+    out_pdf = tmp_path / "cost_breakdown_multi.pdf"
+    data = {
+        "C0: Baseline": [
+            {
+                # Server prefix cache reports 500 cachedTokens, but without M3 it must be ignored
+                "tokenUsage": {"promptTokens": 1000, "completionTokens": 50, "cachedTokens": 500},
+                "timings": {"retrievalMs": 80.0, "generationMs": 1500.0},
+                "cost_usd": 0.00018,
+                "modulesApplied": [],
+            }
+        ],
+        "C2: Re-rank": [
+            {
+                "tokenUsage": {"promptTokens": 1000, "completionTokens": 50, "cachedTokens": 0},
+                "timings": {"retrievalMs": 80.0, "rerankMs": 220.0, "generationMs": 1300.0},
+                "modulesApplied": ["M2"],
+                "rerankDocs": 10,
+                "cost_usd": 0.00118,
+            }
+        ],
+        "C3: Prompt Caching": [
+            {
+                # Cache miss/creation: cachedTokens is 0, but cacheWriteTokens has 4000 tokens
+                "tokenUsage": {"promptTokens": 50, "completionTokens": 50, "cachedTokens": 0, "cacheWriteTokens": 4000},
+                "timings": {"retrievalMs": 80.0, "cacheMs": 10.0, "generationMs": 600.0},
+                "modulesApplied": ["M3"],
+                "cost_usd": 0.0001875,
+            }
+        ],
+    }
+
+    result_path = plot_cost_breakdown(data, output_path=out_pdf)
+    assert result_path.exists()
+    assert result_path.stat().st_size > 1000
+

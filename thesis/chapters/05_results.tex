@@ -273,12 +273,23 @@
 
 % =========================================================================
 % DRAFT NOTES: 5.4.3 Operational Cost Scaling (RQ2)
-% 1. Directly resolve RQ2:
+% 1. Embed Figure 5.2 (figures/cost_breakdown.pdf):
+%    - Stacked bar chart decomposing operational cost across active micro-phases
+%      (uncached prompt, cached context, generation, re-ranking, and auxiliary overhead)
+%      normalized per 1,000 queries.
+% 2. Directly resolve RQ2:
 %    - Quantify operational cost ($) reduction and token consumption across configurations.
 %    - Contrast token inflation from parent context expansion (M1) against the 90%
 %      pricing discount from prompt caching (M3) and model tier discounts (M4).
 %    - Economic breakeven thresholds for prompt caching in high-volume enterprise systems.
 % =========================================================================
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/cost_breakdown.pdf}
+\caption[Operational cost micro-phase breakdown per 1,000 queries]{Operational cost micro-phase breakdown per 1,000 queries isolating uncached prompt tokens ($C_{\text{prompt}}$), context caching read tokens ($C_{\text{cache}}$), and generative completion tokens ($C_{\text{comp}}$) across pipeline configurations.}
+\label{fig:cost_breakdown}
+\end{figure}
 
 \subsubsection{Multidimensional Response Quality Dynamics (RQ3)}
 \label{subsubsec:res_rq3_quality}
@@ -308,7 +319,7 @@
 % =========================================================================
 % DRAFT NOTES: 5.4.5 Pareto Frontier & Deployment Archetypes (RQ4)
 % 1. Embed Figure 5.3 (figures/pareto_frontier.pdf):
-%    - Dual-panel trade-off: (a) Quality vs Median Latency, (b) Quality vs Cost per Query.
+%    - Dual-panel trade-off: (a) Quality vs Median Latency, (b) Quality vs Cost per 1,000 Queries.
 %    - Highlights non-dominated frontier configurations in independent 2D projections.
 % 2. Practical Efficiency Ratios (Thesis Eq. 250 & 255):
 %    - Quality per Dollar: QPD(q) = Q(q) / Cost(q) (monetary efficiency).
@@ -339,7 +350,7 @@
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/pareto_frontier.pdf}
-\caption[Dual-panel Pareto trade-off frontier]{Empirical Pareto frontiers across RAG pipeline configurations: (a) Composite Quality vs. Median Latency ($P_{50}$), and (b) Composite Quality vs. Operational Cost per Query \textbf{[PLACEHOLDER VISUALIZATION]}. Dashed red lines denote the non-dominated Pareto frontier ($\mathcal{P}$).}
+\caption[Dual-panel Pareto trade-off frontier]{Empirical Pareto frontiers across RAG pipeline configurations: (a) Composite Quality vs. Median Latency ($P_{50}$), and (b) Composite Quality vs. Operational Cost per 1,000 Queries \textbf{[PLACEHOLDER VISUALIZATION]}. Dashed red lines denote the non-dominated Pareto frontier ($\mathcal{P}$).}
 \label{fig:pareto_frontier}
 \end{figure}
 

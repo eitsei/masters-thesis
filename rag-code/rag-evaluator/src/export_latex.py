@@ -64,7 +64,7 @@ def export_benchmark_summary_latex(
         "\\begin{tabular*}{\\textwidth}{@{\\extracolsep{\\fill}} l r r r r r r r r r r r r @{}}",
         "\\toprule",
         "\\textbf{Configuration} & \\textbf{$N$} & \\textbf{$P_{50}$} & \\textbf{$P_{95}$} & \\textbf{Tokens} & \\textbf{Cost (\\$)} & \\textbf{EM} & \\textbf{F1} & \\textbf{Faith} & \\textbf{AR} & \\textbf{CP} & \\textbf{CR} & \\textbf{Comp $Q$} \\\\",
-        " & & \\scriptsize{(ms)} & \\scriptsize{(ms)} & \\scriptsize{avg} & \\scriptsize{per q} & \\scriptsize{(\\%)} & \\scriptsize{(\\%)} & & & & & \\scriptsize{$[0,1]$} \\\\",
+        " & & \\scriptsize{(ms)} & \\scriptsize{(ms)} & \\scriptsize{avg} & \\scriptsize{per 1k q} & \\scriptsize{(\\%)} & \\scriptsize{(\\%)} & & & & & \\scriptsize{$[0,1]$} \\\\",
         "\\midrule",
     ]
 
@@ -83,7 +83,7 @@ def export_benchmark_summary_latex(
             f"{s['latency_p50']:.1f} & "
             f"{s['latency_p95']:.1f} & "
             f"{s['tokens_mean']:.0f} & "
-            f"\\${s['cost_mean']:.4f} & "
+            f"\\${s['cost_mean'] * 1000.0:.3f} & "
             f"{em_pct:.1f}\\% & "
             f"{f1_pct:.1f}\\% & "
             f"{s['faithfulness_mean']:.3f} & "
@@ -100,7 +100,7 @@ def export_benchmark_summary_latex(
             "\\end{tabular*}",
             "\\vspace{0.5em}",
             "\\parbox{\\textwidth}{\\footnotesize",
-            "\\textbf{Notes:} $P_{50}$ and $P_{95}$ represent median and 95th percentile end-to-end execution latencies. Cost reflects Google Cloud Gemini Enterprise platform pricing. EM: Exact Match; F1: Token-level $F_1$; Faith: Faithfulness; AR: Answer Relevancy; CP: Context Precision; CR: Context Recall; Comp $Q$: Harmonic mean Composite Quality score (Eq.~238).}",
+            "\\textbf{Notes:} $P_{50}$ and $P_{95}$ represent median and 95th percentile end-to-end execution latencies. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. EM: Exact Match; F1: Token-level $F_1$; Faith: Faithfulness; AR: Answer Relevancy; CP: Context Precision; CR: Context Recall; Comp $Q$: Harmonic mean Composite Quality score (Eq.~238).}",
             "\\end{table*}",
             "",
         ]
@@ -142,7 +142,7 @@ def export_hop_breakdown_latex(
         "\\begin{tabular*}{\\textwidth}{@{\\extracolsep{\\fill}} l r r r r r r r r r r r @{}}",
         "\\toprule",
         "\\textbf{Reasoning Tier} & \\textbf{$N$} & \\textbf{$P_{50}$} & \\textbf{$P_{95}$} & \\textbf{Tokens} & \\textbf{Cost (\\$)} & \\textbf{EM (\\%)} & \\textbf{F1 (\\%)} & \\textbf{Faith} & \\textbf{AR} & \\textbf{CP} & \\textbf{Comp $Q$} \\\\",
-        " & & \\scriptsize{(ms)} & \\scriptsize{(ms)} & \\scriptsize{avg} & \\scriptsize{per q} & & & & & & \\scriptsize{$[0,1]$} \\\\",
+        " & & \\scriptsize{(ms)} & \\scriptsize{(ms)} & \\scriptsize{avg} & \\scriptsize{per 1k q} & & & & & & \\scriptsize{$[0,1]$} \\\\",
         "\\midrule",
     ]
 
@@ -157,7 +157,7 @@ def export_hop_breakdown_latex(
             f"{s['latency_p50']:.1f} & "
             f"{s['latency_p95']:.1f} & "
             f"{s['tokens_mean']:.0f} & "
-            f"\\${s['cost_mean']:.4f} & "
+            f"\\${s['cost_mean'] * 1000.0:.3f} & "
             f"{s['em_mean'] * 100:.1f}\\% & "
             f"{s['f1_mean'] * 100:.1f}\\% & "
             f"{s['faithfulness_mean']:.3f} & "
@@ -177,7 +177,7 @@ def export_hop_breakdown_latex(
             f"{overall_s['latency_p50']:.1f} & "
             f"{overall_s['latency_p95']:.1f} & "
             f"{overall_s['tokens_mean']:.0f} & "
-            f"\\${overall_s['cost_mean']:.4f} & "
+            f"\\${overall_s['cost_mean'] * 1000.0:.3f} & "
             f"{overall_s['em_mean'] * 100:.1f}\\% & "
             f"{overall_s['f1_mean'] * 100:.1f}\\% & "
             f"{overall_s['faithfulness_mean']:.3f} & "
@@ -193,7 +193,7 @@ def export_hop_breakdown_latex(
             "\\end{tabular*}",
             "\\vspace{0.5em}",
             "\\parbox{\\textwidth}{\\footnotesize",
-            "\\textbf{Notes:} Evaluated over the MuSiQue multi-hop benchmark sample partitioned across 2-hop, 3-hop, and 4-hop questions. Metrics follow Chapter 4 definitions.}",
+            "\\textbf{Notes:} Evaluated over the MuSiQue multi-hop benchmark sample partitioned across 2-hop, 3-hop, and 4-hop questions. Costs reflect Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. Metrics follow Chapter 4 definitions.}",
             "\\end{table*}",
             "",
         ]

@@ -183,6 +183,15 @@ Operational expenditure constitutes a critical bottleneck for enterprise RAG ado
 
 where $m(q) \in \{\text{Flash-Lite}, \text{Flash}, \text{Pro}\}$ represents the active generative model tier selected for query $q$, $N_{\text{embed}}$ is the number of query tokens vectorized at unit rate $P_{\text{embed}}$, $N_{\text{uncached}}$ and $N_{\text{cached}}$ represent uncached and cached prompt tokens billed at tier-specific rates $P_{\text{prompt}}^{(m(q))}$ and $P_{\text{cached}}^{(m(q))}$ (reflecting the 90\% discount applied to cached input context), $N_{\text{comp}}$ denotes the generated completion tokens billed at rate $P_{\text{comp}}^{(m(q))}$, and $N_{\text{rerank}}$ represents the count of candidate passages evaluated by the cross-encoder at per-document rate $P_{\text{rerank}}$. Fixed persistent infrastructure expenses, such as base Cloud SQL hosting, are invariant across configurations and therefore excluded from per-query operational cost calculations.
 
+Because individual execution expenditures in highly optimized or cached architectures are fractional (frequently falling below $\$0.001$ per request), presenting single-query costs directly introduces significant rounding truncation in empirical summaries. Consequently, operational expenditures in benchmark summary tables and Pareto frontier analyses are normalized and reported per 1,000 queries:
+
+\begin{equation}
+\label{eq:cost_1k}
+\text{Cost}_{1\text{k}} = 1000 \times \frac{1}{|Q|} \sum_{q \in Q} \text{Cost}(q)
+\end{equation}
+
+providing an intuitive, standard enterprise pricing metric that transparently reflects macroscopic operational volume while preserving underlying per-query accounting fidelity.
+
 \subsubsection{Quality Metrics}
 \label{sec:quality}
 

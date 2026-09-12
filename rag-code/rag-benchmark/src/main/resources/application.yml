@@ -38,6 +38,9 @@ spring:
           # below) so there's one place that literal is written; GOOGLE_GENAI_CHAT_MODEL
           # still overrides it independently for ad hoc local runs.
           model: ${GOOGLE_GENAI_CHAT_MODEL:${rag.models.google-genai.flash}}
+          options:
+            thinking-budget: ${RAG_GENERATION_THINKING_BUDGET:0}
+            include-extended-usage-metadata: true
         embedding:
           # NOTE: Spring AI's Google GenAI embedding support binds a SEPARATE
           # connection-properties block (spring.ai.google.genai.embedding.*) from the
@@ -136,6 +139,10 @@ management:
 # entries are M2's two candidate backends. See thesis chapter 4 (System Implementation
 # / Optimization Pipeline) for where these come from.
 rag:
+  generation:
+    # Reasoning / thinking token budget for Gemini models (0 turns off thinking,
+    # >0 caps thought tokens, -1 allows dynamic/unlimited thinking). Default is 0.
+    thinking-budget: ${RAG_GENERATION_THINKING_BUDGET:0}
   query:
     # Length (in characters) of the `snippet` field on each retrievedChunks entry in
     # POST /api/query's response -- read directly by RagQueryService via @Value, not a

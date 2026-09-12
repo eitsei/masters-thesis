@@ -1,0 +1,52 @@
+# Benchmark Runner Scripts (`rag-code/rag-evaluator/scripts`)
+
+This directory contains executable shell scripts for launching automated benchmark evaluation runs, statistical Wilcoxon signed-rank tests, and publication-ready LaTeX table/figure exports.
+
+## Available Scripts
+
+| Script | Configurations Included | Output Run Directory | Thesis Export Subfolder |
+| :--- | :--- | :--- | :--- |
+| [`run_sample5_m3.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_sample5_m3.sh) | **$C_0, C_1, C_2, C_3, C_5$** (Baseline, S2B, Re-rank, Cache, S2B+Re-rank) | `runs/sample5_m3` | `thesis/tables/sample5_m3`<br>`thesis/figures/sample5_m3` |
+| [`run_sample5_m3_combos.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_sample5_m3_combos.sh) | **$C_0, C_1, C_2, C_3, C_5, C_6, C_8, C_{11}$** (All 8 factorial combinations of M1, M2, M3) | `runs/sample5_m3_combos` | `thesis/tables/sample5_m3_combos`<br>`thesis/figures/sample5_m3_combos` |
+| [`run_sample5_m1_m2.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_sample5_m1_m2.sh) | **$C_0, C_1, C_2, C_5$** (Baseline, S2B, Re-rank, S2B+Re-rank) | `runs/sample5` | `thesis/tables/sample5`<br>`thesis/figures/sample5` |
+
+---
+
+## Execution Instructions
+
+From either the repository root or inside `rag-code/rag-evaluator`:
+
+```bash
+# Run the M3 benchmark suite (5 configurations)
+./rag-code/rag-evaluator/scripts/run_sample5_m3.sh
+
+# Or from inside rag-code/rag-evaluator:
+./scripts/run_sample5_m3.sh
+```
+
+---
+
+## Environment Variable Overrides
+
+All scripts support configuration overrides without modifying the script file:
+
+| Variable | Default Value | Description |
+| :--- | :--- | :--- |
+| `RAG_APP_URL` | `http://localhost:8080` | URL of Spring Boot benchmark service |
+| `LIMIT` | `5` | Number of benchmark questions to evaluate |
+| `TABLE_NAME` | `vector_store_musique` | Target vector database table |
+| `JUDGE` | `gemini` | Evaluation judge provider (`gemini`, `ollama`, `claude`, `none`) |
+| `JUDGE_MODEL` | `gemini-3.5-flash-lite` | Evaluation judge LLM identifier |
+| `WARMUP` | `0` | Number of unmeasured warm-up queries |
+| `RUN_DIR` | `runs/sample5_m3` | Directory where raw JSONL files are stored |
+| `SUBFOLDER` | `sample5_m3` | Subfolder in `thesis/tables` & `thesis/figures` |
+
+### Examples:
+
+```bash
+# Evaluate against deployed Cloud Run service with 10 questions:
+RAG_APP_URL="https://rag-service-xyz.run.app" LIMIT=10 ./scripts/run_sample5_m3.sh
+
+# Fast smoke run without LLM judge:
+JUDGE=none LIMIT=3 ./scripts/run_sample5_m3.sh
+```

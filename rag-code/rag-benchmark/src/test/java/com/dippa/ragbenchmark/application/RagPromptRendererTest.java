@@ -11,7 +11,7 @@ class RagPromptRendererTest {
     private final RagPromptRenderer renderer = new RagPromptRenderer();
 
     @Test
-    void renderContext_joinsChunksWithDashes() {
+    void renderContext_joinsChunksWithDashesInInputOrder() {
         Document d1 = Document.builder().id("1").text("First chunk").build();
         Document d2 = Document.builder().id("2").text("Second chunk").build();
 
@@ -34,13 +34,13 @@ class RagPromptRendererTest {
         String fullPrompt = renderer.renderFullPrompt("Capital of Finland?", List.of(d1));
 
         assertThat(fullPrompt)
-                .contains(RagPromptRenderer.DEFAULT_SYSTEM_INSTRUCTION)
+                .contains(renderer.getSystemInstruction())
                 .contains("Context:\nHelsinki is the capital.")
                 .contains("Question: Capital of Finland?\nAnswer:");
     }
 
     @Test
-    void computeCanonicalCacheKey_isDeterministicRegardlessOfChunkInputOrder() {
+    void computeCanonicalCacheKey_preservesPipelineOrder_andDifferentiatesOrderChanges() {
         Document docA = Document.builder().id("chunk-a").text("Context Alpha").build();
         Document docB = Document.builder().id("chunk-b").text("Context Beta").build();
 
@@ -48,11 +48,16 @@ class RagPromptRendererTest {
         String key1 = renderer.computeCanonicalCacheKey(
                 "google-genai", "gemini-3.8-flash", "table_1", "system instruction", List.of(docA, docB));
 
+        // Pass identical chunks in same order A, B
+        String key1Duplicate = renderer.computeCanonicalCacheKey(
+                "google-genai", "gemini-3.8-flash", "table_1", "system instruction", List.of(docA, docB));
+
         // Pass chunks in reversed order B, A
         String key2 = renderer.computeCanonicalCacheKey(
                 "google-genai", "gemini-3.8-flash", "table_1", "system instruction", List.of(docB, docA));
 
-        assertThat(key1).isEqualTo(key2);
+        assertThat(key1).isEqualTo(key1Duplicate);
+        assertThat(key1).isNotEqualTo(key2);
         assertThat(key1).hasSize(64); // Valid 64-char SHA-256 hex string
     }
 

@@ -154,7 +154,7 @@ def display_summary_table(
     table.add_column("P50 Lat (ms)", justify="right")
     table.add_column("P95 Lat (ms)", justify="right")
     table.add_column("Avg Tokens", justify="right")
-    table.add_column("Avg Cost ($)", justify="right")
+    table.add_column("Cost ($/1k)", justify="right")
     table.add_column("EM (%)", justify="right", style="green")
     table.add_column("F1 (%)", justify="right", style="green")
     table.add_column("Faith", justify="right")
@@ -186,7 +186,7 @@ def display_summary_table(
             f"{s['latency_p50']:.1f}",
             f"{s['latency_p95']:.1f}",
             f"{s['tokens_mean']:.0f}",
-            f"${s['cost_mean']:.5f}",
+            f"${s['cost_mean'] * 1000.0:.3f}",
             f"{s['em_mean'] * 100:.1f}%",
             f"{s['f1_mean'] * 100:.1f}%",
             f"{s['faithfulness_mean']:.3f}",
@@ -222,7 +222,7 @@ def display_hop_breakdown_table(
     table.add_column("P50 Lat (ms)", justify="right")
     table.add_column("P95 Lat (ms)", justify="right")
     table.add_column("Avg Tokens", justify="right")
-    table.add_column("Avg Cost ($)", justify="right")
+    table.add_column("Cost ($/1k)", justify="right")
     table.add_column("EM (%)", justify="right", style="green")
     table.add_column("F1 (%)", justify="right", style="green")
     table.add_column("Faith", justify="right")
@@ -255,7 +255,7 @@ def display_hop_breakdown_table(
             f"{s['latency_p50']:.1f}",
             f"{s['latency_p95']:.1f}",
             f"{s['tokens_mean']:.0f}",
-            f"${s['cost_mean']:.5f}",
+            f"${s['cost_mean'] * 1000.0:.3f}",
             f"{s['em_mean'] * 100:.1f}%",
             f"{s['f1_mean'] * 100:.1f}%",
             f"{s['faithfulness_mean']:.3f}",
@@ -275,7 +275,7 @@ def display_hop_breakdown_table(
             f"{overall_s['latency_p50']:.1f}",
             f"{overall_s['latency_p95']:.1f}",
             f"{overall_s['tokens_mean']:.0f}",
-            f"${overall_s['cost_mean']:.5f}",
+            f"${overall_s['cost_mean'] * 1000.0:.3f}",
             f"{overall_s['em_mean'] * 100:.1f}%",
             f"{overall_s['f1_mean'] * 100:.1f}%",
             f"{overall_s['faithfulness_mean']:.3f}",
