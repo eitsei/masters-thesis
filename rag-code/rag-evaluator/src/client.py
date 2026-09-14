@@ -248,7 +248,11 @@ class RagClient:
         resp = self.session.post(url, json=payload, timeout=self.timeout)
         elapsed = (time.perf_counter() - t0) * 1000.0
         self._log_debug(f"POST {url} completed in {elapsed:.1f}ms status={resp.status_code}")
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as err:
+            logger.error(f"POST {url} failed with status {resp.status_code}: {resp.text}")
+            raise requests.HTTPError(f"{err} - Response body: {resp.text}", response=resp) from err
         return resp.json()
 
     def batch_query(
@@ -298,7 +302,11 @@ class RagClient:
 
         self._log_debug(f"POST {url} payload={payload}")
         resp = self.session.post(url, json=payload, timeout=self.timeout)
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as err:
+            logger.error(f"POST {url} failed with status {resp.status_code}: {resp.text}")
+            raise requests.HTTPError(f"{err} - Response body: {resp.text}", response=resp) from err
         return resp.json()
 
     def close(self) -> None:

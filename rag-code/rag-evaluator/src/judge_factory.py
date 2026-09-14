@@ -1,7 +1,6 @@
 """Factory for constructing LLM judges and embedding models for RAGAS evaluation.
 
-Supports Ollama (with automatic WSL2 host / localhost discovery), Google Gemini,
-and Anthropic Claude.
+Supports Anthropic Claude (via Google Cloud Vertex AI), Google Gemini, and Ollama.
 """
 
 from __future__ import annotations
@@ -144,8 +143,8 @@ class JudgeFactory:
         """Create an LLM judge and associated embedding model for RAGAS.
 
         Args:
-            provider: 'ollama', 'gemini', or 'claude'. Defaults to `JUDGE_PROVIDER` env or 'ollama'.
-            model: Judge model name. Defaults to `JUDGE_MODEL` env or provider default.
+            provider: 'claude', 'vertex', 'gemini', or 'ollama'. Defaults to `JUDGE_PROVIDER` env or 'claude'.
+            model: Judge model name (e.g. 'claude-sonnet-5'). Defaults to `JUDGE_MODEL` env or provider default.
             embedding_model: Embedding model name. Defaults to `JUDGE_EMBEDDING_MODEL` or provider default.
             base_url: Base URL for Ollama (optional, auto-discovered if omitted).
             temperature: LLM temperature (default 0.0 for deterministic evaluation).
@@ -155,7 +154,7 @@ class JudgeFactory:
             Tuple of (llm_judge, embedding_model).
         """
         selected_provider = (
-            provider or os.getenv("JUDGE_PROVIDER") or "ollama"
+            provider or os.getenv("JUDGE_PROVIDER") or "claude"
         ).strip().lower()
 
         if selected_provider == "ollama":
@@ -182,10 +181,74 @@ class JudgeFactory:
             judge_model = model
             if not judge_model:
                 env_model = os.getenv("JUDGE_MODEL")
-                if env_model and ("gemini" in env_model or "gemma" not in env_model):
+                if env_model and ("gemini" in env_model.lower() or ("gemma" not in env_model.lower() and "claude" not in env_model.lower())):
                     judge_model = env_model
+                elif selected_provider in ("vertex", "vertexai"):
+                    judge_model = "claude-sonnet-5"
                 else:
                     judge_model = "gemini-3.5-flash-lite"
+
+            # If user selected vertex with a Claude model (e.g. claude-sonnet-5)
+            if "claude" in judge_model.lower() or "sonnet" in judge_model.lower():
+                from langchain_google_vertexai.model_garden import ChatAnthropicVertex
+                from langchain_google_vertexai import VertexAIEmbeddings
+                import google.auth
+
+                _patch_vertex_ai_async_prediction_client()
+
+                project = (
+                    kwargs.pop("project", None)
+                    or os.getenv("GOOGLE_CLOUD_PROJECT_ID")
+                    or os.getenv("GCP_PROJECT")
+                    or os.getenv("ANTIGRAVITY_PROJECT_ID")
+                )
+                if not project:
+                    try:
+                        _, project = google.auth.default()
+                    except Exception:
+                        pass
+                if not project:
+                    project = "default-project"
+
+                location = (
+                    kwargs.pop("location", None)
+                    or os.getenv("ANTHROPIC_VERTEX_LOCATION")
+                    or os.getenv("GOOGLE_CLOUD_LOCATION")
+                    or os.getenv("GCP_REGION")
+                    or "global"
+                )
+
+                emb_model = embedding_model
+                if not emb_model:
+                    env_emb = os.getenv("JUDGE_EMBEDDING_MODEL")
+                    if env_emb and "nomic" not in env_emb.lower():
+                        emb_model = env_emb
+                    else:
+                        emb_model = "text-embedding-004"
+                vertex_emb_model = emb_model.replace("models/", "") if emb_model.startswith("models/") else emb_model
+
+                emb_location = (
+                    kwargs.pop("embedding_location", None)
+                    or os.getenv("GOOGLE_CLOUD_EMBEDDING_LOCATION")
+                    or "us-central1"
+                )
+
+                max_tokens = kwargs.pop("max_output_tokens", kwargs.pop("max_tokens", 4096))
+
+                llm = ChatAnthropicVertex(
+                    model_name=judge_model,
+                    project=project,
+                    location=location,
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                    **kwargs,
+                )
+                embeddings = VertexAIEmbeddings(
+                    model_name=vertex_emb_model,
+                    project=project,
+                    location=emb_location,
+                )
+                return llm, embeddings
 
             emb_model = embedding_model
             if not emb_model:
@@ -253,46 +316,118 @@ class JudgeFactory:
                 )
                 return llm, embeddings
 
-        elif selected_provider in ("claude", "anthropic"):
-            judge_model = (
-                model or os.getenv("JUDGE_MODEL") or "claude-3-5-sonnet-20241022"
-            )
-            api_key = os.getenv("ANTHROPIC_API_KEY")
+        elif selected_provider in ("claude", "anthropic", "claude-vertex", "vertex-claude", "claude-direct", "anthropic-direct"):
+            judge_model = model
+            if not judge_model:
+                env_model = os.getenv("JUDGE_MODEL")
+                if env_model and ("claude" in env_model.lower() or "sonnet" in env_model.lower() or ("gemini" not in env_model.lower() and "gemma" not in env_model.lower())):
+                    judge_model = env_model
+                else:
+                    judge_model = "claude-sonnet-5"
 
-            llm_kwargs = dict(kwargs)
-            llm_kwargs["model"] = judge_model
-            llm_kwargs["temperature"] = temperature
-            if api_key:
-                llm_kwargs["api_key"] = api_key
+            # Check if explicit direct Anthropic API was requested via provider name or kwargs
+            use_vertex = kwargs.pop("use_vertex", True)
+            if selected_provider in ("claude-direct", "anthropic-direct"):
+                use_vertex = False
 
-            llm = ChatAnthropic(**llm_kwargs)
+            if use_vertex:
+                from langchain_google_vertexai.model_garden import ChatAnthropicVertex
+                from langchain_google_vertexai import VertexAIEmbeddings
+                import google.auth
 
-            # Claude does not provide an embeddings API. Fall back to Gemini if available,
-            # otherwise Ollama embeddings via discovery.
-            if os.getenv("GOOGLE_AI_API_KEY") or os.getenv("GEMINI_API_KEY"):
-                gemini_key = os.getenv("GOOGLE_AI_API_KEY") or os.getenv("GEMINI_API_KEY")
-                embeddings = GoogleGenerativeAIEmbeddings(
-                    model=embedding_model or "models/text-embedding-004",
-                    google_api_key=gemini_key,
+                _patch_vertex_ai_async_prediction_client()
+
+                project = (
+                    kwargs.pop("project", None)
+                    or os.getenv("GOOGLE_CLOUD_PROJECT_ID")
+                    or os.getenv("GCP_PROJECT")
+                    or os.getenv("ANTIGRAVITY_PROJECT_ID")
                 )
+                if not project:
+                    try:
+                        _, project = google.auth.default()
+                    except Exception:
+                        pass
+                if not project:
+                    project = "default-project"
+
+                # Claude models on Vertex AI require regional endpoints (e.g. us-east5, europe-west1).
+                # If GOOGLE_CLOUD_LOCATION is set to 'global' (for Gemini models), fallback to us-east5.
+                location = (
+                    kwargs.pop("location", None)
+                    or os.getenv("ANTHROPIC_VERTEX_LOCATION")
+                    or os.getenv("GOOGLE_CLOUD_LOCATION")
+                    or os.getenv("GCP_REGION")
+                    or "global"
+                )
+
+                emb_model = embedding_model
+                if not emb_model:
+                    env_emb = os.getenv("JUDGE_EMBEDDING_MODEL")
+                    if env_emb and "nomic" not in env_emb.lower():
+                        emb_model = env_emb
+                    else:
+                        emb_model = "text-embedding-004"
+                vertex_emb_model = emb_model.replace("models/", "") if emb_model.startswith("models/") else emb_model
+
+                emb_location = (
+                    kwargs.pop("embedding_location", None)
+                    or os.getenv("GOOGLE_CLOUD_EMBEDDING_LOCATION")
+                    or "us-central1"
+                )
+
+                max_tokens = kwargs.pop("max_output_tokens", kwargs.pop("max_tokens", 4096))
+
+                llm = ChatAnthropicVertex(
+                    model_name=judge_model,
+                    project=project,
+                    location=location,
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                    **kwargs,
+                )
+                embeddings = VertexAIEmbeddings(
+                    model_name=vertex_emb_model,
+                    project=project,
+                    location=emb_location,
+                )
+                return llm, embeddings
             else:
-                active_base_url = (base_url or discover_ollama_endpoint()).rstrip("/")
-                emb_model = (
-                    embedding_model
-                    or os.getenv("JUDGE_EMBEDDING_MODEL")
-                    or "nomic-embed-text:latest"
-                )
-                embeddings = OpenAIEmbeddings(
-                    base_url=f"{active_base_url}/v1",
-                    api_key="ollama",
-                    model=emb_model,
-                )
-            return llm, embeddings
+                api_key = os.getenv("ANTHROPIC_API_KEY")
+                llm_kwargs = dict(kwargs)
+                llm_kwargs["model"] = judge_model
+                llm_kwargs["temperature"] = temperature
+                if api_key:
+                    llm_kwargs["api_key"] = api_key
+
+                llm = ChatAnthropic(**llm_kwargs)
+
+                # Claude does not provide an embeddings API. Fall back to Gemini if available,
+                # otherwise Ollama embeddings via discovery.
+                if os.getenv("GOOGLE_AI_API_KEY") or os.getenv("GEMINI_API_KEY"):
+                    gemini_key = os.getenv("GOOGLE_AI_API_KEY") or os.getenv("GEMINI_API_KEY")
+                    embeddings = GoogleGenerativeAIEmbeddings(
+                        model=embedding_model or "models/text-embedding-004",
+                        google_api_key=gemini_key,
+                    )
+                else:
+                    active_base_url = (base_url or discover_ollama_endpoint()).rstrip("/")
+                    emb_model = (
+                        embedding_model
+                        or os.getenv("JUDGE_EMBEDDING_MODEL")
+                        or "nomic-embed-text:latest"
+                    )
+                    embeddings = OpenAIEmbeddings(
+                        base_url=f"{active_base_url}/v1",
+                        api_key="ollama",
+                        model=emb_model,
+                    )
+                return llm, embeddings
 
         else:
             raise ValueError(
                 f"Unsupported judge provider: '{selected_provider}'. "
-                "Supported providers are 'ollama', 'gemini', and 'claude'."
+                "Supported providers are 'claude', 'vertex', 'gemini', and 'ollama'."
             )
 
 

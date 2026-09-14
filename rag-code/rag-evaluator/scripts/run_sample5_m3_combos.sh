@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Full Multi-Module Benchmark Suite (C0, C1, C2, C3, C5, C6, C8, C11)
-# Evaluates all combinations of M1, M2, and M3 against vector_store_musique
+# Evaluates all combinations of M1, M2, and M3 against vector_store_musique with Claude Sonnet 5 judge (Vertex AI)
 # ==============================================================================
 set -euo pipefail
 
@@ -13,8 +13,8 @@ PYTHON="${PYTHON:-venv/bin/python}"
 URL="${RAG_APP_URL:-http://localhost:8080}"
 LIMIT="${LIMIT:-5}"
 TABLE_NAME="${TABLE_NAME:-vector_store_musique}"
-JUDGE="${JUDGE:-gemini}"
-JUDGE_MODEL="${JUDGE_MODEL:-gemini-3.5-flash-lite}"
+JUDGE="${JUDGE:-claude}"
+JUDGE_MODEL="${JUDGE_MODEL:-claude-sonnet-5}"
 WARMUP="${WARMUP:-0}"
 
 RUN_DIR="${RUN_DIR:-runs/sample5_m3_combos}"

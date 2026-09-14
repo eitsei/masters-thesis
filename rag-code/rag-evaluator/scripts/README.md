@@ -35,8 +35,8 @@ All scripts support configuration overrides without modifying the script file:
 | `RAG_APP_URL` | `http://localhost:8080` | URL of Spring Boot benchmark service |
 | `LIMIT` | `5` | Number of benchmark questions to evaluate |
 | `TABLE_NAME` | `vector_store_musique` | Target vector database table |
-| `JUDGE` | `gemini` | Evaluation judge provider (`gemini`, `ollama`, `claude`, `none`) |
-| `JUDGE_MODEL` | `gemini-3.5-flash-lite` | Evaluation judge LLM identifier |
+| `JUDGE` | `claude` | Evaluation judge provider (`claude`, `vertex`, `gemini`, `ollama`, `none`) |
+| `JUDGE_MODEL` | `claude-sonnet-5` | Evaluation judge LLM identifier (Claude Sonnet 5 via Vertex AI) |
 | `WARMUP` | `0` | Number of unmeasured warm-up queries |
 | `RUN_DIR` | `runs/sample5_m3` | Directory where raw JSONL files are stored |
 | `SUBFOLDER` | `sample5_m3` | Subfolder in `thesis/tables` & `thesis/figures` |

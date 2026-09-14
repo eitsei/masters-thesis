@@ -11,6 +11,7 @@ import pytest
 from src.export_latex import (
     export_benchmark_summary_latex,
     export_hop_breakdown_latex,
+    export_wilcoxon_decomposed_latex,
     export_wilcoxon_tests_latex,
 )
 from src.plot_results import (
@@ -54,7 +55,9 @@ def test_export_benchmark_summary_latex(tmp_path: Path, sample_benchmark_records
     )
 
     assert out_tex.exists()
-    assert "\\begin{table*}" in content
+    assert "\\begin{landscape}" in content
+    assert "\\begin{table}[p]" in content
+    assert "\\end{landscape}" in content
     assert "\\toprule" in content
     assert "\\bottomrule" in content
     assert "Naive Baseline" in content
@@ -72,8 +75,10 @@ def test_export_hop_breakdown_latex(tmp_path: Path, sample_benchmark_records):
     assert "3-Hop Reasoning" in content
     assert "4-Hop Reasoning" in content
     assert "Combined Corpus" in content
-    assert "\\begin{table*}" in content
-    assert "per 1k q" in content
+    assert "\\begin{table}[!htbp]" in content
+    assert "\\footnotesize" in content
+    assert "\\makecell" in content
+    assert "(\\$/1k)" in content
     assert "\\$0.390" in content
 
 
@@ -92,6 +97,22 @@ def test_export_wilcoxon_tests_latex(tmp_path: Path):
     assert "RQ3" in content
     assert "C1: S2B" in content
     assert "\\textbf{**}" in content
+
+
+def test_export_wilcoxon_decomposed_latex(tmp_path: Path):
+    comparisons = [
+        WilcoxonComparison("RQ1", "End-to-End Latency", "C1: S2B", 1400.0, 1200.0, -200.0, 0.0, 0.001, 0.002, "**"),
+        WilcoxonComparison("RQ2", "Cost ($)", "C1: S2B", 0.0004, 0.0003, -0.0001, 2.0, 0.004, 0.008, "**"),
+        WilcoxonComparison("RQ3", "Composite Quality", "C1: S2B", 0.75, 0.85, 0.10, 1.0, 0.002, 0.006, "**"),
+    ]
+
+    results = export_wilcoxon_decomposed_latex(comparisons, output_dir=tmp_path)
+    assert (tmp_path / "wilcoxon_rq1_latency.tex").exists()
+    assert (tmp_path / "wilcoxon_rq2_cost.tex").exists()
+    assert (tmp_path / "wilcoxon_rq3_quality.tex").exists()
+    assert "\\label{tab:wilcoxon_rq1}" in results["rq1"]
+    assert "\\label{tab:wilcoxon_rq2}" in results["rq2"]
+    assert "\\label{tab:wilcoxon_rq3}" in results["rq3"]
 
 
 def test_plot_pareto_frontier(tmp_path: Path, sample_benchmark_records):

@@ -173,6 +173,14 @@ PRICING_CATALOG: dict[str, PricingTier] = {
         rerank_price_per_doc=0.0,
         embed_price_per_million=0.0,
     ),
+    "claude-5-sonnet": PricingTier(
+        name="claude-sonnet-5",
+        prompt_price_per_million=3.00,
+        comp_price_per_million=15.00,
+        cached_price_per_million=0.30,
+        rerank_price_per_doc=0.0,
+        embed_price_per_million=0.0,
+    ),
     # GPT-4o-mini
     "gpt-4o-mini": PricingTier(
         name="gpt-4o-mini",

@@ -98,20 +98,62 @@ class TestJudgeFactoryCreation:
             emb_kwargs = mock_emb.call_args.kwargs
             assert emb_kwargs["location"] == "us-central1"
 
-    def test_claude_provider_configuration(self, monkeypatch):
+    def test_claude_vertex_provider_configuration_default(self, monkeypatch):
+        monkeypatch.setenv("GOOGLE_CLOUD_PROJECT_ID", "test-claude-project")
+        monkeypatch.delenv("GOOGLE_CLOUD_LOCATION", raising=False)
+        monkeypatch.delenv("ANTHROPIC_VERTEX_LOCATION", raising=False)
+        monkeypatch.delenv("JUDGE_MODEL", raising=False)
+
+        with patch("langchain_google_vertexai.model_garden.ChatAnthropicVertex") as mock_chat, \
+             patch("langchain_google_vertexai.VertexAIEmbeddings") as mock_emb:
+            llm, emb = JudgeFactory.create_judge(provider="claude")
+
+            mock_chat.assert_called_once()
+            call_kwargs = mock_chat.call_args.kwargs
+            assert call_kwargs["model_name"] == "claude-sonnet-5"
+            assert call_kwargs["location"] == "global"
+            assert call_kwargs["project"] == "test-claude-project"
+            assert call_kwargs["temperature"] == 0.0
+
+            mock_emb.assert_called_once()
+            emb_kwargs = mock_emb.call_args.kwargs
+            assert emb_kwargs["location"] == "us-central1"
+            assert emb_kwargs["model_name"] == "text-embedding-004"
+
+    def test_vertex_provider_with_claude_sonnet_5(self, monkeypatch):
+        monkeypatch.setenv("GOOGLE_CLOUD_PROJECT_ID", "test-vertex-project")
+        monkeypatch.setenv("ANTHROPIC_VERTEX_LOCATION", "europe-west1")
+
+        with patch("langchain_google_vertexai.model_garden.ChatAnthropicVertex") as mock_chat, \
+             patch("langchain_google_vertexai.VertexAIEmbeddings") as mock_emb:
+            llm, emb = JudgeFactory.create_judge(
+                provider="vertex",
+                model="claude-sonnet-5",
+            )
+
+            mock_chat.assert_called_once()
+            call_kwargs = mock_chat.call_args.kwargs
+            assert call_kwargs["model_name"] == "claude-sonnet-5"
+            assert call_kwargs["location"] == "europe-west1"
+            assert call_kwargs["project"] == "test-vertex-project"
+
+            mock_emb.assert_called_once()
+            assert mock_emb.call_args.kwargs["model_name"] == "text-embedding-004"
+
+    def test_claude_direct_provider_configuration(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-anthropic-key")
         monkeypatch.delenv("GOOGLE_AI_API_KEY", raising=False)
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
         with patch("src.judge_factory.discover_ollama_endpoint", return_value="http://172.21.64.1:11434"):
             llm, emb = JudgeFactory.create_judge(
-                provider="claude",
-                model="claude-3-5-sonnet-20241022",
+                provider="claude-direct",
+                model="claude-sonnet-5",
                 embedding_model="nomic-embed-text:latest",
             )
 
         assert isinstance(llm, ChatAnthropic)
-        assert llm.model == "claude-3-5-sonnet-20241022"
+        assert llm.model == "claude-sonnet-5"
         assert llm.temperature == 0.0
         # Embeddings fallback to Ollama embeddings
         assert isinstance(emb, OpenAIEmbeddings)

@@ -80,20 +80,25 @@ Edit `.env` to configure your RAG service URL and Judge model:
 # Spring Boot RAG service URL
 RAG_APP_URL=http://localhost:8080
 
-# Judge Provider (ollama, gemini, or claude)
-JUDGE_PROVIDER=ollama
-JUDGE_MODEL=gemma4:e2b
-JUDGE_EMBEDDING_MODEL=nomic-embed-text:latest
-OLLAMA_BASE_URL=http://localhost:11434
+# Judge Provider (claude, vertex, gemini, or ollama)
+JUDGE_PROVIDER=claude
+JUDGE_MODEL=claude-sonnet-5
+JUDGE_EMBEDDING_MODEL=text-embedding-004
 
-# API Keys (for cloud judges)
+# Google Cloud Vertex AI Configuration (Claude Sonnet 5 & Gemini on Vertex AI)
+GOOGLE_CLOUD_PROJECT_ID=your_gcp_project_here
+GOOGLE_CLOUD_LOCATION=us-east5
+ANTHROPIC_VERTEX_LOCATION=us-east5
+
+# Optional direct API keys / local Ollama
+OLLAMA_BASE_URL=http://localhost:11434
 GOOGLE_AI_API_KEY=your_gemini_key_here
 ANTHROPIC_API_KEY=your_anthropic_key_here
 ```
 
 ### 3. Verify Judge Connectivity (Smoke Test)
 ```bash
-venv/bin/python src/cli.py test-judge --judge ollama
+venv/bin/python src/cli.py test-judge --judge claude --judge-model claude-sonnet-5
 ```
 
 ---
@@ -166,7 +171,7 @@ Options:
   --sample, -s            Use canonical 100-question benchmark sample
   --modules, -m  TEXT     Optimization modules comma-separated (e.g. M1,M2)
   --table-name   TEXT     Vector store pgvector table override
-  --judge, -j    TEXT     Judge provider: ollama, gemini, claude, none [default: none]
+  --judge, -j    TEXT     Judge provider: claude, vertex, gemini, ollama, none [default: none]
   --judge-model  TEXT     Judge model identifier
   --warmup, -w   INTEGER  Number of unmeasured warm-up queries [default: 2]
   --debug, -d             Enable detailed client payload and timing logs

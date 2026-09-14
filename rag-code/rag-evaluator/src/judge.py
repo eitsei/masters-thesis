@@ -28,11 +28,11 @@ def get_judge_components(
 ) -> Tuple[Any, Any]:
     """Initializes and returns (ragas_llm, ragas_embeddings) based on provider configuration.
 
-    Delegates to JudgeFactory to provide OpenAI-compatible Ollama endpoints (/v1),
-    Google Gemini, or Anthropic Claude without legacy deprecation warnings.
+    Delegates to JudgeFactory to provide Anthropic Claude (via Vertex AI),
+    Google Gemini, or OpenAI-compatible Ollama endpoints (/v1) without legacy deprecation warnings.
     """
     chosen_provider = (
-        provider or os.getenv("JUDGE_PROVIDER", "ollama")
+        provider or os.getenv("JUDGE_PROVIDER", "claude")
     ).strip().lower()
 
     if chosen_provider in ("none", "off", "disabled"):
@@ -92,7 +92,7 @@ def test_judge_connection(
 
         return {
             "status": "success",
-            "provider": provider or os.getenv("JUDGE_PROVIDER", "ollama"),
+            "provider": provider or os.getenv("JUDGE_PROVIDER", "claude"),
             "model": model_name,
             "response": response_text.strip(),
             "init_latency_ms": init_ms,
@@ -104,7 +104,7 @@ def test_judge_connection(
         llm_ms = (time.perf_counter() - t_llm) * 1000
         return {
             "status": "error",
-            "provider": provider or os.getenv("JUDGE_PROVIDER", "ollama"),
+            "provider": provider or os.getenv("JUDGE_PROVIDER", "claude"),
             "error": str(e),
             "init_latency_ms": init_ms,
             "llm_latency_ms": llm_ms,

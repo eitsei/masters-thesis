@@ -30,6 +30,7 @@ from src.collector import BenchmarkCollector, StreamingBenchmarkCollector
 from src.export_latex import (
     export_benchmark_summary_latex,
     export_hop_breakdown_latex,
+    export_wilcoxon_decomposed_latex,
     export_wilcoxon_tests_latex,
 )
 from src.judge import get_judge_components, test_judge_connection
@@ -231,7 +232,7 @@ def run(
     sample: bool = typer.Option(False, "--sample", "-s", help="Use canonical 100-question sample (Thesis §4.2.1)"),
     modules: str = typer.Option("", "--modules", "-m", help="Comma-separated optimization modules (e.g. M1,M2 or S2B,SR)"),
     table_name: Optional[str] = typer.Option(None, "--table-name", help="Vector store table name override"),
-    judge: str = typer.Option("none", "--judge", "-j", help="Judge provider (ollama, gemini, claude, none)"),
+    judge: str = typer.Option("none", "--judge", "-j", help="Judge provider (claude, vertex, gemini, ollama, none)"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
     warmup: int = typer.Option(2, "--warmup", "-w", help="Number of unmeasured warm-up queries to eliminate JVM JIT / TLS jitter"),
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable verbose debug logging"),
@@ -241,7 +242,7 @@ def run(
     judge_delay: Optional[float] = typer.Option(
         None,
         "--judge-delay",
-        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Gemini/Claude, 0s for Ollama)",
+        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Claude/Gemini, 0s for Ollama)",
     ),
 ) -> None:
     """Executes a benchmark evaluation run against the Spring Boot RAG service."""
@@ -345,7 +346,7 @@ def run(
     effective_delay: float
     if judge_delay is not None:
         effective_delay = max(0.0, judge_delay)
-    elif judge.lower() in ("gemini", "claude"):
+    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai", "vertex-claude", "claude-vertex"):
         effective_delay = 1.5
     else:
         effective_delay = 0.0
@@ -385,7 +386,7 @@ def run(
 
 @app.command("test-judge")
 def test_judge(
-    judge: str = typer.Option("ollama", "--judge", "-j", help="Judge provider: ollama, gemini, claude, none"),
+    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, vertex, gemini, ollama, none"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
 ) -> None:
     """Tests connectivity, responsiveness, and latency of the configured evaluation judge."""
@@ -426,13 +427,13 @@ def test_judge(
 @app.command()
 def evaluate(
     input_file: Path = typer.Option(..., "--input", "-i", help="Input JSONL file containing raw benchmark results"),
-    judge: str = typer.Option("ollama", "--judge", "-j", help="Judge provider: ollama, gemini, claude, none"),
+    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, vertex, gemini, ollama, none"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSONL path for evaluated results"),
     judge_delay: Optional[float] = typer.Option(
         None,
         "--judge-delay",
-        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Gemini/Claude, 0s for Ollama)",
+        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Claude/Gemini, 0s for Ollama)",
     ),
 ) -> None:
     """Computes EM, F1, RAGAS metrics, and Composite Q on previously gathered run records."""
@@ -442,7 +443,7 @@ def evaluate(
     effective_delay: float
     if judge_delay is not None:
         effective_delay = max(0.0, judge_delay)
-    elif judge.lower() in ("gemini", "claude"):
+    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai", "vertex-claude", "claude-vertex"):
         effective_delay = 1.5
     else:
         effective_delay = 0.0
@@ -566,6 +567,8 @@ def export_thesis(
         comparisons = batch_compare_configurations(base_recs, treatments)
         export_wilcoxon_tests_latex(comparisons, tables_dir / "wilcoxon_tests.tex")
         console.print(f"  [green]✓[/green] Table: [cyan]{tables_dir / 'wilcoxon_tests.tex'}[/cyan]")
+        export_wilcoxon_decomposed_latex(comparisons, tables_dir)
+        console.print(f"  [green]✓[/green] Tables (Decomposed): [cyan]{tables_dir / 'wilcoxon_rq*.tex'}[/cyan]")
 
     # 2. Export Publication Vector Figures
     p1 = plot_pareto_frontier(run_dict, figures_dir / "pareto_frontier.pdf")
@@ -591,7 +594,7 @@ def query_cmd(
     query_text: str = typer.Argument(..., help="Query or question to ask the RAG pipeline"),
     table_name: str = typer.Option("vector_store_nordea", "--table-name", "-t", help="Target vector store table"),
     modules: str = typer.Option("", "--modules", "-m", help="Comma-separated optimization modules"),
-    judge: str = typer.Option("ollama", "--judge", "-j", help="Judge provider: ollama, gemini, claude, none"),
+    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, vertex, gemini, ollama, none"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
     ground_truth: Optional[str] = typer.Option(None, "--ground-truth", "-g", help="Optional reference answer"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Optional path to save evaluation result JSONL"),
@@ -676,7 +679,8 @@ def run_questions(
     input_file: Path = typer.Option(..., "--input", "-i", help="JSON or JSONL file containing questions"),
     table_name: str = typer.Option("vector_store_nordea", "--table-name", "-t", help="Target vector store table"),
     modules: str = typer.Option("", "--modules", "-m", help="Comma-separated optimization modules"),
-    judge: str = typer.Option("ollama", "--judge", "-j", help="Judge provider: ollama, gemini, claude, none"),
+    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of questions to evaluate"),
+    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, vertex, gemini, ollama, none"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSONL path for evaluated results"),
     url: Optional[str] = typer.Option(None, "--url", help="RAG service URL"),
@@ -684,7 +688,7 @@ def run_questions(
     judge_delay: Optional[float] = typer.Option(
         None,
         "--judge-delay",
-        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Gemini/Claude, 0s for Ollama)",
+        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Claude/Gemini, 0s for Ollama)",
     ),
 ) -> None:
     """Runs a batch of questions from a file against a vector store table and evaluates with RAGAS."""
@@ -702,6 +706,9 @@ def run_questions(
             if line:
                 records.append(json.loads(line))
 
+    if limit is not None and limit > 0:
+        records = records[:limit]
+
     console.print(f"Loaded [bold]{len(records)}[/bold] questions from [cyan]{input_file}[/cyan].")
     module_list = [m.strip() for m in modules.split(",") if m.strip()]
     module_label = "+".join(module_list) if module_list else "C0_Baseline"
@@ -709,7 +716,7 @@ def run_questions(
     effective_delay: float
     if judge_delay is not None:
         effective_delay = max(0.0, judge_delay)
-    elif judge.lower() in ("gemini", "claude"):
+    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai", "vertex-claude", "claude-vertex"):
         effective_delay = 1.5
     else:
         effective_delay = 0.0
