@@ -32,9 +32,12 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -502,37 +505,83 @@ public class RagQueryService {
             logger.info("Still generating answer... took {}s", elapsedSeconds);
         }, 3, 3, TimeUnit.SECONDS);
 
-        logger.info("Dispatching answer generation to model '{}'...", effectiveModelName);
+        logger.info("Dispatching answer generation to model '{}' (streaming)...", effectiveModelName);
 
         Timer.Sample generationSample = Timer.start(meterRegistry);
-        ChatResponse chatResponse;
         long generationNanos;
+        StringBuilder answerBuilder = new StringBuilder();
+        AtomicReference<ChatResponse> lastResponse = new AtomicReference<>();
+        AtomicReference<ChatResponse> responseWithUsage = new AtomicReference<>();
+        AtomicLong firstTokenTime = new AtomicLong(0L);
+
         try {
-            chatResponse = chatModel.call(promptToSend);
+            Flux<ChatResponse> responseFlux = null;
+            try {
+                responseFlux = chatModel.stream(promptToSend);
+            } catch (UnsupportedOperationException e) {
+                logger.debug("ChatModel does not support streaming, falling back to call: {}", e.getMessage());
+            }
+
+            if (responseFlux != null) {
+                responseFlux.doOnNext(chunk -> {
+                    firstTokenTime.compareAndSet(0L, System.currentTimeMillis());
+                    if (chunk != null) {
+                        lastResponse.set(chunk);
+                        if (chunk.getResult() != null && chunk.getResult().getOutput() != null) {
+                            String text = chunk.getResult().getOutput().getText();
+                            if (text != null && !text.isEmpty()) {
+                                answerBuilder.append(text);
+                            }
+                        }
+                        if (chunk.getMetadata() != null && chunk.getMetadata().getUsage() != null) {
+                            Usage usage = chunk.getMetadata().getUsage();
+                            if ((usage.getPromptTokens() != null && usage.getPromptTokens() > 0)
+                                    || (usage.getCompletionTokens() != null && usage.getCompletionTokens() > 0)
+                                    || (usage.getTotalTokens() != null && usage.getTotalTokens() > 0)) {
+                                responseWithUsage.set(chunk);
+                            }
+                        }
+                    }
+                }).blockLast();
+            } else {
+                // Fallback for mocks / environments where streaming is un-stubbed
+                ChatResponse fallbackResponse = chatModel.call(promptToSend);
+                if (fallbackResponse != null) {
+                    firstTokenTime.compareAndSet(0L, System.currentTimeMillis());
+                    lastResponse.set(fallbackResponse);
+                    if (fallbackResponse.getResult() != null && fallbackResponse.getResult().getOutput() != null) {
+                        String text = fallbackResponse.getResult().getOutput().getText();
+                        if (text != null) {
+                            answerBuilder.append(text);
+                        }
+                    }
+                }
+            }
         } finally {
             progressTask.cancel(false);
             generationNanos = generationSample.stop(meterRegistry.timer("rag.pipeline.generation"));
         }
         long generationMs = TimeUnit.NANOSECONDS.toMillis(generationNanos);
 
-        String answer = "";
-        if (chatResponse != null && chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null) {
-            String text = chatResponse.getResult().getOutput().getText();
-            if (text != null) {
-                answer = text;
-            }
-        }
+        String answer = answerBuilder.toString();
+        ChatResponse finalChatResponse = responseWithUsage.get() != null
+                ? responseWithUsage.get()
+                : lastResponse.get();
+
+        long firstTokenTs = firstTokenTime.get();
+        long prefillMs = (firstTokenTs > 0L) ? Math.max(0L, firstTokenTs - startGenTime) : generationMs;
+        long ttftMs = retrievalMs + rerankMs + expansionMs + cacheMs + routeMs + prefillMs;
 
         int embedTokens = Math.max(1, (int) Math.ceil(query.trim().length() / 3.5));
         TokenUsageDto tokenUsage = extractTokenUsage(
-                chatResponse, cacheResult, rerankDocsCount, embedTokens, routePromptTokens, routeCompTokens);
+                finalChatResponse, cacheResult, rerankDocsCount, embedTokens, routePromptTokens, routeCompTokens);
 
         String preview = answer != null ? answer.replaceAll("\\s+", " ").trim() : "";
         if (preview.length() > 30) {
             preview = preview.substring(0, 30) + "...";
         }
-        logger.info("Answer generated by '{}' in {} ms ({} chars, promptTokens={}, completionTokens={}, totalTokens={}): \"{}\"",
-                effectiveModelName, generationMs, answer.length(),
+        logger.info("Answer generated by '{}' in {} ms (ttft={} ms, {} chars, promptTokens={}, completionTokens={}, totalTokens={}): \"{}\"",
+                effectiveModelName, generationMs, ttftMs, answer.length(),
                 tokenUsage.promptTokens(), tokenUsage.completionTokens(), tokenUsage.totalTokens(),
                 preview);
 
@@ -550,6 +599,7 @@ public class RagQueryService {
                 rerankMs,
                 cacheMs,
                 routeMs,
+                ttftMs,
                 effectiveModelName,
                 cacheStatus,
                 cacheMetadata,

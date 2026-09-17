@@ -44,7 +44,8 @@ public class QueryController {
                 result.generationMs(),
                 result.expansionMs(),
                 result.cacheMs(),
-                result.routeMs());
+                result.routeMs(),
+                result.ttftMs());
 
         return ResponseEntity.ok(
                 new QueryResponse(

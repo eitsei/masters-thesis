@@ -131,6 +131,14 @@ management:
       exposure:
         include: health,metrics,prometheus
 
+logging:
+  level:
+    root: INFO
+    com.google.genai: ${LOGGING_LEVEL_COM_GOOGLE_GENAI:DEBUG}
+    org.springframework.ai.google.genai: ${LOGGING_LEVEL_SPRING_AI_GOOGLE_GENAI:DEBUG}
+    java.net.http: ${LOGGING_LEVEL_JAVA_NET_HTTP:DEBUG}
+    org.apache.http: ${LOGGING_LEVEL_ORG_APACHE_HTTP:DEBUG}
+
 # Reference catalog -- bound by ModelCatalogProperties, not yet read by any bean, but
 # `flash` below IS the single source of truth for spring.ai.google.genai.chat.model's
 # default (above): flash is M0's active/base model today AND the tier M4 (model

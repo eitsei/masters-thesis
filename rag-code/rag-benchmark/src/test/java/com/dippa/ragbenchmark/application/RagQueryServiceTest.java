@@ -55,6 +55,7 @@ import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.ClassPathResource;
+import reactor.core.publisher.Flux;
 
 /**
  * Plain unit tests for {@link RagQueryService} — exercises M0, M1, M2, and M3 pipelines.
@@ -558,5 +559,24 @@ class RagQueryServiceTest {
         Prompt generationPrompt = promptCaptor.getValue();
         assertThat(generationPrompt.getOptions()).isNotNull();
         assertThat(generationPrompt.getOptions().getModel()).isEqualTo("gemini-3.5-flash-lite");
+    }
+
+    @Test
+    void query_withStreaming_assemblesAnswerAndCapturesTtft() {
+        Document doc = Document.builder().id("d1").text("Stream context").build();
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
+
+        ChatResponse chunk1 = createChatResponse("Hello ", null);
+        ChatResponse chunk2 = createChatResponse("world!", new DefaultUsage(25, 10, 35));
+        when(chatModel.stream(any(Prompt.class))).thenReturn(Flux.just(chunk1, chunk2));
+
+        RagQueryResult result = ragQueryService.query("Hello query", Set.of());
+
+        assertThat(result.answer()).isEqualTo("Hello world!");
+        assertThat(result.ttftMs()).isGreaterThanOrEqualTo(0L);
+        assertThat(result.tokenUsage().promptTokens()).isEqualTo(25);
+        assertThat(result.tokenUsage().completionTokens()).isEqualTo(10);
+        assertThat(result.tokenUsage().totalTokens()).isEqualTo(35);
+        verify(chatModel).stream(any(Prompt.class));
     }
 }

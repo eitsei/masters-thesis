@@ -10,10 +10,15 @@ public record TimingsDto(
         long generationMs,
         long expansionMs,
         long cacheMs,
-        long routeMs) {
+        long routeMs,
+        long ttftMs) {
+
+    public TimingsDto(long retrievalMs, long rerankMs, long generationMs, long expansionMs, long cacheMs, long routeMs) {
+        this(retrievalMs, rerankMs, generationMs, expansionMs, cacheMs, routeMs, 0L);
+    }
 
     public TimingsDto(long retrievalMs, long rerankMs, long generationMs, long expansionMs, long cacheMs) {
-        this(retrievalMs, rerankMs, generationMs, expansionMs, cacheMs, 0L);
+        this(retrievalMs, rerankMs, generationMs, expansionMs, cacheMs, 0L, 0L);
     }
 
     public TimingsDto(long retrievalMs, long rerankMs, long generationMs, long expansionMs) {

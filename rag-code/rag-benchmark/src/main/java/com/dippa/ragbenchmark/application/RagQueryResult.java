@@ -23,10 +23,29 @@ public record RagQueryResult(
         long rerankMs,
         long cacheMs,
         long routeMs,
+        long ttftMs,
         String modelUsed,
         CacheStatus cacheStatus,
         CacheMetadataDto cacheMetadata,
         TokenUsageDto tokenUsage) {
+
+    public RagQueryResult(
+            String answer,
+            Set<ModuleId> modulesApplied,
+            List<RetrievedChunk> retrievedChunks,
+            long retrievalMs,
+            long generationMs,
+            long expansionMs,
+            long rerankMs,
+            long cacheMs,
+            long routeMs,
+            String modelUsed,
+            CacheStatus cacheStatus,
+            CacheMetadataDto cacheMetadata,
+            TokenUsageDto tokenUsage) {
+        this(answer, modulesApplied, retrievedChunks, retrievalMs, generationMs, expansionMs, rerankMs, cacheMs,
+                routeMs, 0L, modelUsed, cacheStatus, cacheMetadata, tokenUsage);
+    }
 
     public RagQueryResult(
             String answer,
