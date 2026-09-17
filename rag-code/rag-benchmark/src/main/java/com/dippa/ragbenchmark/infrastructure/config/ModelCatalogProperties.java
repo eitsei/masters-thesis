@@ -7,12 +7,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Reference catalog of model identifiers from the thesis's tiered model design (Chapter 4,
  * System Implementation), bound from {@code rag.models.*} in application.yml.
  *
- * <p>Not yet consumed by any bean: M2 (re-ranking) and M4 (model routing/cascading) are
- * unimplemented in v1 (see TODO.md). This exists so those modules, once built, have a single
- * typed place to read model ids from instead of hardcoding strings at that point. The raw
- * {@code flash} value is already the source of truth for
- * {@code spring.ai.google.genai.chat.model}'s default via a YAML placeholder (see
- * application.yml) -- that link is at the property level, not through this record.</p>
+ * <p>Consumed across modules: M2 (semantic re-ranking) reads candidate model names for Vertex AI
+ * and local cross-encoders, and M4 (model routing/cascading) uses the three Gemini tiers
+ * ({@code flashLite}, {@code flash}, {@code pro}) for dynamic query routing, classifier execution,
+ * and empirical oracle mapping. The raw {@code flash} value also serves as
+ * {@code spring.ai.google.genai.chat.model}'s default via a YAML placeholder.</p>
  */
 @ConfigurationProperties(prefix = "rag.models")
 public record ModelCatalogProperties(GoogleGenAiTiers googleGenai, Reranker reranker) {

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -13,6 +14,8 @@ import com.dippa.ragbenchmark.api.TokenUsageDto;
 import com.dippa.ragbenchmark.domain.CacheLookupResult;
 import com.dippa.ragbenchmark.domain.CacheRequest;
 import com.dippa.ragbenchmark.domain.CacheStatus;
+import com.dippa.ragbenchmark.domain.ComplexityTier;
+import com.dippa.ragbenchmark.domain.ModelRouter;
 import com.dippa.ragbenchmark.domain.ModuleId;
 import com.dippa.ragbenchmark.domain.ModuleNotImplementedException;
 import com.dippa.ragbenchmark.domain.PromptCache;
@@ -20,6 +23,10 @@ import com.dippa.ragbenchmark.domain.PromptCacheConfigurationException;
 import com.dippa.ragbenchmark.domain.Reranker;
 import com.dippa.ragbenchmark.domain.RerankingConfigurationException;
 import com.dippa.ragbenchmark.domain.RetrievalExpander;
+import com.dippa.ragbenchmark.domain.RouterConfigurationException;
+import com.dippa.ragbenchmark.domain.RoutingDecision;
+import com.dippa.ragbenchmark.domain.RoutingMode;
+import com.dippa.ragbenchmark.domain.RoutingRequest;
 import com.dippa.ragbenchmark.infrastructure.NoOpReranker;
 import com.dippa.ragbenchmark.infrastructure.config.GenerationProperties;
 import com.dippa.ragbenchmark.infrastructure.config.PromptCacheProperties;
@@ -231,11 +238,8 @@ class RagQueryServiceTest {
     @Test
     void requestedModules_failsFastBeforeTouchingAnyDependency() {
         assertThatThrownBy(() -> ragQueryService.query("query", Set.of(ModuleId.M4)))
-                .isInstanceOf(ModuleNotImplementedException.class)
-                .satisfies(exception -> {
-                    ModuleNotImplementedException moduleException = (ModuleNotImplementedException) exception;
-                    assertThat(moduleException.getModules()).containsExactly(ModuleId.M4);
-                });
+                .isInstanceOf(RouterConfigurationException.class)
+                .hasMessageContaining("Module M4 was requested, but 'rag.router.provider' is configured as 'noop'");
 
         verifyNoInteractions(vectorStore, chatModel, reranker);
     }
@@ -469,5 +473,90 @@ class RagQueryServiceTest {
         verify(reranker).rerank("Complex combo query?", retrievedPool, 5);
         verify(retrievalExpander).expand(rerankedPool, "vector_store_test_large");
         verify(promptCache).getOrCreate(any(CacheRequest.class));
+    }
+
+    @Test
+    void m4Requested_isolated_routesToExpectedModelTier_andRecordsRouteMsAndTokens() {
+        ModelRouter mockRouter = mock(ModelRouter.class);
+        when(mockRouter.isConfigured()).thenReturn(true);
+        when(mockRouter.route(any(RoutingRequest.class))).thenReturn(new RoutingDecision(
+                "gemini-3.1-pro",
+                ComplexityTier.MULTI_HOP,
+                3,
+                142L,
+                28,
+                1,
+                RoutingMode.CLASSIFIER,
+                "3"
+        ));
+
+        RagQueryService serviceWithM4 = new RagQueryService(
+                vectorStore, chatModel, reranker, retrievalExpander, promptCache, mockRouter,
+                meterRegistry, 50, 5, new org.springframework.core.io.ClassPathResource("prompts/answer-generation.st"));
+
+        Document doc = Document.builder().id("d1").text("Sample text").build();
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Pro answer", new DefaultUsage(100, 50, 150)));
+
+        RagQueryResult result = serviceWithM4.query("Complex multi-hop question", Set.of(ModuleId.M4), null, null, null, 3);
+
+        assertThat(result.modulesApplied()).containsExactly(ModuleId.M4);
+        assertThat(result.modelUsed()).isEqualTo("gemini-3.1-pro");
+        assertThat(result.routeMs()).isEqualTo(142L);
+        assertThat(result.tokenUsage().routingPromptTokens()).isEqualTo(28);
+        assertThat(result.tokenUsage().routingCompletionTokens()).isEqualTo(1);
+        assertThat(result.tokenUsage().routingTokens()).isEqualTo(29);
+        assertThat(result.totalLatencyMs()).isGreaterThanOrEqualTo(142L);
+
+        verify(mockRouter).route(new RoutingRequest("Complex multi-hop question", 3));
+
+        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(promptCaptor.capture());
+        Prompt generationPrompt = promptCaptor.getValue();
+        assertThat(generationPrompt.getOptions()).isNotNull();
+        assertThat(generationPrompt.getOptions().getModel()).isEqualTo("gemini-3.1-pro");
+    }
+
+    @Test
+    void m4AndM3Requested_bindsContextCacheKeyAndGeneratorToRoutedModel() {
+        ModelRouter mockRouter = mock(ModelRouter.class);
+        when(mockRouter.isConfigured()).thenReturn(true);
+        when(mockRouter.route(any(RoutingRequest.class))).thenReturn(new RoutingDecision(
+                "gemini-3.5-flash-lite",
+                ComplexityTier.SINGLE_HOP,
+                1,
+                85L,
+                25,
+                1,
+                RoutingMode.CLASSIFIER,
+                "1"
+        ));
+
+        RagQueryService serviceWithM3M4 = new RagQueryService(
+                vectorStore, chatModel, reranker, retrievalExpander, promptCache, mockRouter,
+                meterRegistry, 50, 5, new org.springframework.core.io.ClassPathResource("prompts/answer-generation.st"));
+
+        Document doc = Document.builder().id("d1").text("Sample text").build();
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
+        when(promptCache.isConfigured()).thenReturn(true);
+        when(promptCache.getOrCreate(any(CacheRequest.class)))
+                .thenReturn(CacheLookupResult.hit("cachedContents/routed-lite-123", 4200L, Instant.now().plusSeconds(300)));
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Lite answer", new DefaultUsage(10, 20, 30)));
+
+        RagQueryResult result = serviceWithM3M4.query("Simple query", Set.of(ModuleId.M3, ModuleId.M4));
+
+        assertThat(result.modulesApplied()).containsExactlyInAnyOrder(ModuleId.M3, ModuleId.M4);
+        assertThat(result.modelUsed()).isEqualTo("gemini-3.5-flash-lite");
+        assertThat(result.routeMs()).isEqualTo(85L);
+
+        ArgumentCaptor<CacheRequest> cacheRequestCaptor = ArgumentCaptor.forClass(CacheRequest.class);
+        verify(promptCache).getOrCreate(cacheRequestCaptor.capture());
+        assertThat(cacheRequestCaptor.getValue().model()).isEqualTo("gemini-3.5-flash-lite");
+
+        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(promptCaptor.capture());
+        Prompt generationPrompt = promptCaptor.getValue();
+        assertThat(generationPrompt.getOptions()).isNotNull();
+        assertThat(generationPrompt.getOptions().getModel()).isEqualTo("gemini-3.5-flash-lite");
     }
 }

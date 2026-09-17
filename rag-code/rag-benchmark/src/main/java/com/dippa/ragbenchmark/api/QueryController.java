@@ -38,7 +38,13 @@ public class QueryController {
         List<String> modulesApplied = result.modulesApplied().stream()
                 .map(Enum::name)
                 .toList();
-        TimingsDto timings = new TimingsDto(result.retrievalMs(), result.rerankMs(), result.generationMs(), result.expansionMs(), result.cacheMs());
+        TimingsDto timings = new TimingsDto(
+                result.retrievalMs(),
+                result.rerankMs(),
+                result.generationMs(),
+                result.expansionMs(),
+                result.cacheMs(),
+                result.routeMs());
 
         return ResponseEntity.ok(
                 new QueryResponse(
@@ -49,6 +55,7 @@ public class QueryController {
                         result.tokenUsage() != null ? result.tokenUsage() : TokenUsageDto.ZERO,
                         result.cacheStatus(),
                         result.cacheMetadata(),
+                        result.modelUsed(),
                         result.totalLatencyMs()));
     }
 

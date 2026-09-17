@@ -11,6 +11,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime
@@ -41,6 +42,7 @@ from src.metrics import (
     compute_qpd,
     compute_qps,
     exact_match,
+    get_pricing_tier,
     token_f1,
 )
 from src.plot_results import (
@@ -166,6 +168,11 @@ def _process_item_metrics(
         or 0
     )
 
+    model_used = item.get("modelUsed") or item.get("model_used")
+    if model_used:
+        item["model_used"] = model_used
+    effective_tier = model_used if model_used else pricing_tier
+
     item["rerank_docs"] = rerank_docs
     item["embed_tokens"] = embed_tokens
     item["routing_tokens"] = route_tokens
@@ -176,19 +183,41 @@ def _process_item_metrics(
         cached_tokens=cached_tokens,
         rerank_docs=rerank_docs,
         embed_tokens=embed_tokens,
-        tier=pricing_tier,
+        tier=effective_tier,
         prompt_is_uncached=True,
     )
+    if route_tokens > 0:
+        try:
+            router_tier = get_pricing_tier("gemini-3.5-flash-lite")
+            cost += (route_tokens * router_tier.prompt_price_per_million) / 1_000_000.0
+        except Exception:
+            pass
     item["cost_usd"] = cost
 
     # Latency parsing
     timings = item.get("timings") or item.get("timingsMs") or {}
     ret_ms = timings.get("retrievalMs", item.get("retrieval_ms", 0.0))
     gen_ms = timings.get("generationMs", item.get("generation_ms", 0.0))
-    tot_ms = item.get("totalLatencyMs", item.get("total_latency_ms", ret_ms + gen_ms))
-    item["total_latency_ms"] = tot_ms
+    route_ms = timings.get("routeMs", item.get("route_ms", 0.0))
+    rerank_ms = timings.get("rerankMs", item.get("rerank_ms", 0.0))
+    expand_ms = timings.get("expansionMs", item.get("expansion_ms", 0.0))
+    cache_ms = timings.get("cacheMs", item.get("cache_ms", 0.0))
+
     item["retrieval_ms"] = ret_ms
     item["generation_ms"] = gen_ms
+    item["route_ms"] = route_ms
+    item["rerank_ms"] = rerank_ms
+    item["expansion_ms"] = expand_ms
+    item["cache_ms"] = cache_ms
+
+    tot_ms = item.get(
+        "totalLatencyMs",
+        item.get(
+            "total_latency_ms",
+            ret_ms + gen_ms + route_ms + rerank_ms + expand_ms + cache_ms,
+        ),
+    )
+    item["total_latency_ms"] = tot_ms
 
     # RAGAS evaluation
     if ragas_evaluator and ragas_evaluator.llm is not None:
@@ -232,7 +261,7 @@ def run(
     sample: bool = typer.Option(False, "--sample", "-s", help="Use canonical 100-question sample (Thesis §4.2.1)"),
     modules: str = typer.Option("", "--modules", "-m", help="Comma-separated optimization modules (e.g. M1,M2 or S2B,SR)"),
     table_name: Optional[str] = typer.Option(None, "--table-name", help="Vector store table name override"),
-    judge: str = typer.Option("none", "--judge", "-j", help="Judge provider (claude, vertex, gemini, ollama, none)"),
+    judge: str = typer.Option("none", "--judge", "-j", help="Judge provider (claude, gemini, vertex, ollama, none)"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
     warmup: int = typer.Option(2, "--warmup", "-w", help="Number of unmeasured warm-up queries to eliminate JVM JIT / TLS jitter"),
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable verbose debug logging"),
@@ -346,7 +375,7 @@ def run(
     effective_delay: float
     if judge_delay is not None:
         effective_delay = max(0.0, judge_delay)
-    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai", "vertex-claude", "claude-vertex"):
+    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai"):
         effective_delay = 1.5
     else:
         effective_delay = 0.0
@@ -386,7 +415,7 @@ def run(
 
 @app.command("test-judge")
 def test_judge(
-    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, vertex, gemini, ollama, none"),
+    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, gemini, vertex, ollama, none"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
 ) -> None:
     """Tests connectivity, responsiveness, and latency of the configured evaluation judge."""
@@ -427,7 +456,7 @@ def test_judge(
 @app.command()
 def evaluate(
     input_file: Path = typer.Option(..., "--input", "-i", help="Input JSONL file containing raw benchmark results"),
-    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, vertex, gemini, ollama, none"),
+    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, gemini, vertex, ollama, none"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSONL path for evaluated results"),
     judge_delay: Optional[float] = typer.Option(
@@ -443,7 +472,7 @@ def evaluate(
     effective_delay: float
     if judge_delay is not None:
         effective_delay = max(0.0, judge_delay)
-    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai", "vertex-claude", "claude-vertex"):
+    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai"):
         effective_delay = 1.5
     else:
         effective_delay = 0.0
@@ -534,8 +563,12 @@ def export_thesis(
     target_path = Path(input_target)
     run_dict: dict[str, list[dict[str, Any]]] = {}
 
+    def _sort_key(p: Path) -> tuple[int, str]:
+        m = re.search(r"[Cc](\d+)", p.stem)
+        return (int(m.group(1)) if m else 999, p.name)
+
     if target_path.is_dir():
-        for jsonl_file in sorted(target_path.glob("*.jsonl")):
+        for jsonl_file in sorted(target_path.glob("*.jsonl"), key=_sort_key):
             stem = jsonl_file.stem.replace("run_", "").replace("_evaluated", "")
             run_dict[stem] = _load_jsonl(jsonl_file)
     elif target_path.is_file():
@@ -594,7 +627,7 @@ def query_cmd(
     query_text: str = typer.Argument(..., help="Query or question to ask the RAG pipeline"),
     table_name: str = typer.Option("vector_store_nordea", "--table-name", "-t", help="Target vector store table"),
     modules: str = typer.Option("", "--modules", "-m", help="Comma-separated optimization modules"),
-    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, vertex, gemini, ollama, none"),
+    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, gemini, vertex, ollama, none"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
     ground_truth: Optional[str] = typer.Option(None, "--ground-truth", "-g", help="Optional reference answer"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Optional path to save evaluation result JSONL"),
@@ -680,7 +713,7 @@ def run_questions(
     table_name: str = typer.Option("vector_store_nordea", "--table-name", "-t", help="Target vector store table"),
     modules: str = typer.Option("", "--modules", "-m", help="Comma-separated optimization modules"),
     limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of questions to evaluate"),
-    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, vertex, gemini, ollama, none"),
+    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, gemini, vertex, ollama, none"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSONL path for evaluated results"),
     url: Optional[str] = typer.Option(None, "--url", help="RAG service URL"),
@@ -749,11 +782,15 @@ def run_questions(
             "generatedAnswer": resp.get("answer", ""),
             "groundTruthAnswer": gt,
             "groundTruthAliases": aliases,
+            "modulesApplied": resp.get("modulesApplied", module_list),
             "retrievedChunks": resp.get("retrievedChunks", []),
             "timings": resp.get("timingsMs", {}),
             "tokenUsage": resp.get("tokenUsage", {}),
             "totalLatencyMs": resp.get("totalLatencyMs", elapsed),
             "tableNameUsed": table_name,
+            "modelUsed": resp.get("modelUsed"),
+            "cacheStatus": resp.get("cacheStatus"),
+            "cacheMetadata": resp.get("cacheMetadata"),
         }
         if ragas_evaluator:
             console.print(f"[dim]Evaluating question [{i}/{len(records)}] with judge [{judge}]...[/dim]")

@@ -10,7 +10,9 @@ package com.dippa.ragbenchmark.api;
  * @param cacheWriteTokens number of tokens written into the context cache (cacheWriteInputTokens)
  * @param rerankDocs number of candidate passages scored by the cross-encoder reranker
  * @param embedTokens number of query tokens embedded by dense vectorizer
- * @param routingTokens number of tokens consumed by the dynamic model routing classifier
+ * @param routingTokens total tokens consumed by the dynamic model routing classifier (prompt + completion)
+ * @param routingPromptTokens prompt tokens consumed by the dynamic model routing classifier
+ * @param routingCompletionTokens completion tokens consumed by the dynamic model routing classifier
  */
 public record TokenUsageDto(
         long promptTokens,
@@ -20,15 +22,45 @@ public record TokenUsageDto(
         long cacheWriteTokens,
         int rerankDocs,
         int embedTokens,
-        int routingTokens) {
+        int routingTokens,
+        int routingPromptTokens,
+        int routingCompletionTokens) {
 
-    public static final TokenUsageDto ZERO = new TokenUsageDto(0, 0, 0, 0, 0, 0, 0, 0);
+    public static final TokenUsageDto ZERO = new TokenUsageDto(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+    public TokenUsageDto(
+            long promptTokens,
+            long completionTokens,
+            long totalTokens,
+            long cachedTokens,
+            long cacheWriteTokens,
+            int rerankDocs,
+            int embedTokens,
+            int routingPromptTokens,
+            int routingCompletionTokens) {
+        this(promptTokens, completionTokens, totalTokens, cachedTokens, cacheWriteTokens,
+                rerankDocs, embedTokens, routingPromptTokens + routingCompletionTokens,
+                routingPromptTokens, routingCompletionTokens);
+    }
+
+    public TokenUsageDto(
+            long promptTokens,
+            long completionTokens,
+            long totalTokens,
+            long cachedTokens,
+            long cacheWriteTokens,
+            int rerankDocs,
+            int embedTokens,
+            int routingTokens) {
+        this(promptTokens, completionTokens, totalTokens, cachedTokens, cacheWriteTokens,
+                rerankDocs, embedTokens, routingTokens, routingTokens, 0);
+    }
 
     public TokenUsageDto(long promptTokens, long completionTokens, long totalTokens, long cachedTokens, long cacheWriteTokens) {
-        this(promptTokens, completionTokens, totalTokens, cachedTokens, cacheWriteTokens, 0, 0, 0);
+        this(promptTokens, completionTokens, totalTokens, cachedTokens, cacheWriteTokens, 0, 0, 0, 0, 0);
     }
 
     public TokenUsageDto(long promptTokens, long completionTokens, long totalTokens, long cachedTokens) {
-        this(promptTokens, completionTokens, totalTokens, cachedTokens, 0L, 0, 0, 0);
+        this(promptTokens, completionTokens, totalTokens, cachedTokens, 0L, 0, 0, 0, 0, 0);
     }
 }

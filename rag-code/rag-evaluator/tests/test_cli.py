@@ -383,4 +383,47 @@ def test_process_item_metrics_caching_attribution():
     assert res_legacy["cost_usd"] == pytest.approx(0.000180075, rel=1e-5)
 
 
+def test_process_item_metrics_model_routing_attribution():
+    from src.cli import _process_item_metrics
+
+    # M4 routed item targeting gemini-3.5-flash-lite
+    m4_item = {
+        "question": "What is RAG?",
+        "generatedAnswer": "Retrieval Augmented Generation",
+        "groundTruthAnswer": "Retrieval Augmented Generation",
+        "modulesApplied": ["M4"],
+        "modelUsed": "gemini-3.5-flash-lite",
+        "timings": {
+            "retrievalMs": 100.0,
+            "routeMs": 25.0,
+            "generationMs": 200.0,
+        },
+        "tokenUsage": {
+            "promptTokens": 500,
+            "completionTokens": 30,
+            "cachedTokens": 0,
+            "routingTokens": 80,
+        },
+    }
+
+    res = _process_item_metrics(m4_item, pricing_tier="gemini-3.8-flash")
+
+    assert res["model_used"] == "gemini-3.5-flash-lite"
+    assert res["route_ms"] == 25.0
+    assert res["retrieval_ms"] == 100.0
+    assert res["generation_ms"] == 200.0
+    assert res["total_latency_ms"] == 325.0
+    assert res["routing_tokens"] == 80
+
+    # Pricing calculation check:
+    # generation tier: gemini-3.5-flash-lite (prompt $0.075/1M, comp $0.30/1M, embed $0.025/1M)
+    # 500 prompt * 0.075/1M = 0.0000375
+    # 30 comp * 0.30/1M = 0.000009
+    # 3 embed * 0.025/1M = 0.000000075
+    # routing overhead: 80 * 0.075/1M = 0.000006
+    # expected total = 0.0000375 + 0.000009 + 0.000000075 + 0.000006 = 0.000052575
+    assert res["cost_usd"] == pytest.approx(0.000052575, rel=1e-5)
+
+
+
 

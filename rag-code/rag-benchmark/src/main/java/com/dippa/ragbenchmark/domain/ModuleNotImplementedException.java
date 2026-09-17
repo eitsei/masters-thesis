@@ -4,9 +4,9 @@ import java.util.EnumSet;
 import java.util.Set;
 
 /**
- * Thrown when a {@link ModuleId} (or set of them) is requested by a caller but has no
- * implementation wired up yet. In v1, all of M1-M4 fall into this bucket — the baseline
- * (M0) pipeline fails fast rather than silently ignoring the request.
+ * Thrown when an unrecognized or unsupported {@link ModuleId} is requested by a caller.
+ * In the thesis testbed, all four modules M1–M4 are supported; this exception serves as a
+ * fail-fast guard ensuring callers receive HTTP 501 rather than unhandled behavior.
  */
 public class ModuleNotImplementedException extends RuntimeException {
 

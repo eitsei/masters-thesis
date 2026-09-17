@@ -7,8 +7,8 @@ import java.util.Set;
 /**
  * Identifies one of the four RAG optimization modules studied in the thesis.
  *
- * <p>None of these modules are implemented in v1 (the M0 baseline) — they exist as a stable
- * vocabulary that the API and domain ports can already refer to.</p>
+ * <p>All four modules are implemented in the benchmark application to support the full
+ * 2^4 = 16 factorial evaluation matrix (C0 to C15).</p>
  *
  * <ul>
  *     <li>{@code M1} — small-to-big retrieval expansion (child chunk retrieval, parent window expansion)</li>

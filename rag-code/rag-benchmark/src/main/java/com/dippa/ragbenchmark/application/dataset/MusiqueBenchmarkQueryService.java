@@ -75,8 +75,8 @@ public class MusiqueBenchmarkQueryService {
         }
 
         RagQueryResult queryResult = (parentTable != null)
-                ? ragQueryService.query(question.question(), modules, requestedTable, parentTable, topK)
-                : ragQueryService.query(question.question(), modules, requestedTable, topK);
+                ? ragQueryService.query(question.question(), modules, requestedTable, parentTable, topK, question.hopCount())
+                : ragQueryService.query(question.question(), modules, requestedTable, null, topK, question.hopCount());
 
         List<String> expectedTitles = question.getSupportingTitles();
         int supportingTitleCount = 0;
@@ -120,6 +120,8 @@ public class MusiqueBenchmarkQueryService {
                 queryResult.generationMs(),
                 queryResult.expansionMs(),
                 queryResult.cacheMs(),
+                queryResult.routeMs(),
+                queryResult.modelUsed(),
                 queryResult.cacheStatus(),
                 queryResult.cacheMetadata(),
                 totalLatencyMs,
@@ -192,7 +194,8 @@ public class MusiqueBenchmarkQueryService {
         long totalCacheWriteTokens = 0;
         int totalRerankDocs = 0;
         int totalEmbedTokens = 0;
-        int totalRoutingTokens = 0;
+        int totalRoutingPromptTokens = 0;
+        int totalRoutingCompletionTokens = 0;
         int supportingEvidenceFoundCount = 0;
 
         for (MusiqueQuestion question : questionsToEvaluate) {
@@ -210,7 +213,8 @@ public class MusiqueBenchmarkQueryService {
                 totalCacheWriteTokens += result.tokenUsage().cacheWriteTokens();
                 totalRerankDocs += result.tokenUsage().rerankDocs();
                 totalEmbedTokens += result.tokenUsage().embedTokens();
-                totalRoutingTokens += result.tokenUsage().routingTokens();
+                totalRoutingPromptTokens += result.tokenUsage().routingPromptTokens();
+                totalRoutingCompletionTokens += result.tokenUsage().routingCompletionTokens();
             }
         }
 
@@ -219,7 +223,7 @@ public class MusiqueBenchmarkQueryService {
                 : (double) results.stream().mapToLong(MusiqueBenchmarkQueryResult::totalLatencyMs).sum() / results.size();
         TokenUsageDto aggregateUsage = new TokenUsageDto(
                 totalPromptTokens, totalCompletionTokens, totalTokens, totalCachedTokens, totalCacheWriteTokens,
-                totalRerankDocs, totalEmbedTokens, totalRoutingTokens);
+                totalRerankDocs, totalEmbedTokens, totalRoutingPromptTokens, totalRoutingCompletionTokens);
 
         return new MusiqueBatchQueryResult(
                 results.size(),

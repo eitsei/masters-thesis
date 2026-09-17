@@ -51,4 +51,23 @@ class TokenUsageDtoTest {
         TokenUsageDto deserialized = objectMapper.readValue(json, TokenUsageDto.class);
         assertThat(deserialized).isEqualTo(dto);
     }
+
+    @Test
+    void granularRoutingTokens_serializesAndDeserializesCorrectly() throws Exception {
+        TokenUsageDto dto = new TokenUsageDto(1000, 50, 1050, 4000, 0, 50, 18, 25, 2);
+        assertThat(dto.routingPromptTokens()).isEqualTo(25);
+        assertThat(dto.routingCompletionTokens()).isEqualTo(2);
+        assertThat(dto.routingTokens()).isEqualTo(27);
+
+        String json = objectMapper.writeValueAsString(dto);
+        assertThat(json).contains("\"routingPromptTokens\":25");
+        assertThat(json).contains("\"routingCompletionTokens\":2");
+        assertThat(json).contains("\"routingTokens\":27");
+
+        TokenUsageDto deserialized = objectMapper.readValue(json, TokenUsageDto.class);
+        assertThat(deserialized).isEqualTo(dto);
+        assertThat(deserialized.routingPromptTokens()).isEqualTo(25);
+        assertThat(deserialized.routingCompletionTokens()).isEqualTo(2);
+        assertThat(deserialized.routingTokens()).isEqualTo(27);
+    }
 }

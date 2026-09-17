@@ -7,8 +7,7 @@ and to run a RAG query pipeline against them, against either a fully local model
 (Ollama) or a cloud one (Google Gemini via Spring AI's Google GenAI integration),
 switchable with a single environment variable. The current version implements the
 **M0 baseline** pipeline along with **M1 (small-to-big retrieval expansion)**, **M2 (semantic re-ranking)**,
-and **M3 (prompt / context caching)**; module **M4 (model routing / cascading)** exists as a named seam in
-the domain model. The design and research questions this
+**M3 (prompt / context caching)**, and **M4 (model routing / cascading)**. The design and research questions this
 project supports are documented in
 [`/home/eitsei/dippa/thesis/chapters/04_research_methods.tex`](/home/eitsei/dippa/thesis/chapters/04_research_methods.tex).
 
@@ -66,15 +65,21 @@ curl -X POST http://localhost:8080/api/query \
   -d '{"query": "What is the capital of France?"}'
 ```
 
-Requesting an optimization module that isn't implemented yet (`modules` accepts any of
-`M1`, `M2`, `M3`, `M4`) returns `501 Not Implemented` with a body describing which
-module(s) were rejected, instead of silently ignoring the request:
+Requesting optimization modules (`modules` accepts any combination of `M1`, `M2`, `M3`, `M4`)
+enables the corresponding pipeline stages:
 
 ```
 curl -X POST http://localhost:8080/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "What is the capital of France?", "modules": ["M2"]}'
+  -d '{"query": "What is the capital of France?", "modules": ["M2", "M4"]}'
 ```
+
+If an optimization module is requested while its backing provider is inactive or unconfigured
+(for example, requesting `M4` with `rag.router.provider=noop`, `M2` with `rag.reranker.provider=noop`,
+or `M1` without a valid parent table), the API returns `400 Bad Request` with a descriptive error code
+(`router_not_configured`, `reranker_not_configured`, `prompt_cache_not_configured`, or `parent_expansion_failed`)
+rather than silently ignoring the requested optimization. If an unsupported module identifier is supplied,
+the service returns `501 Not Implemented`.
 
 ### Retrieved-chunk snippet length and top-K
 
@@ -158,7 +163,7 @@ GOOGLE_AI_API_KEY=<your key from https://aistudio.google.com/apikey>
 then export the updated `.env` and re-run `mvn spring-boot:run`. No code or config
 file changes are needed for this switch — only environment variables.
 
-## What's implemented (M0-M3) vs. stubbed (M4)
+## What's implemented (M0-M4)
 
 | Module | Status |
 |---|---|
@@ -166,7 +171,7 @@ file changes are needed for this switch — only environment variables.
 | M1 — small-to-big retrieval expansion | Implemented with child-table retrieval, parent-table expansion, ranked deduplication, and explicit failure responses |
 | M2 — re-ranking | Implemented via `VertexAiReranker` (`semantic-ranker-default-004`), retrieving a candidate pool of 50 chunks, re-ranking down to top-N, and attaching score metadata (`rerank_score`); `NoOpReranker` serves the baseline |
 | M3 — prompt / context caching | Implemented via `GoogleGenAiPromptCache` and `CachedContentService` for contexts meeting the 4096-token minimum threshold with single-flight concurrency, TTL lifecycle, and clear-down endpoint; `NoOpPromptCache` serves non-cached configurations |
-| M4 — model routing / cascading | Not implemented; a `ModelRouter` port exists but has no implementation wired up; requesting it returns `501` |
+| M4 — model routing / cascading | Implemented via `GoogleGenAiModelRouter` (Gemini 3.5 Flash-Lite zero-shot complexity classifier), `OracleModelRouter` (hop-count deterministic baseline), and `NoOpModelRouter` with fallback resilience, model option propagation, and timing/token telemetry |
 
 See `TODO.md` for what's deferred beyond the module stubs (dataset ingestion,
 evaluation, cost accounting, etc).

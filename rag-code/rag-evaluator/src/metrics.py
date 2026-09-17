@@ -164,6 +164,14 @@ PRICING_CATALOG: dict[str, PricingTier] = {
         rerank_price_per_doc=0.0001,
         embed_price_per_million=0.025,
     ),
+    "gemini-3.1-pro-preview": PricingTier(
+        name="gemini-3.1-pro",
+        prompt_price_per_million=1.25,
+        comp_price_per_million=5.00,
+        cached_price_per_million=0.3125,
+        rerank_price_per_doc=0.0001,
+        embed_price_per_million=0.025,
+    ),
     # Anthropic Claude 3.5 Sonnet / Sonnet 5 (Evaluation Judge)
     "claude-sonnet-5": PricingTier(
         name="claude-sonnet-5",

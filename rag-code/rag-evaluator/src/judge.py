@@ -18,7 +18,7 @@ load_dotenv()
 
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
-from src.judge_factory import JudgeFactory, discover_ollama_endpoint
+from src.judge_factory import JudgeFactory
 
 
 def get_judge_components(
@@ -28,8 +28,8 @@ def get_judge_components(
 ) -> Tuple[Any, Any]:
     """Initializes and returns (ragas_llm, ragas_embeddings) based on provider configuration.
 
-    Delegates to JudgeFactory to provide Anthropic Claude (via Vertex AI),
-    Google Gemini, or OpenAI-compatible Ollama endpoints (/v1) without legacy deprecation warnings.
+    Delegates to JudgeFactory to provide Vertex AI (Gemini + Claude via Model Garden)
+    or Ollama endpoints (/v1).
     """
     chosen_provider = (
         provider or os.getenv("JUDGE_PROVIDER", "claude")

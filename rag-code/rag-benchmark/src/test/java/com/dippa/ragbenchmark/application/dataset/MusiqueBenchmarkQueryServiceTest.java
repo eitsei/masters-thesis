@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -71,7 +72,7 @@ class MusiqueBenchmarkQueryServiceTest {
                 75L,
                 usage
         );
-        when(ragQueryService.query(eq("Where was Tolkien born?"), any(), eq("custom_table"), eq(8)))
+        when(ragQueryService.query(eq("Where was Tolkien born?"), any(), eq("custom_table"), isNull(), eq(8), eq(2)))
                 .thenReturn(queryResult);
 
         BenchmarkQueryRequest request = new BenchmarkQueryRequest(Set.of(), "custom_table", 8);
@@ -84,7 +85,7 @@ class MusiqueBenchmarkQueryServiceTest {
         assertThat(result.totalLatencyMs()).isEqualTo(100L);
         assertThat(result.tableNameUsed()).isEqualTo("custom_table");
 
-        verify(ragQueryService).query("Where was Tolkien born?", Set.of(), "custom_table", 8);
+        verify(ragQueryService).query("Where was Tolkien born?", Set.of(), "custom_table", null, 8, 2);
     }
 
     @Test
@@ -101,7 +102,7 @@ class MusiqueBenchmarkQueryServiceTest {
                 40L,
                 usage
         );
-        when(ragQueryService.query(anyString(), any(), anyString(), any()))
+        when(ragQueryService.query(anyString(), any(), anyString(), isNull(), any(), anyInt()))
                 .thenReturn(queryResult);
 
         BenchmarkBatchQueryRequest batchRequest = new BenchmarkBatchQueryRequest(
@@ -141,12 +142,12 @@ class MusiqueBenchmarkQueryServiceTest {
                 40L,
                 TokenUsageDto.ZERO
         );
-        when(ragQueryService.query(eq("Where was Tolkien born?"), any(), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull()))
+        when(ragQueryService.query(eq("Where was Tolkien born?"), any(), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull(), eq(2)))
                 .thenReturn(queryResult);
 
         MusiqueBenchmarkQueryResult result = benchmarkQueryService.evaluateQuestion("2hop__123");
 
         assertThat(result.tableNameUsed()).isEqualTo("vector_store_test");
-        verify(ragQueryService).query("Where was Tolkien born?", Set.of(), null, null);
+        verify(ragQueryService).query("Where was Tolkien born?", Set.of(), null, null, null, 2);
     }
 }

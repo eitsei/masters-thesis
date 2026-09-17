@@ -5,9 +5,17 @@ import com.dippa.ragbenchmark.domain.InvalidModuleException;
 import com.dippa.ragbenchmark.domain.ModuleId;
 import com.dippa.ragbenchmark.domain.ModuleNotImplementedException;
 import com.dippa.ragbenchmark.domain.ParentExpansionException;
+import com.dippa.ragbenchmark.domain.PromptCacheConfigurationException;
+import com.dippa.ragbenchmark.domain.PromptCacheUnavailableException;
+import com.dippa.ragbenchmark.domain.RerankingConfigurationException;
+import com.dippa.ragbenchmark.domain.RerankingException;
+import com.dippa.ragbenchmark.domain.RouterConfigurationException;
+import com.dippa.ragbenchmark.domain.RouterException;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -18,6 +26,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
 
     @ExceptionHandler(ModuleNotImplementedException.class)
     public ResponseEntity<ModuleNotImplementedResponse> handleModuleNotImplemented(
@@ -52,28 +63,40 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", "parent_expansion_failed", "message", exception.getMessage()));
     }
 
-    @ExceptionHandler(com.dippa.ragbenchmark.domain.RerankingException.class)
-    public ResponseEntity<Map<String, Object>> handleReranking(com.dippa.ragbenchmark.domain.RerankingException exception) {
+    @ExceptionHandler(RerankingException.class)
+    public ResponseEntity<Map<String, Object>> handleReranking(RerankingException exception) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(Map.of("error", "reranking_failed", "message", exception.getMessage()));
     }
 
-    @ExceptionHandler(com.dippa.ragbenchmark.domain.RerankingConfigurationException.class)
-    public ResponseEntity<Map<String, Object>> handleRerankingConfiguration(com.dippa.ragbenchmark.domain.RerankingConfigurationException exception) {
+    @ExceptionHandler(RerankingConfigurationException.class)
+    public ResponseEntity<Map<String, Object>> handleRerankingConfiguration(RerankingConfigurationException exception) {
         return ResponseEntity.badRequest()
                 .body(Map.of("error", "reranking_not_configured", "message", exception.getMessage()));
     }
 
-    @ExceptionHandler(com.dippa.ragbenchmark.domain.PromptCacheConfigurationException.class)
-    public ResponseEntity<Map<String, Object>> handlePromptCacheConfiguration(com.dippa.ragbenchmark.domain.PromptCacheConfigurationException exception) {
+    @ExceptionHandler(PromptCacheConfigurationException.class)
+    public ResponseEntity<Map<String, Object>> handlePromptCacheConfiguration(PromptCacheConfigurationException exception) {
         return ResponseEntity.badRequest()
                 .body(Map.of("error", "prompt_cache_not_configured", "message", exception.getMessage()));
     }
 
-    @ExceptionHandler(com.dippa.ragbenchmark.domain.PromptCacheUnavailableException.class)
-    public ResponseEntity<Map<String, Object>> handlePromptCacheUnavailable(com.dippa.ragbenchmark.domain.PromptCacheUnavailableException exception) {
+    @ExceptionHandler(PromptCacheUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handlePromptCacheUnavailable(PromptCacheUnavailableException exception) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(Map.of("error", "prompt_cache_unavailable", "message", exception.getMessage()));
+    }
+
+    @ExceptionHandler(RouterConfigurationException.class)
+    public ResponseEntity<Map<String, Object>> handleRouterConfiguration(RouterConfigurationException exception) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("error", "router_not_configured", "message", exception.getMessage()));
+    }
+
+    @ExceptionHandler(RouterException.class)
+    public ResponseEntity<Map<String, Object>> handleRouter(RouterException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("error", "routing_failed", "message", exception.getMessage()));
     }
 
     @ExceptionHandler(NoSuchElementException.class)
@@ -87,4 +110,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(Map.of("error", "bad_request", "message", exception.getMessage()));
     }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleGenericException(Exception exception) {
+        logger.error("Unhandled exception processing request: {}", exception.getMessage(), exception);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(
+                        "error", "internal_server_error",
+                        "exception", exception.getClass().getSimpleName(),
+                        "message", exception.getMessage() != null ? exception.getMessage() : "null"));
+    }
 }
+

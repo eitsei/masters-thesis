@@ -173,11 +173,17 @@ rag:
     ttl: ${RAG_PROMPT_CACHE_TTL:300s}
     chars-per-token-estimate: 3.5
     display-name-prefix: "rag-benchmark-"
+  router:
+    provider: ${RAG_ROUTER_PROVIDER:classifier}
+    classifier-model: ${RAG_ROUTER_CLASSIFIER_MODEL:${rag.models.google-genai.flash-lite}}
+    fallback-model: ${RAG_ROUTER_FALLBACK_MODEL:${rag.models.google-genai.flash}}
+    temperature: 0.0
+    timeout-ms: 5000
   models:
     google-genai:
       flash-lite: gemini-3.5-flash-lite
       flash: gemini-3.8-flash
-      pro: gemini-3.1-pro-preview
+      pro: ${GOOGLE_GENAI_PRO_MODEL:gemini-3.1-pro-preview}
     reranker:
       vertex-default: semantic-ranker-default-004
       vertex-fast: semantic-ranker-fast-004

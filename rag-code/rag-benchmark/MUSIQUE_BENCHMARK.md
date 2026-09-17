@@ -8,7 +8,7 @@ This guide describes how to explore the MuSiQue multi-hop question-answering dat
 
 The [MuSiQue](https://arxiv.org/abs/2108.01073) dataset is designed for multi-hop reasoning (2-hop, 3-hop, and 4-hop questions) where disconnected evidence paragraphs must be retrieved and synthesized to arrive at the final answer.
 
-In `rag-benchmark`, MuSiQue is integrated to evaluate retrieval quality and reasoning capabilities across the optimization modules (M0–M4). M0 and M1 are currently executable; M2–M4 remain explicitly unsupported and return `501`.
+In `rag-benchmark`, MuSiQue is integrated to evaluate retrieval quality and reasoning capabilities across the optimization modules (M0–M4). All modules M0–M4 are executable across the full factorial experiment matrix ($C_0$–$C_{15}$).
 
 ---
 

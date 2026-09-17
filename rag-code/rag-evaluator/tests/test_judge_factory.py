@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 import pytest
-from langchain_anthropic import ChatAnthropic
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from src.judge_factory import (
@@ -64,24 +62,12 @@ class TestJudgeFactoryCreation:
         assert isinstance(emb, OpenAIEmbeddings)
         assert emb.model == "nomic-embed-text:latest"
 
-    def test_gemini_provider_configuration(self, monkeypatch):
-        monkeypatch.setenv("GOOGLE_AI_API_KEY", "fake-gemini-key")
-        llm, emb = JudgeFactory.create_judge(
-            provider="gemini",
-            model="gemini-2.5-flash",
-            embedding_model="models/text-embedding-004",
-        )
-
-        assert isinstance(llm, ChatGoogleGenerativeAI)
-        assert "gemini-2.5-flash" in llm.model
-        assert isinstance(emb, GoogleGenerativeAIEmbeddings)
-        assert emb.model == "models/text-embedding-004"
-
     def test_vertex_ai_provider_configuration_global(self, monkeypatch):
         monkeypatch.delenv("GOOGLE_AI_API_KEY", raising=False)
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
         monkeypatch.setenv("GOOGLE_CLOUD_PROJECT_ID", "test-project")
         monkeypatch.delenv("GOOGLE_CLOUD_LOCATION", raising=False)
+        monkeypatch.delenv("JUDGE_MODEL", raising=False)
 
         with patch("langchain_google_vertexai.ChatVertexAI") as mock_chat, \
              patch("langchain_google_vertexai.VertexAIEmbeddings") as mock_emb:
@@ -139,25 +125,6 @@ class TestJudgeFactoryCreation:
 
             mock_emb.assert_called_once()
             assert mock_emb.call_args.kwargs["model_name"] == "text-embedding-004"
-
-    def test_claude_direct_provider_configuration(self, monkeypatch):
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-anthropic-key")
-        monkeypatch.delenv("GOOGLE_AI_API_KEY", raising=False)
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-
-        with patch("src.judge_factory.discover_ollama_endpoint", return_value="http://172.21.64.1:11434"):
-            llm, emb = JudgeFactory.create_judge(
-                provider="claude-direct",
-                model="claude-sonnet-5",
-                embedding_model="nomic-embed-text:latest",
-            )
-
-        assert isinstance(llm, ChatAnthropic)
-        assert llm.model == "claude-sonnet-5"
-        assert llm.temperature == 0.0
-        # Embeddings fallback to Ollama embeddings
-        assert isinstance(emb, OpenAIEmbeddings)
-        assert emb.model == "nomic-embed-text:latest"
 
     def test_unsupported_provider_raises_error(self):
         with pytest.raises(ValueError, match="Unsupported judge provider"):

@@ -46,7 +46,7 @@ class QueryControllerTest {
     }
 
     @Test
-    void validModuleName_isCaseInsensitive_andReturns501WhenNotImplemented() throws Exception {
+    void validModuleName_isCaseInsensitive_andReturns501WhenModuleNotImplementedExceptionThrown() throws Exception {
         when(ragQueryService.query(eq("hi"), eq(Set.of(ModuleId.M2))))
                 .thenThrow(new ModuleNotImplementedException(Set.of(ModuleId.M2)));
 
@@ -78,5 +78,51 @@ class QueryControllerTest {
                 .andExpect(jsonPath("$.retrievedChunks[0].snippet").value("Paris is the capital of France."))
                 .andExpect(jsonPath("$.timingsMs.retrievalMs").value(12))
                 .andExpect(jsonPath("$.timingsMs.generationMs").value(34));
+    }
+
+    @Test
+    void m4Requested_whenRouterNotConfigured_returns400() throws Exception {
+        when(ragQueryService.query(eq("hi"), eq(Set.of(ModuleId.M4))))
+                .thenThrow(new com.dippa.ragbenchmark.domain.RouterConfigurationException("Router not configured"));
+
+        mockMvc.perform(post("/api/query")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\": \"hi\", \"modules\": [\"m4\"]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("router_not_configured"))
+                .andExpect(jsonPath("$.message").value("Router not configured"));
+    }
+
+    @Test
+    void m4Pipeline_returnsModelUsedAndRouteMs() throws Exception {
+        TokenUsageDto usage = new TokenUsageDto(100, 20, 120, 0, 0, 0, 0, 25, 1);
+        RagQueryResult result = new RagQueryResult(
+                "Lite answer.",
+                Set.of(ModuleId.M4),
+                List.of(new RetrievedChunk("chunk-1", "Text snippet")),
+                10L,
+                40L,
+                0L,
+                0L,
+                0L,
+                45L,
+                "gemini-3.5-flash-lite",
+                com.dippa.ragbenchmark.domain.CacheStatus.NONE,
+                CacheMetadataDto.NONE,
+                usage);
+        when(ragQueryService.query(eq("Simple factual question"), eq(Set.of(ModuleId.M4))))
+                .thenReturn(result);
+
+        mockMvc.perform(post("/api/query")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\": \"Simple factual question\", \"modules\": [\"M4\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer").value("Lite answer."))
+                .andExpect(jsonPath("$.modulesApplied[0]").value("M4"))
+                .andExpect(jsonPath("$.modelUsed").value("gemini-3.5-flash-lite"))
+                .andExpect(jsonPath("$.timingsMs.routeMs").value(45))
+                .andExpect(jsonPath("$.tokenUsage.routingPromptTokens").value(25))
+                .andExpect(jsonPath("$.tokenUsage.routingCompletionTokens").value(1))
+                .andExpect(jsonPath("$.tokenUsage.routingTokens").value(26));
     }
 }

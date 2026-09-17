@@ -4,6 +4,7 @@ import com.dippa.ragbenchmark.infrastructure.config.GenerationProperties;
 import com.dippa.ragbenchmark.infrastructure.config.ModelCatalogProperties;
 import com.dippa.ragbenchmark.infrastructure.config.PromptCacheProperties;
 import com.dippa.ragbenchmark.infrastructure.config.RerankerProperties;
+import com.dippa.ragbenchmark.infrastructure.config.RouterProperties;
 import com.dippa.ragbenchmark.infrastructure.dataset.MusiqueDatasetProperties;
 import com.dippa.ragbenchmark.ingest.nordea.NordeaIngestionProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,6 +19,7 @@ import org.springframework.context.annotation.Bean;
         ModelCatalogProperties.class,
         RerankerProperties.class,
         PromptCacheProperties.class,
+        RouterProperties.class,
         GenerationProperties.class,
         NordeaIngestionProperties.class,
         MusiqueDatasetProperties.class
@@ -85,6 +87,7 @@ public class RagBenchmarkApplication {
             String embProvider = env.getProperty("spring.ai.model.embedding", "ollama");
             String rerankerProvider = env.getProperty("rag.reranker.provider", "noop");
             String promptCacheProvider = env.getProperty("rag.prompt-cache.provider", "noop");
+            String routerProvider = env.getProperty("rag.router.provider", "noop");
             String gcpProject = env.getProperty("GOOGLE_CLOUD_PROJECT_ID", env.getProperty("spring.ai.google.genai.project-id", "dippatyo"));
             String gcpLocation = env.getProperty("GOOGLE_CLOUD_LOCATION", env.getProperty("spring.ai.google.genai.location", "global"));
 
@@ -94,6 +97,7 @@ public class RagBenchmarkApplication {
             System.out.println("  Embedding Provider:    " + embProvider);
             System.out.println("  Reranker Provider:     " + rerankerProvider);
             System.out.println("  Prompt Cache Provider: " + promptCacheProvider);
+            System.out.println("  Router Provider:       " + routerProvider);
             System.out.println("  GCP Project / Loc:     " + gcpProject + " / " + gcpLocation);
             System.out.println("=======================================================\n");
         };
