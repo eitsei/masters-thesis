@@ -524,8 +524,8 @@ public class RagQueryService {
 
             if (responseFlux != null) {
                 responseFlux.doOnNext(chunk -> {
-                    firstTokenTime.compareAndSet(0L, System.currentTimeMillis());
                     if (chunk != null) {
+                        firstTokenTime.compareAndSet(0L, System.currentTimeMillis());
                         lastResponse.set(chunk);
                         if (chunk.getResult() != null && chunk.getResult().getOutput() != null) {
                             String text = chunk.getResult().getOutput().getText();
@@ -600,6 +600,7 @@ public class RagQueryService {
                 cacheMs,
                 routeMs,
                 ttftMs,
+                prefillMs,
                 effectiveModelName,
                 cacheStatus,
                 cacheMetadata,
