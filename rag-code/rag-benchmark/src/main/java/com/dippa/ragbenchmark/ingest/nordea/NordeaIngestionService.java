@@ -41,18 +41,21 @@ public class NordeaIngestionService {
     private final VectorStore defaultVectorStore;
     private final PgVectorStoreFactory vectorStoreFactory;
     private final JdbcTemplate jdbcTemplate;
+    private final NordeaIngestionProperties properties;
 
     public NordeaIngestionService(
             NordeaCrawler crawler,
             NordeaPdfExtractor pdfExtractor,
             VectorStore defaultVectorStore,
             ObjectProvider<PgVectorStoreFactory> vectorStoreFactoryProvider,
-            ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+            ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
+            NordeaIngestionProperties properties) {
         this.crawler = crawler;
         this.pdfExtractor = pdfExtractor;
         this.defaultVectorStore = defaultVectorStore;
         this.vectorStoreFactory = vectorStoreFactoryProvider != null ? vectorStoreFactoryProvider.getIfAvailable() : null;
         this.jdbcTemplate = jdbcTemplateProvider != null ? jdbcTemplateProvider.getIfAvailable() : null;
+        this.properties = properties;
     }
 
     public record NordeaIngestionSummary(
@@ -76,50 +79,44 @@ public class NordeaIngestionService {
 
     public NordeaIngestionSummary ingestOriginal() throws IOException {
         long startTime = System.currentTimeMillis();
-        Path stagingDir = Files.createTempDirectory("nordea-scrape-");
         TokenTextSplitter splitter = TokenTextSplitter.builder().withChunkSize(BASELINE_CHUNK_SIZE_TOKENS).build();
         VectorStore targetStore = (vectorStoreFactory != null)
                 ? vectorStoreFactory.getStore("vector_store_nordea")
                 : defaultVectorStore;
 
-        try {
-            NordeaCrawler.CrawlResult crawlResult = crawler.crawl();
-            logger.info("Crawled " + crawlResult.pages().size() + " HTML page(s), found "
-                    + crawlResult.pdfUrls().size() + " candidate PDF link(s)");
+        NordeaCrawler.CrawlResult crawlResult = crawler.crawl();
+        logger.info("Crawled " + crawlResult.pages().size() + " HTML page(s), found "
+                + crawlResult.pdfUrls().size() + " candidate PDF link(s)");
 
-            List<Document> allChunks = new ArrayList<>();
-            int fileCounter = 0;
+        List<Document> allChunks = new ArrayList<>();
+        int fileCounter = 0;
 
-            for (NordeaCrawler.CrawledPage page : crawlResult.pages()) {
-                if (page.text().isBlank()) continue;
-                String stagedText = stageAndReload(stagingDir, "page-" + fileCounter++, page.text());
-                allChunks.addAll(chunkBaseline(splitter, stagedText, page.url(), page.title()));
-            }
-
-            int pdfsExtracted = 0;
-            for (String pdfUrl : crawlResult.pdfUrls()) {
-                Optional<NordeaPdfExtractor.CrawledPdf> extracted = pdfExtractor.extract(pdfUrl);
-                if (extracted.isEmpty() || extracted.get().text().isBlank()) continue;
-                NordeaPdfExtractor.CrawledPdf pdf = extracted.get();
-                String stagedText = stageAndReload(stagingDir, "pdf-" + fileCounter++, pdf.text());
-                allChunks.addAll(chunkBaseline(splitter, stagedText, pdf.url(), pdf.title()));
-                pdfsExtracted++;
-            }
-
-            logger.info("Extracted text from " + pdfsExtracted + " PDF(s)");
-            logger.info("Writing " + allChunks.size() + " baseline chunk(s) to vector_store_nordea");
-            addInBatches(targetStore, allChunks, 100);
-            long durationMs = System.currentTimeMillis() - startTime;
-            logger.info("Nordea baseline ingestion complete: " + allChunks.size() + " chunk(s) in " + durationMs + " ms");
-            return new NordeaIngestionSummary(crawlResult.pages().size(), pdfsExtracted, 0, allChunks.size(), durationMs, "original");
-        } finally {
-            deleteRecursively(stagingDir);
+        for (NordeaCrawler.CrawledPage page : crawlResult.pages()) {
+            if (page.text().isBlank()) continue;
+            exportMarkdown("pages", slugify(page.url(), page.title(), fileCounter++), page.url(), page.title(), page.text(), "html");
+            allChunks.addAll(chunkBaseline(splitter, page.text(), page.url(), page.title(), "html"));
         }
+
+        int pdfsExtracted = 0;
+        for (String pdfUrl : crawlResult.pdfUrls()) {
+            Optional<NordeaPdfExtractor.CrawledPdf> extracted = pdfExtractor.extract(pdfUrl);
+            if (extracted.isEmpty() || extracted.get().text().isBlank()) continue;
+            NordeaPdfExtractor.CrawledPdf pdf = extracted.get();
+            exportMarkdown("pdfs", slugify(pdf.url(), pdf.title(), fileCounter++), pdf.url(), pdf.title(), pdf.text(), "pdf");
+            allChunks.addAll(chunkBaseline(splitter, pdf.text(), pdf.url(), pdf.title(), "pdf"));
+            pdfsExtracted++;
+        }
+
+        logger.info("Extracted markdown from " + pdfsExtracted + " PDF(s)");
+        logger.info("Writing " + allChunks.size() + " baseline chunk(s) to vector_store_nordea");
+        addInBatches(targetStore, allChunks, 100);
+        long durationMs = System.currentTimeMillis() - startTime;
+        logger.info("Nordea baseline ingestion complete: " + allChunks.size() + " chunk(s) in " + durationMs + " ms");
+        return new NordeaIngestionSummary(crawlResult.pages().size(), pdfsExtracted, 0, allChunks.size(), durationMs, "original");
     }
 
     public NordeaIngestionSummary ingestSmallToBig() throws IOException {
         long startTime = System.currentTimeMillis();
-        Path stagingDir = Files.createTempDirectory("nordea-s2b-scrape-");
         TokenTextSplitter parentSplitter = TokenTextSplitter.builder().withChunkSize(S2B_PARENT_CHUNK_SIZE_TOKENS).build();
         TokenTextSplitter childSplitter = TokenTextSplitter.builder().withChunkSize(S2B_CHILD_CHUNK_SIZE_TOKENS).build();
 
@@ -130,49 +127,45 @@ public class NordeaIngestionService {
                 ? vectorStoreFactory.getStore("vector_store_nordea_small")
                 : defaultVectorStore;
 
-        try {
-            NordeaCrawler.CrawlResult crawlResult = crawler.crawl();
-            logger.info("S2B: Crawled " + crawlResult.pages().size() + " HTML page(s), found "
-                    + crawlResult.pdfUrls().size() + " candidate PDF link(s)");
+        NordeaCrawler.CrawlResult crawlResult = crawler.crawl();
+        logger.info("S2B: Crawled " + crawlResult.pages().size() + " HTML page(s), found "
+                + crawlResult.pdfUrls().size() + " candidate PDF link(s)");
 
-            if (crawlResult.pages().isEmpty() && crawlResult.pdfUrls().isEmpty() && jdbcTemplate != null) {
-                logger.warn("Live crawl returned 0 pages/PDFs. Falling back to ingestSmallToBigFromBaseline() from vector_store_nordea...");
-                return ingestSmallToBigFromBaseline();
-            }
-
-            List<Document> parentChunks = new ArrayList<>();
-            List<Document> childChunks = new ArrayList<>();
-            int fileCounter = 0;
-
-            for (NordeaCrawler.CrawledPage page : crawlResult.pages()) {
-                if (page.text().isBlank()) continue;
-                String stagedText = stageAndReload(stagingDir, "page-" + fileCounter++, page.text());
-                splitAndLink(parentSplitter, childSplitter, stagedText, page.url(), page.title(), parentChunks, childChunks);
-            }
-
-            int pdfsExtracted = 0;
-            for (String pdfUrl : crawlResult.pdfUrls()) {
-                Optional<NordeaPdfExtractor.CrawledPdf> extracted = pdfExtractor.extract(pdfUrl);
-                if (extracted.isEmpty() || extracted.get().text().isBlank()) continue;
-                NordeaPdfExtractor.CrawledPdf pdf = extracted.get();
-                String stagedText = stageAndReload(stagingDir, "pdf-" + fileCounter++, pdf.text());
-                splitAndLink(parentSplitter, childSplitter, stagedText, pdf.url(), pdf.title(), parentChunks, childChunks);
-                pdfsExtracted++;
-            }
-
-            logger.info("Writing " + parentChunks.size() + " parent chunks to vector_store_nordea_large");
-            addInBatches(largeStore, parentChunks, 10);
-
-            logger.info("Writing " + childChunks.size() + " child chunks to vector_store_nordea_small");
-            addInBatches(smallStore, childChunks, 25);
-
-            long durationMs = System.currentTimeMillis() - startTime;
-            logger.info("Nordea S2B ingestion complete: " + parentChunks.size() + " parent(s), " + childChunks.size()
-                    + " child(ren) in " + durationMs + " ms");
-            return new NordeaIngestionSummary(crawlResult.pages().size(), pdfsExtracted, parentChunks.size(), childChunks.size(), durationMs, "s2b");
-        } finally {
-            deleteRecursively(stagingDir);
+        if (crawlResult.pages().isEmpty() && crawlResult.pdfUrls().isEmpty() && jdbcTemplate != null) {
+            logger.warn("Live crawl returned 0 pages/PDFs. Falling back to ingestSmallToBigFromBaseline() from vector_store_nordea...");
+            return ingestSmallToBigFromBaseline();
         }
+
+        List<Document> parentChunks = new ArrayList<>();
+        List<Document> childChunks = new ArrayList<>();
+        int fileCounter = 0;
+
+        for (NordeaCrawler.CrawledPage page : crawlResult.pages()) {
+            if (page.text().isBlank()) continue;
+            exportMarkdown("pages", slugify(page.url(), page.title(), fileCounter++), page.url(), page.title(), page.text(), "html");
+            splitAndLink(parentSplitter, childSplitter, page.text(), page.url(), page.title(), "html", parentChunks, childChunks);
+        }
+
+        int pdfsExtracted = 0;
+        for (String pdfUrl : crawlResult.pdfUrls()) {
+            Optional<NordeaPdfExtractor.CrawledPdf> extracted = pdfExtractor.extract(pdfUrl);
+            if (extracted.isEmpty() || extracted.get().text().isBlank()) continue;
+            NordeaPdfExtractor.CrawledPdf pdf = extracted.get();
+            exportMarkdown("pdfs", slugify(pdf.url(), pdf.title(), fileCounter++), pdf.url(), pdf.title(), pdf.text(), "pdf");
+            splitAndLink(parentSplitter, childSplitter, pdf.text(), pdf.url(), pdf.title(), "pdf", parentChunks, childChunks);
+            pdfsExtracted++;
+        }
+
+        logger.info("Writing " + parentChunks.size() + " parent chunks to vector_store_nordea_large");
+        addInBatches(largeStore, parentChunks, 10);
+
+        logger.info("Writing " + childChunks.size() + " child chunks to vector_store_nordea_small");
+        addInBatches(smallStore, childChunks, 25);
+
+        long durationMs = System.currentTimeMillis() - startTime;
+        logger.info("Nordea S2B ingestion complete: " + parentChunks.size() + " parent(s), " + childChunks.size()
+                + " child(ren) in " + durationMs + " ms");
+        return new NordeaIngestionSummary(crawlResult.pages().size(), pdfsExtracted, parentChunks.size(), childChunks.size(), durationMs, "s2b");
     }
 
     public NordeaIngestionSummary ingestSmallToBigFromBaseline() {
@@ -220,7 +213,7 @@ public class NordeaIngestionService {
             String url = entry.getKey();
             String title = titlesByUrl.getOrDefault(url, "");
             String docText = entry.getValue().toString().trim();
-            splitAndLink(parentSplitter, childSplitter, docText, url, title, parentChunks, childChunks);
+            splitAndLink(parentSplitter, childSplitter, docText, url, title, "baseline", parentChunks, childChunks);
         }
 
         logger.info("Writing " + parentChunks.size() + " parent chunks to vector_store_nordea_large");
@@ -274,11 +267,15 @@ public class NordeaIngestionService {
             String text,
             String sourceUrl,
             String title,
+            String docType,
             List<Document> outParents,
             List<Document> outChildren) {
         Map<String, Object> baseMeta = new HashMap<>();
         baseMeta.put("source_url", sourceUrl);
         baseMeta.put("page_title", title);
+        if (docType != null) {
+            baseMeta.put("doc_type", docType);
+        }
 
         List<Document> rawParents = parentSplitter.split(new Document(text, baseMeta));
         for (int pIdx = 0; pIdx < rawParents.size(); pIdx++) {
@@ -310,10 +307,13 @@ public class NordeaIngestionService {
         }
     }
 
-    private List<Document> chunkBaseline(TokenTextSplitter splitter, String text, String sourceUrl, String title) {
+    private List<Document> chunkBaseline(TokenTextSplitter splitter, String text, String sourceUrl, String title, String docType) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("source_url", sourceUrl);
         metadata.put("page_title", title);
+        if (docType != null) {
+            metadata.put("doc_type", docType);
+        }
 
         List<Document> chunks = splitter.split(new Document(text, metadata));
         List<Document> withDeterministicIds = new ArrayList<>(chunks.size());
@@ -328,23 +328,47 @@ public class NordeaIngestionService {
         return withDeterministicIds;
     }
 
-    private static String stageAndReload(Path stagingDir, String fileNamePrefix, String text) throws IOException {
-        Path stagedFile = stagingDir.resolve(fileNamePrefix + ".txt");
-        Files.writeString(stagedFile, text, StandardCharsets.UTF_8);
-        return Files.readString(stagedFile, StandardCharsets.UTF_8);
+    private void exportMarkdown(String subDir, String filename, String url, String title, String markdown, String docType) {
+        if (properties == null || properties.markdownExportDir() == null || properties.markdownExportDir().isBlank()) {
+            return;
+        }
+        try {
+            Path targetDir = Path.of(properties.markdownExportDir()).resolve(subDir);
+            Files.createDirectories(targetDir);
+            Path targetFile = targetDir.resolve(filename);
+
+            String frontmatter = """
+                    ---
+                    url: "%s"
+                    title: "%s"
+                    type: "%s"
+                    crawled_at: "%s"
+                    ---
+
+                    """.formatted(
+                            url.replace("\"", "\\\""),
+                            (title != null ? title.replace("\"", "\\\"") : ""),
+                            docType,
+                            java.time.Instant.now().toString()
+                    );
+
+            Files.writeString(targetFile, frontmatter + markdown, StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            logger.warn("Failed to export markdown to disk for " + url + ": " + ex.getMessage());
+        }
     }
 
-    private static void deleteRecursively(Path dir) {
-        try (Stream<Path> walk = Files.walk(dir)) {
-            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
-                try {
-                    Files.delete(path);
-                } catch (IOException ex) {
-                    logger.warn("Failed to delete staging file " + path + ": " + ex.getMessage());
-                }
-            });
-        } catch (IOException ex) {
-            logger.warn("Failed to walk staging dir for cleanup " + dir + ": " + ex.getMessage());
+    private static String slugify(String url, String title, int index) {
+        String base = (title != null && !title.isBlank()) ? title : url;
+        String clean = base.toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9äöå]+", "-")
+                .replaceAll("^-+|-+$", "");
+        if (clean.length() > 60) {
+            clean = clean.substring(0, 60);
         }
+        if (clean.isBlank()) {
+            clean = "doc";
+        }
+        return String.format("%03d-%s.md", index, clean);
     }
 }

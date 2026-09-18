@@ -48,6 +48,51 @@ class MusiqueBenchmarkQueryResponseTest {
     }
 
     @Test
+    void fromResult_preservesTtftMsAndPrefillMsInTimings() {
+        TokenUsageDto usage = new TokenUsageDto(100, 50, 150, 0);
+        MusiqueBenchmarkQueryResult result = new MusiqueBenchmarkQueryResult(
+                "q-ttft",
+                "question",
+                "ground-truth",
+                List.of(),
+                2,
+                "answer",
+                List.of("M1", "M2"),
+                List.of(),
+                25L,  // retrieval
+                15L,  // rerank
+                60L,  // generation
+                10L,  // expansion
+                5L,   // cache
+                20L,  // route
+                85L,  // ttftMs (retrieval 25 + rerank 15 + expand 10 + cache 5 + route 20 + prefill 10)
+                10L,  // prefillMs
+                "gemini-3.8-flash",
+                com.dippa.ragbenchmark.domain.CacheStatus.NONE,
+                CacheMetadataDto.NONE,
+                135L, // totalLatencyMs
+                usage,
+                "custom_musique_table",
+                List.of("Title"),
+                true,
+                1,
+                true
+        );
+
+        MusiqueBenchmarkQueryResponse response = MusiqueBenchmarkQueryResponse.fromResult(result);
+
+        assertThat(response.timings()).isNotNull();
+        assertThat(response.timings().ttftMs()).isEqualTo(85L);
+        assertThat(response.timings().prefillMs()).isEqualTo(10L);
+        assertThat(response.timings().retrievalMs()).isEqualTo(25L);
+        assertThat(response.timings().rerankMs()).isEqualTo(15L);
+        assertThat(response.timings().expansionMs()).isEqualTo(10L);
+        assertThat(response.timings().cacheMs()).isEqualTo(5L);
+        assertThat(response.timings().routeMs()).isEqualTo(20L);
+        assertThat(response.timings().generationMs()).isEqualTo(60L);
+    }
+
+    @Test
     void backwardCompatibleConstructor_defaultsNewFields() {
         MusiqueBenchmarkQueryResponse response = new MusiqueBenchmarkQueryResponse(
                 "q-1",

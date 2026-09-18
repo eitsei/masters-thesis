@@ -121,6 +121,7 @@ public class MusiqueBenchmarkQueryService {
                 queryResult.expansionMs(),
                 queryResult.cacheMs(),
                 queryResult.routeMs(),
+                queryResult.ttftMs(),
                 queryResult.prefillMs(),
                 queryResult.modelUsed(),
                 queryResult.cacheStatus(),

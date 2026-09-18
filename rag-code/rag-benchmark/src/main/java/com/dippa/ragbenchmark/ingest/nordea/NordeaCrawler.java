@@ -60,7 +60,7 @@ public class NordeaCrawler {
                 politeDelay();
             }
 
-            pages.add(new CrawledPage(url, doc.title(), extractMainText(doc)));
+            pages.add(new CrawledPage(url, doc.title(), NordeaHtmlToMarkdownConverter.convert(doc)));
 
             for (Element link : doc.select("a[href]")) {
                 String absHref = stripFragment(link.absUrl("href"));
@@ -78,21 +78,6 @@ public class NordeaCrawler {
         }
 
         return new CrawlResult(pages, List.copyOf(pdfUrls));
-    }
-
-    /**
-     * Best-effort boilerplate stripping: drops nav/header/footer/script/style and common
-     * cookie-consent-banner elements, then prefers a {@code <main>} element if the page has one.
-     * Nordea's exact DOM structure wasn't available to verify ahead of time, so this heuristic
-     * may need tuning if a spot-check of ingested chunks shows leftover chrome.
-     */
-    private static String extractMainText(Document doc) {
-        Document copy = doc.clone();
-        copy.select("nav, header, footer, script, style, noscript, form, iframe").remove();
-        copy.select("[class*=cookie], [class*=consent], [id*=cookie], [id*=consent]").remove();
-        Element main = copy.selectFirst("main");
-        Element contentRoot = main != null ? main : copy.body();
-        return contentRoot == null ? "" : contentRoot.text();
     }
 
     private static String stripFragment(String url) {

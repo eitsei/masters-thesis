@@ -29,7 +29,8 @@ def _safe_float(val: Any, default: float = 0.0) -> float:
     try:
         if val is None:
             return default
-        return float(val)
+        f = float(val)
+        return default if math.isnan(f) else f
     except (ValueError, TypeError):
         return default
 

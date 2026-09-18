@@ -61,12 +61,12 @@ public class NordeaPdfExtractor {
             }
 
             try (PDDocument document = Loader.loadPDF(body)) {
-                String text = new PDFTextStripper().getText(document);
                 String title = Optional.ofNullable(document.getDocumentInformation().getTitle())
                         .map(String::strip)
                         .filter(t -> !t.isEmpty())
                         .orElseGet(() -> filenameFrom(url));
-                return Optional.of(new CrawledPdf(url, title, text));
+                String markdown = NordeaPdfToMarkdownConverter.convert(document, title);
+                return Optional.of(new CrawledPdf(url, title, markdown));
             }
         } catch (IOException ex) {
             logger.warn("Skipping PDF " + url + ": " + ex.getMessage());

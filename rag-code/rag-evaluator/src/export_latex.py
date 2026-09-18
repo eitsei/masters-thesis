@@ -311,7 +311,9 @@ def export_wilcoxon_rq1_latency_latex(
     target_path = Path(output_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
-    rq1_comps = [c for c in comparisons if c.target_rq == "RQ1"]
+    rq1_comps = [c for c in comparisons if c.target_rq == "RQ1" and "end-to-end" in c.metric_name.lower()]
+    if not rq1_comps:
+        rq1_comps = [c for c in comparisons if c.target_rq == "RQ1"]
 
     latex_lines = [
         "\\begin{table}[!htbp]",
@@ -368,6 +370,75 @@ def export_wilcoxon_rq1_latency_latex(
     return content
 
 
+def export_wilcoxon_rq1_ttft_latex(
+    comparisons: Sequence[WilcoxonComparison],
+    output_path: Path | str = "thesis/tables/wilcoxon_rq1_ttft.tex",
+    label: str = "tab:wilcoxon_rq1_ttft",
+    caption: str = "Paired Wilcoxon signed-rank test results for Time to First Token (RQ1) against baseline ($C_0$).",
+) -> str:
+    """Exports RQ1 TTFT Wilcoxon signed-rank tests matching thesis publication formatting."""
+    target_path = Path(output_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    ttft_comps = [c for c in comparisons if c.target_rq == "RQ1" and "token" in c.metric_name.lower()]
+    if not ttft_comps:
+        ttft_comps = [c for c in comparisons if c.target_rq == "RQ1"]
+
+    latex_lines = [
+        "\\begin{table}[!htbp]",
+        "\\centering",
+        "\\small",
+        f"\\caption{{{caption}}}",
+        f"\\label{{{label}}}",
+        "\\begin{tabular*}{\\textwidth}{@{\\extracolsep{\\fill}} l r r r r r r c @{}}",
+        "\\toprule",
+        "\\textbf{Configuration} & \\textbf{$C_0$ Med} & \\textbf{$C_k$ Med} & \\textbf{$\\tilde{\\mu}_\\Delta$} & \\textbf{$W$-Stat} & \\textbf{$p_{\\text{raw}}$} & \\textbf{$p_{\\text{adj}}$} & \\textbf{Sig} \\\\",
+        " & \\scriptsize{(ms)} & \\scriptsize{(ms)} & \\scriptsize{(ms)} & & & & \\\\",
+        "\\midrule",
+    ]
+
+    for comp in ttft_comps:
+        base_str = f"{comp.baseline_median:.1f}" if abs(comp.baseline_median) >= 10 else f"{comp.baseline_median:.4f}"
+        treat_str = f"{comp.treatment_median:.1f}" if abs(comp.treatment_median) >= 10 else f"{comp.treatment_median:.4f}"
+        diff_str = f"{comp.median_diff:+.1f}" if abs(comp.median_diff) >= 10 else f"{comp.median_diff:+.4f}"
+        p_raw_str = f"{comp.p_raw:.2e}" if comp.p_raw < 0.001 else f"{comp.p_raw:.4f}"
+        p_adj_str = f"{comp.p_adjusted:.2e}" if comp.p_adjusted < 0.001 else f"{comp.p_adjusted:.4f}"
+
+        sig_tex = comp.significance
+        if sig_tex != "ns":
+            sig_tex = f"\\textbf{{{sig_tex}}}"
+
+        cfg_name = _escape_latex(comp.config_name) if not comp.config_name.startswith("$") else comp.config_name
+
+        row = (
+            f"{cfg_name} & "
+            f"{base_str} & "
+            f"{treat_str} & "
+            f"{diff_str} & "
+            f"{comp.w_statistic:.1f} & "
+            f"{p_raw_str} & "
+            f"{p_adj_str} & "
+            f"{sig_tex} \\\\"
+        )
+        latex_lines.append(row)
+
+    latex_lines.extend(
+        [
+            "\\bottomrule",
+            "\\end{tabular*}",
+            "\\vspace{0.5em}",
+            "\\parbox{\\textwidth}{\\footnotesize",
+            "\\textbf{Notes:} $\\tilde{\\mu}_\\Delta$ represents the median paired difference ($C_k - C_0$). Two-tailed Wilcoxon signed-rank test evaluated at $\\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\\text{adj}}$). Significance flags: $^{***}\\,p < 0.001$, $^{**}\\,p < 0.01$, $^{*}\\,p < 0.05$, $\\text{ns}\\,p \\ge 0.05$.}",
+            "\\end{table}",
+            "",
+        ]
+    )
+
+    content = "\n".join(latex_lines)
+    target_path.write_text(content, encoding="utf-8")
+    return content
+
+
 def export_wilcoxon_rq2_cost_latex(
     comparisons: Sequence[WilcoxonComparison],
     output_path: Path | str = "thesis/tables/wilcoxon_rq2_cost.tex",
@@ -378,7 +449,9 @@ def export_wilcoxon_rq2_cost_latex(
     target_path = Path(output_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
-    rq2_comps = [c for c in comparisons if c.target_rq == "RQ2"]
+    rq2_comps = [c for c in comparisons if c.target_rq == "RQ2" and "cost" in c.metric_name.lower()]
+    if not rq2_comps:
+        rq2_comps = [c for c in comparisons if c.target_rq == "RQ2"]
 
     latex_lines = [
         "\\begin{table}[!htbp]",
@@ -515,11 +588,12 @@ def export_wilcoxon_decomposed_latex(
     comparisons: Sequence[WilcoxonComparison],
     output_dir: Path | str = "thesis/tables",
 ) -> dict[str, str]:
-    """Exports all three decomposed Wilcoxon tables (RQ1, RQ2, RQ3) to target directory."""
+    """Exports decomposed Wilcoxon tables (RQ1 latency, RQ1 TTFT, RQ2 cost, RQ3 quality) to target directory."""
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     return {
         "rq1": export_wilcoxon_rq1_latency_latex(comparisons, out_dir / "wilcoxon_rq1_latency.tex"),
+        "rq1_ttft": export_wilcoxon_rq1_ttft_latex(comparisons, out_dir / "wilcoxon_rq1_ttft.tex"),
         "rq2": export_wilcoxon_rq2_cost_latex(comparisons, out_dir / "wilcoxon_rq2_cost.tex"),
         "rq3": export_wilcoxon_rq3_quality_latex(comparisons, out_dir / "wilcoxon_rq3_quality.tex"),
     }

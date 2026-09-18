@@ -19,5 +19,6 @@ public record NordeaIngestionProperties(
         int maxPdfs,
         long maxPdfSizeBytes,
         long requestDelayMillis,
-        String userAgent) {
+        String userAgent,
+        String markdownExportDir) {
 }

@@ -665,6 +665,11 @@ def export_thesis(
         "-s",
         help="Optional subfolder inside tables-dir and figures-dir to isolate run outputs (e.g., 'sample_runs', 'musique', 'nordea', 'comparisons', 'runs/<run_name>')",
     ),
+    family_scope: str = typer.Option(
+        "metric",
+        "--family-scope",
+        help="Holm-Bonferroni family scope: 'metric' (default, m=15 per metric), 'rq', 'config', 'global'",
+    ),
 ) -> None:
     """Exports publication-ready LaTeX tables and vector PDF figures to the thesis directory."""
     tables_dir = _resolve_thesis_path(tables_dir)
@@ -714,7 +719,7 @@ def export_thesis(
     if baseline_key and len(run_dict) > 1:
         base_recs = run_dict[baseline_key]
         treatments = {k: v for k, v in run_dict.items() if k != baseline_key}
-        comparisons = batch_compare_configurations(base_recs, treatments)
+        comparisons = batch_compare_configurations(base_recs, treatments, family_scope=family_scope)
         export_wilcoxon_tests_latex(comparisons, tables_dir / "wilcoxon_tests.tex")
         console.print(f"  [green]✓[/green] Table: [cyan]{tables_dir / 'wilcoxon_tests.tex'}[/cyan]")
         export_wilcoxon_decomposed_latex(comparisons, tables_dir)

@@ -158,7 +158,7 @@ public record MusiqueBenchmarkQueryResponse(
                         result.expansionMs(),
                         result.cacheMs(),
                         result.routeMs(),
-                        0L,
+                        result.ttftMs(),
                         result.prefillMs()),
                 result.totalLatencyMs(),
                 result.tokenUsage(),

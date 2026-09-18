@@ -154,3 +154,140 @@ def test_batch_compare_configurations():
     c_names = [c.config_name for c in batch_comps]
     assert "C1: S2B" in c_names
     assert "C2: SR" in c_names
+
+
+def test_extract_metric_series_ttft_and_tokens():
+    from src.stats import _extract_metric_series
+
+    records = [
+        {
+            "timings": {"ttftMs": 450.0, "generationMs": 800.0},
+            "tokenUsage": {"totalTokens": 1250, "promptTokens": 1000},
+            "metrics": {"faithfulness": 0.95},
+            "cost_usd": 0.0004,
+        },
+        {
+            "ttft_ms": 320.0,
+            "total_tokens": 800,
+            "faithfulness": 0.80,
+            "cost": 0.0002,
+        },
+    ]
+
+    ttft = _extract_metric_series(records, "ttft_ms")
+    assert ttft == [450.0, 320.0]
+
+    tokens = _extract_metric_series(records, "total_tokens")
+    assert tokens == [1250.0, 800.0]
+
+    costs = _extract_metric_series(records, "cost_usd")
+    assert costs == [0.0004, 0.0002]
+
+    faith = _extract_metric_series(records, "faithfulness")
+    assert faith == [0.95, 0.80]
+
+
+def test_wilcoxon_paired_test_nan_handling():
+    # 10 pairs with some NaN values
+    baseline = [100.0, 110.0, float("nan"), 130.0, 140.0, 150.0, 160.0, 170.0, 180.0, 190.0]
+    treatment = [85.0, float("nan"), 105.0, 115.0, 125.0, 135.0, 145.0, 155.0, 165.0, 175.0]
+
+    med_diff, w_stat, p_val = wilcoxon_paired_test(baseline, treatment)
+    assert not math.isnan(med_diff)
+    assert not math.isnan(w_stat)
+    assert not math.isnan(p_val)
+    assert med_diff == -15.0
+
+
+def test_compare_paired_runs_default_metrics_and_n_pairs():
+    baseline_records = [
+        {
+            "questionId": f"q_{i}",
+            "total_latency_ms": 200.0 + i * 5,
+            "timings": {"ttftMs": 50.0 + i},
+            "cost_usd": 0.0005,
+            "tokenUsage": {"totalTokens": 1000 + i * 10},
+            "composite_quality": 0.75,
+            "exact_match": 1.0 if i % 2 == 0 else 0.0,
+            "token_f1": 0.70,
+            "faithfulness": 0.80,
+            "answer_relevancy": 0.85,
+            "context_precision": 0.90,
+            "context_recall": 0.88,
+        }
+        for i in range(10)
+    ]
+    treatment_records = [
+        {
+            "questionId": f"q_{i}",
+            "total_latency_ms": 150.0 + i * 5,
+            "timings": {"ttftMs": 40.0 + i},
+            "cost_usd": 0.0003,
+            "tokenUsage": {"totalTokens": 800 + i * 10},
+            "composite_quality": 0.85,
+            "exact_match": 1.0,
+            "token_f1": 0.85,
+            "faithfulness": 0.90,
+            "answer_relevancy": 0.92,
+            "context_precision": 0.95,
+            "context_recall": 0.94,
+        }
+        for i in range(10)
+    ]
+
+    comps = compare_paired_runs(baseline_records, treatment_records, config_name="C1: S2B")
+    # All 11 metrics tested by default
+    assert len(comps) == 11
+    metric_names = [c.metric_name for c in comps]
+    assert "Time to First Token (ms)" in metric_names
+    assert "Total Token Usage" in metric_names
+    assert "End-to-End Latency (ms)" in metric_names
+    assert "Operational Cost ($)" in metric_names
+    for c in comps:
+        assert c.n_pairs == 10
+
+
+def test_batch_compare_configurations_family_scope():
+    baseline_records = [
+        {
+            "questionId": f"q_{i}",
+            "total_latency_ms": 200.0 + i,
+            "cost_usd": 0.005,
+        }
+        for i in range(10)
+    ]
+    c1_records = [
+        {
+            "questionId": f"q_{i}",
+            "total_latency_ms": 150.0 + i,
+            "cost_usd": 0.001,
+        }
+        for i in range(10)
+    ]
+    c2_records = [
+        {
+            "questionId": f"q_{i}",
+            "total_latency_ms": 160.0 + i,
+            "cost_usd": 0.002,
+        }
+        for i in range(10)
+    ]
+
+    treatments = {"C1": c1_records, "C2": c2_records}
+
+    # Under family_scope="metric", m = 2 (2 treatments per metric)
+    comps_metric = batch_compare_configurations(
+        baseline_records, treatments, metrics_to_test=["total_latency_ms", "cost_usd"], family_scope="metric"
+    )
+    # Under family_scope="global", m = 4 (2 treatments * 2 metrics = 4)
+    comps_global = batch_compare_configurations(
+        baseline_records, treatments, metrics_to_test=["total_latency_ms", "cost_usd"], family_scope="global"
+    )
+
+    assert len(comps_metric) == 4
+    assert len(comps_global) == 4
+
+    # The global adjusted p-value for the best test should be larger than metric-family adjusted
+    min_metric = min(c.p_adjusted for c in comps_metric)
+    min_global = min(c.p_adjusted for c in comps_global)
+    assert min_global >= min_metric
