@@ -51,6 +51,10 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.embedding.EmbeddingRequest;
+import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.ai.embedding.EmbeddingResponseMetadata;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -140,7 +144,7 @@ class RagQueryServiceTest {
         assertThat(result.generationMs()).isGreaterThanOrEqualTo(0);
         assertThat(result.totalLatencyMs()).isEqualTo(result.retrievalMs() + result.generationMs() + result.expansionMs() + result.rerankMs() + result.cacheMs());
 
-        assertThat(result.tokenUsage()).isEqualTo(new TokenUsageDto(10, 5, 15, 0, 0, 0, 8, 0));
+        assertThat(result.tokenUsage()).isEqualTo(new TokenUsageDto(10, 5, 15, 0, 0, 0, 0, 0));
 
         assertThat(meterRegistry.find("rag.pipeline.retrieval").timer()).isNotNull();
         assertThat(meterRegistry.find("rag.pipeline.generation").timer()).isNotNull();
@@ -578,5 +582,43 @@ class RagQueryServiceTest {
         assertThat(result.tokenUsage().completionTokens()).isEqualTo(10);
         assertThat(result.tokenUsage().totalTokens()).isEqualTo(35);
         verify(chatModel).stream(any(Prompt.class));
+    }
+
+    @Test
+    void query_withEmbeddingModel_capturesMeasuredEmbedTokens() {
+        EmbeddingModel mockEmbeddingModel = mock(EmbeddingModel.class);
+        Usage embedUsage = new DefaultUsage(7, 0, 7);
+        EmbeddingResponseMetadata embedMeta = new EmbeddingResponseMetadata("text-embedding-004", embedUsage);
+        EmbeddingResponse embedResp = new EmbeddingResponse(List.of(), embedMeta);
+        when(mockEmbeddingModel.call(any(EmbeddingRequest.class))).thenReturn(embedResp);
+
+        RagQueryService serviceWithEmbedding = new RagQueryService(
+                vectorStore,
+                chatModel,
+                reranker,
+                retrievalExpander,
+                promptCache,
+                promptRenderer,
+                promptCacheProperties,
+                null,
+                null,
+                null,
+                "gemini-3.8-flash",
+                meterRegistry,
+                Integer.MAX_VALUE,
+                5,
+                RerankerProperties.defaultProperties(),
+                new ClassPathResource("prompts/answer-generation.st"),
+                "vector_store_test",
+                null,
+                mockEmbeddingModel);
+
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Test answer", new DefaultUsage(10, 5, 15)));
+
+        RagQueryResult result = serviceWithEmbedding.query("How many tokens?", null);
+
+        assertThat(result.tokenUsage().embedTokens()).isEqualTo(7);
+        verify(mockEmbeddingModel).call(any(EmbeddingRequest.class));
     }
 }

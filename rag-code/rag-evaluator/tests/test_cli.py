@@ -425,5 +425,93 @@ def test_process_item_metrics_model_routing_attribution():
     assert res["cost_usd"] == pytest.approx(0.000052575, rel=1e-5)
 
 
+def test_evaluate_item_with_feedback_no_judge():
+    from src.cli import _evaluate_item_with_feedback
+    from rich.console import Console
+
+    test_console = Console(record=True)
+    item = {
+        "question": "What is M1?",
+        "generatedAnswer": "Small-to-Big retrieval",
+        "groundTruthAnswer": "Small-to-Big retrieval",
+        "totalLatencyMs": 150.0,
+        "tokenUsage": {"promptTokens": 100, "completionTokens": 10, "cachedTokens": 0},
+    }
+
+    processed = _evaluate_item_with_feedback(
+        item=item,
+        ragas_evaluator=None,
+        judge="none",
+        item_idx=1,
+        total_items=1,
+        console=test_console,
+    )
+
+    output = test_console.export_text()
+    assert "✓" in output
+    assert "EM=" in output
+    assert "F1=" in output
+    assert processed["exact_match"] == 1.0
+
+
+def test_evaluate_item_with_feedback_with_judge():
+    from src.cli import _evaluate_item_with_feedback
+    from rich.console import Console
+
+    test_console = Console(record=True)
+    item = {
+        "question": "What is M1?",
+        "generatedAnswer": "Small-to-Big retrieval",
+        "groundTruthAnswer": "Small-to-Big retrieval",
+        "totalLatencyMs": 150.0,
+        "tokenUsage": {"promptTokens": 100, "completionTokens": 10, "cachedTokens": 0},
+    }
+
+    mock_judge_wrapper = MagicMock()
+    mock_judge_wrapper.llm = MagicMock()
+
+    def fake_eval(question, response, retrieved_contexts, ground_truth, progress_callback=None):
+        if progress_callback:
+            progress_callback("faithfulness", "start", "1/4")
+            progress_callback("faithfulness", "done", "1.00")
+            progress_callback("answer_relevancy", "start", "2/4")
+            progress_callback("answer_relevancy", "done", "0.95")
+        return {
+            "faithfulness": 1.0,
+            "answer_relevancy": 0.95,
+            "context_precision": 1.0,
+            "context_recall": 1.0,
+        }
+
+    mock_judge_wrapper.evaluate_sample.side_effect = fake_eval
+
+    processed = _evaluate_item_with_feedback(
+        item=item,
+        ragas_evaluator=mock_judge_wrapper,
+        judge="claude",
+        item_idx=1,
+        total_items=5,
+        console=test_console,
+    )
+
+    output = test_console.export_text()
+    assert "✓" in output
+    assert "Faith=" in output
+    assert "Rel=" in output
+    assert processed["faithfulness"] == 1.0
+    assert processed["answer_relevancy"] == 0.95
+
+
+def test_pacing_delay_with_spinner():
+    from src.cli import _pacing_delay_with_spinner
+    import time
+
+    t0 = time.perf_counter()
+    _pacing_delay_with_spinner(0.05, current_idx=1, total_items=2)
+    elapsed = time.perf_counter() - t0
+    assert elapsed >= 0.04
+
+
+
 
 

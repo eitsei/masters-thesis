@@ -39,6 +39,10 @@ public record TimingsDto(
         this(retrievalMs, 0L, generationMs, 0L, 0L, 0L, 0L, 0L);
     }
 
+    /**
+     * Sum of all pipeline phase timings ({@code T_total}, Eq. 1 in thesis §4.5.1).
+     * Note: retrievalMs subsumes T_embed + T_ret; generationMs subsumes T_prefill + T_stream.
+     */
     public long totalMs() {
         return retrievalMs + rerankMs + generationMs + expansionMs + cacheMs + routeMs;
     }

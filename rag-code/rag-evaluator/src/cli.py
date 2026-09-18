@@ -97,6 +97,7 @@ def _process_item_metrics(
     item: dict[str, Any],
     ragas_evaluator: RagasEvaluatorWrapper | None = None,
     pricing_tier: str = "gemini-3.8-flash",
+    progress_callback: Any = None,
 ) -> dict[str, Any]:
     """Enriches a benchmark result item with EM, F1, Cost, RAGAS scores, and Composite Q."""
     question = item.get("question") or item.get("query") or ""
@@ -228,6 +229,7 @@ def _process_item_metrics(
             response=pred,
             retrieved_contexts=contexts,
             ground_truth=gt,
+            progress_callback=progress_callback,
         )
         item["faithfulness"] = ragas_scores.get("faithfulness", 0.0)
         item["answer_relevancy"] = ragas_scores.get("answer_relevancy", 0.0)
@@ -251,6 +253,99 @@ def _process_item_metrics(
     item["qps"] = compute_qps(comp_q, tot_ms)
 
     return item
+
+
+METRIC_DISPLAY_NAMES: dict[str, str] = {
+    "faithfulness": "Faithfulness",
+    "answer_relevancy": "Answer Relevancy",
+    "context_precision": "Context Precision",
+    "context_recall": "Context Recall",
+}
+
+
+def _pacing_delay_with_spinner(
+    seconds: float,
+    current_idx: int,
+    total_items: int,
+    console: Console = console,
+) -> None:
+    """Displays an active spinner while pausing between judge requests to prevent rate limits."""
+    if seconds <= 0 or current_idx >= total_items:
+        return
+    with console.status(
+        f"[dim yellow]Pacing judge ({seconds:.1f}s rate-limit pause before item [{current_idx + 1}/{total_items}])...[/dim yellow]",
+        spinner="clock",
+    ):
+        time.sleep(seconds)
+
+
+def _evaluate_item_with_feedback(
+    item: dict[str, Any],
+    ragas_evaluator: RagasEvaluatorWrapper | None,
+    judge: str,
+    item_idx: int,
+    total_items: int,
+    pricing_tier: str = "gemini-3.8-flash",
+    console: Console = console,
+) -> dict[str, Any]:
+    """Evaluates a single item with active spinner and metric-by-metric progress feedback."""
+    if not ragas_evaluator or ragas_evaluator.llm is None:
+        processed = _process_item_metrics(item, ragas_evaluator=None, pricing_tier=pricing_tier)
+        em = processed.get("exact_match", 0.0)
+        f1 = processed.get("token_f1", 0.0)
+        tot_ms = processed.get("total_latency_ms", 0.0)
+        cost = processed.get("cost_usd", 0.0)
+        console.print(
+            f"  [bold green]✓[/bold green] [{item_idx}/{total_items}] Evaluated: "
+            f"EM=[green]{em:.2f}[/green] | F1=[green]{f1:.2f}[/green] | "
+            f"Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
+        )
+        return processed
+
+    with console.status(
+        f"[bold magenta][{item_idx}/{total_items}][/bold magenta] Judge [{judge}]: Preparing evaluation...",
+        spinner="dots",
+    ) as status:
+        def _on_progress(metric_name: str, phase: str, detail: str = "") -> None:
+            clean = METRIC_DISPLAY_NAMES.get(metric_name.lower(), metric_name)
+            if phase == "start":
+                status.update(
+                    f"[bold magenta][{item_idx}/{total_items}][/bold magenta] Judge [{judge}]: Evaluating [cyan]{clean}[/cyan] ({detail})..."
+                )
+            elif phase == "done":
+                status.update(
+                    f"[bold magenta][{item_idx}/{total_items}][/bold magenta] Judge [{judge}]: Finished [cyan]{clean}[/cyan] (score: {detail})"
+                )
+            elif phase == "delay":
+                status.update(
+                    f"[dim yellow][{item_idx}/{total_items}][/dim yellow] Judge [{judge}]: Inter-metric pause ({detail})..."
+                )
+            elif phase == "error":
+                status.update(
+                    f"[bold red][{item_idx}/{total_items}][/bold red] Judge [{judge}]: Error on [cyan]{clean}[/cyan] ({detail})"
+                )
+
+        processed = _process_item_metrics(
+            item,
+            ragas_evaluator=ragas_evaluator,
+            pricing_tier=pricing_tier,
+            progress_callback=_on_progress,
+        )
+
+    f_score = processed.get("faithfulness", 0.0)
+    ar_score = processed.get("answer_relevancy", 0.0)
+    cp_score = processed.get("context_precision", 0.0)
+    cr_score = processed.get("context_recall", 0.0)
+    q_comp = processed.get("composite_quality", 0.0)
+    tot_ms = processed.get("total_latency_ms", 0.0)
+    cost = processed.get("cost_usd", 0.0)
+    console.print(
+        f"  [bold green]✓[/bold green] [{item_idx}/{total_items}] Evaluated: "
+        f"Faith=[green]{f_score:.2f}[/green] | Rel=[green]{ar_score:.2f}[/green] | "
+        f"Prec=[green]{cp_score:.2f}[/green] | Rec=[green]{cr_score:.2f}[/green] | "
+        f"Q=[yellow]{q_comp:.3f}[/yellow] | Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
+    )
+    return processed
 
 
 @app.command()
@@ -383,22 +478,35 @@ def run(
     # Initialize RAGAS judge if requested
     ragas_evaluator = None
     if judge.lower() not in ("none", "off", "disabled"):
-        console.print(f"Initializing evaluation judge with provider [magenta]{judge}[/magenta]...")
+        with console.status(
+            f"[bold magenta]Initializing judge [{judge}] ({judge_model or 'default'})...[/bold magenta]",
+            spinner="dots",
+        ):
+            llm, emb = get_judge_components(provider=judge, model=judge_model)
+            inter_metric_delay = min(0.8, effective_delay / 2) if effective_delay > 0 else 0.0
+            ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb, delay_seconds=inter_metric_delay)
+        console.print(f"[bold green]✓[/bold green] Judge [magenta]{judge}[/magenta] initialized.")
         if effective_delay > 0:
             console.print(f"[dim]Pacing judge requests ({effective_delay:.1f}s delay) to avoid 429 rate limit errors...[/dim]")
-        llm, emb = get_judge_components(provider=judge, model=judge_model)
-        inter_metric_delay = min(0.8, effective_delay / 2) if effective_delay > 0 else 0.0
-        ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb, delay_seconds=inter_metric_delay)
 
     # Process metrics
     processed_records: list[dict[str, Any]] = []
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_path = Path(output) if output else Path(f"runs/run_{module_label}_{timestamp}.jsonl")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
     for idx, item in enumerate(raw_results, 1):
-        if ragas_evaluator:
-            console.print(f"[dim]Evaluating item [{idx}/{len(raw_results)}] with judge [{judge}]...[/dim]")
-        processed = _process_item_metrics(item, ragas_evaluator=ragas_evaluator)
+        processed = _evaluate_item_with_feedback(
+            item=item,
+            ragas_evaluator=ragas_evaluator,
+            judge=judge,
+            item_idx=idx,
+            total_items=len(raw_results),
+            console=console,
+        )
         processed_records.append(processed)
         if ragas_evaluator and effective_delay > 0 and idx < len(raw_results):
-            time.sleep(effective_delay)
+            _pacing_delay_with_spinner(effective_delay, current_idx=idx, total_items=len(raw_results), console=console)
 
     # Display Rich Tables
     console.print()
@@ -407,8 +515,6 @@ def run(
     display_hop_breakdown_table(processed_records, console=console)
 
     # Save output
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path = Path(output) if output else Path(f"runs/run_{module_label}_{timestamp}.jsonl")
     _save_jsonl(processed_records, out_path)
     console.print(f"\n[bold green]✓ Benchmark run saved to:[/bold green] [cyan]{out_path}[/cyan]")
 
@@ -479,27 +585,38 @@ def evaluate(
 
     ragas_evaluator = None
     if judge.lower() not in ("none", "off", "disabled"):
-        console.print(f"Initializing evaluation judge: [magenta]{judge}[/magenta]...")
+        with console.status(
+            f"[bold magenta]Initializing judge [{judge}] ({judge_model or 'default'})...[/bold magenta]",
+            spinner="dots",
+        ):
+            llm, emb = get_judge_components(provider=judge, model=judge_model)
+            inter_metric_delay = min(0.8, effective_delay / 2) if effective_delay > 0 else 0.0
+            ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb, delay_seconds=inter_metric_delay)
+        console.print(f"[bold green]✓[/bold green] Judge [magenta]{judge}[/magenta] initialized.")
         if effective_delay > 0:
             console.print(f"[dim]Pacing judge requests ({effective_delay:.1f}s delay) to avoid 429 rate limit errors...[/dim]")
-        llm, emb = get_judge_components(provider=judge, model=judge_model)
-        inter_metric_delay = min(0.8, effective_delay / 2) if effective_delay > 0 else 0.0
-        ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb, delay_seconds=inter_metric_delay)
 
     evaluated_records: list[dict[str, Any]] = []
+    out_path = output or input_file.with_name(f"{input_file.stem}_evaluated.jsonl")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
     for idx, item in enumerate(records, 1):
-        if ragas_evaluator:
-            console.print(f"[dim]Evaluating item [{idx}/{len(records)}] with judge [{judge}]...[/dim]")
-        processed = _process_item_metrics(item, ragas_evaluator=ragas_evaluator)
+        processed = _evaluate_item_with_feedback(
+            item=item,
+            ragas_evaluator=ragas_evaluator,
+            judge=judge,
+            item_idx=idx,
+            total_items=len(records),
+            console=console,
+        )
         evaluated_records.append(processed)
         if ragas_evaluator and effective_delay > 0 and idx < len(records):
-            time.sleep(effective_delay)
+            _pacing_delay_with_spinner(effective_delay, current_idx=idx, total_items=len(records), console=console)
 
     config_name = input_file.stem
     display_summary_table({config_name: evaluated_records}, console=console)
     display_hop_breakdown_table(evaluated_records, console=console)
 
-    out_path = output or input_file.with_name(f"{input_file.stem}_evaluated.jsonl")
     _save_jsonl(evaluated_records, out_path)
     console.print(f"\n[bold green]✓ Evaluated results saved to:[/bold green] [cyan]{out_path}[/cyan]")
 
@@ -677,12 +794,21 @@ def query_cmd(
 
     ragas_evaluator = None
     if judge.lower() not in ("none", "off", "disabled"):
-        with console.status(f"[bold magenta]Evaluating with RAGAS ({judge})...[/bold magenta]"):
+        with console.status(
+            f"[bold magenta]Initializing judge [{judge}] ({judge_model or 'default'})...[/bold magenta]",
+            spinner="dots",
+        ):
             llm, emb = get_judge_components(provider=judge, model=judge_model)
             ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb)
-            item = _process_item_metrics(item, ragas_evaluator=ragas_evaluator)
-    else:
-        item = _process_item_metrics(item, ragas_evaluator=None)
+
+    item = _evaluate_item_with_feedback(
+        item=item,
+        ragas_evaluator=ragas_evaluator,
+        judge=judge,
+        item_idx=1,
+        total_items=1,
+        console=console,
+    )
 
     # Display Metrics Panel
     metrics_str = (
@@ -757,12 +883,20 @@ def run_questions(
     # Initialize judge if requested
     ragas_evaluator = None
     if judge.lower() not in ("none", "off", "disabled"):
-        console.print(f"Initializing judge: [magenta]{judge}[/magenta]...")
+        with console.status(
+            f"[bold magenta]Initializing judge [{judge}] ({judge_model or 'default'})...[/bold magenta]",
+            spinner="dots",
+        ):
+            llm, emb = get_judge_components(provider=judge, model=judge_model)
+            inter_metric_delay = min(0.8, effective_delay / 2) if effective_delay > 0 else 0.0
+            ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb, delay_seconds=inter_metric_delay)
+        console.print(f"[bold green]✓[/bold green] Judge [magenta]{judge}[/magenta] initialized.")
         if effective_delay > 0:
             console.print(f"[dim]Pacing judge requests ({effective_delay:.1f}s delay) to avoid 429 rate limit errors...[/dim]")
-        llm, emb = get_judge_components(provider=judge, model=judge_model)
-        inter_metric_delay = min(0.8, effective_delay / 2) if effective_delay > 0 else 0.0
-        ragas_evaluator = RagasEvaluatorWrapper(llm=llm, embeddings=emb, delay_seconds=inter_metric_delay)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_path = output or Path(f"runs/run_{table_name}_{timestamp}.jsonl")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     evaluated_records: list[dict[str, Any]] = []
     for i, rec in enumerate(records, 1):
@@ -771,10 +905,25 @@ def run_questions(
         aliases = rec.get("aliases") or rec.get("groundTruthAliases") or []
         qid = rec.get("id", f"q{i}")
 
-        console.print(f"[{i}/{len(records)}] Querying: [cyan]{q}[/cyan]")
-        t0 = time.perf_counter()
-        resp = client.query(query=q, modules=module_list, table_name=table_name)
-        elapsed = (time.perf_counter() - t0) * 1000.0
+        q_disp = (q[:90] + "...") if len(q) > 90 else q
+        console.print(f"\n[bold cyan]─── Question [{i}/{len(records)}] ───[/bold cyan] [bold white]{q_disp}[/bold white]")
+
+        try:
+            with console.status(
+                f"[bold cyan][{i}/{len(records)}][/bold cyan] Querying RAG service ({table_name})...",
+                spinner="dots",
+            ):
+                t0 = time.perf_counter()
+                resp = client.query(query=q, modules=module_list, table_name=table_name)
+                elapsed = (time.perf_counter() - t0) * 1000.0
+        except Exception as q_err:
+            console.print(f"  [bold red]✗ Query failed for question [{i}/{len(records)}]: {q_err}[/bold red]")
+            continue
+
+        ret_chunks = len(resp.get("retrievedChunks", []))
+        ans_raw = (resp.get("answer") or "").replace("\n", " ").strip()
+        ans_preview = (ans_raw[:80] + "...") if len(ans_raw) > 80 else ans_raw
+        console.print(f"  [dim]↳ RAG responded in {elapsed:.0f}ms ({ret_chunks} chunks): \"{ans_preview}\"[/dim]")
 
         item = {
             "questionId": qid,
@@ -792,21 +941,32 @@ def run_questions(
             "cacheStatus": resp.get("cacheStatus"),
             "cacheMetadata": resp.get("cacheMetadata"),
         }
-        if ragas_evaluator:
-            console.print(f"[dim]Evaluating question [{i}/{len(records)}] with judge [{judge}]...[/dim]")
-        processed = _process_item_metrics(item, ragas_evaluator=ragas_evaluator)
+
+        processed = _evaluate_item_with_feedback(
+            item=item,
+            ragas_evaluator=ragas_evaluator,
+            judge=judge,
+            item_idx=i,
+            total_items=len(records),
+            console=console,
+        )
         evaluated_records.append(processed)
+
+        # Incrementally checkpoint to disk so progress is preserved
+        with out_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(processed) + "\n")
+
         if ragas_evaluator and effective_delay > 0 and i < len(records):
-            time.sleep(effective_delay)
+            _pacing_delay_with_spinner(effective_delay, current_idx=i, total_items=len(records), console=console)
 
-    # Display Rich Summary Table
-    display_summary_table({table_name: evaluated_records}, console=console)
-
-    # Save output
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path = output or Path(f"runs/run_{table_name}_{timestamp}.jsonl")
-    _save_jsonl(evaluated_records, out_path)
-    console.print(f"\n[bold green]✓ Evaluated results saved to:[/bold green] [cyan]{out_path}[/cyan]")
+    if evaluated_records:
+        # Display Rich Summary Table
+        display_summary_table({table_name: evaluated_records}, console=console)
+        # Ensure final file is cleanly written
+        _save_jsonl(evaluated_records, out_path)
+        console.print(f"\n[bold green]✓ Evaluated results saved to:[/bold green] [cyan]{out_path}[/cyan]")
+    else:
+        console.print("[yellow]No questions were successfully evaluated.[/yellow]")
 
 
 if __name__ == "__main__":

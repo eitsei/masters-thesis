@@ -46,6 +46,9 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.embedding.EmbeddingOptions;
+import org.springframework.ai.embedding.EmbeddingRequest;
+import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.ai.google.genai.GoogleGenAiChatModel;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.ollama.OllamaChatModel;
@@ -572,7 +575,21 @@ public class RagQueryService {
         long prefillMs = (firstTokenTs > 0L) ? Math.max(0L, firstTokenTs - startGenTime) : generationMs;
         long ttftMs = retrievalMs + rerankMs + expansionMs + cacheMs + routeMs + prefillMs;
 
-        int embedTokens = Math.max(1, (int) Math.ceil(query.trim().length() / 3.5));
+        int embedTokens = 0;
+        if (this.embeddingModel != null) {
+            try {
+                EmbeddingResponse embedResponse = this.embeddingModel.call(
+                        new EmbeddingRequest(List.of(query.trim()),
+                                EmbeddingOptions.builder().build()));
+                if (embedResponse != null && embedResponse.getMetadata() != null
+                        && embedResponse.getMetadata().getUsage() != null
+                        && embedResponse.getMetadata().getUsage().getPromptTokens() != null) {
+                    embedTokens = embedResponse.getMetadata().getUsage().getPromptTokens().intValue();
+                }
+            } catch (Exception e) {
+                logger.debug("Could not retrieve embed token count from EmbeddingModel response; defaulting to 0. Cause: {}", e.getMessage());
+            }
+        }
         TokenUsageDto tokenUsage = extractTokenUsage(
                 finalChatResponse, cacheResult, rerankDocsCount, embedTokens, routePromptTokens, routeCompTokens);
 

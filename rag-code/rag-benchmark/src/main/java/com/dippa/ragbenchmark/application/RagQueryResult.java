@@ -143,6 +143,13 @@ public record RagQueryResult(
                 0L, 0L, 0L, null, CacheStatus.NONE, new CacheMetadataDto(CacheStatus.NONE, null, null, null), TokenUsageDto.ZERO);
     }
 
+    /**
+     * Total wall-clock latency ({@code T_total}, Eq. 1 in thesis §4.5.1).
+     * Note: {@code retrievalMs} subsumes both T_embed (query vectorization) and
+     * T_ret (HNSW vector search), as the embedding call is performed within the
+     * VectorStore similarity search primitive. {@code generationMs} subsumes both
+     * T_prefill and T_stream.
+     */
     public long totalLatencyMs() {
         return retrievalMs + generationMs + expansionMs + rerankMs + cacheMs + routeMs;
     }

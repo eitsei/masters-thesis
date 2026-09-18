@@ -449,6 +449,7 @@ class RagasEvaluatorWrapper:
         response: str,
         retrieved_contexts: list[str],
         ground_truth: str,
+        progress_callback: Any = None,
     ) -> dict[str, float]:
         """Evaluates a single sample using RAGAS single-turn evaluation."""
         from ragas.dataset_schema import SingleTurnSample
@@ -483,16 +484,43 @@ class RagasEvaluatorWrapper:
                 ContextPrecision(llm=self.llm),
                 ContextRecall(llm=self.llm),
             ]
-            for idx, m in enumerate(metrics):
+            total_m = len(metrics)
+            for idx, m in enumerate(metrics, 1):
+                if progress_callback:
+                    try:
+                        progress_callback(m.name, "start", f"{idx}/{total_m}")
+                    except Exception:
+                        pass
                 try:
                     score = m.single_turn_score(sample)
-                    scores[m.name] = float(score) if score is not None else 0.0
-                except Exception:
+                    val = float(score) if score is not None else 0.0
+                    scores[m.name] = val
+                    if progress_callback:
+                        try:
+                            progress_callback(m.name, "done", f"{val:.2f}")
+                        except Exception:
+                            pass
+                except Exception as exc:
                     scores[m.name] = 0.0
-                if self.delay_seconds > 0 and idx < len(metrics) - 1:
+                    if progress_callback:
+                        try:
+                            progress_callback(m.name, "error", str(exc)[:80])
+                        except Exception:
+                            pass
+                if self.delay_seconds > 0 and idx < total_m:
+                    if progress_callback:
+                        try:
+                            progress_callback(m.name, "delay", f"{self.delay_seconds:.1f}s")
+                        except Exception:
+                            pass
                     import time
                     time.sleep(self.delay_seconds)
-        except Exception:
+        except Exception as exc:
+            if progress_callback:
+                try:
+                    progress_callback("all", "error", str(exc)[:80])
+                except Exception:
+                    pass
             scores = {
                 "faithfulness": 0.0,
                 "answer_relevancy": 0.0,
