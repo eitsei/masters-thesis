@@ -1,0 +1,23 @@
+\begin{table}[htbp]
+\centering
+\caption{Operational pricing catalog and cloud tariffs for generative, re-ranking, and embedding services (verified as of September 2026).}
+\label{tab:pricing_catalog}
+\sffamily
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\linewidth}{l>{\raggedright\arraybackslash}Xrrrrc}
+\toprule
+\textbf{Model / Service} & \textbf{Pipeline Role} & \textbf{Prompt} & \textbf{Cached} & \textbf{Output} & \textbf{Auxiliary} & \textbf{Source} \\
+& & \textbf{(\$/1M)} & \textbf{(\$/1M)} & \textbf{(\$/1M)} & \textbf{Unit Rate} & \\
+\midrule
+Gemini 3.8 Flash & Primary Workhorse ($M_0, M_4$) & \$0.75 & \$0.075 & \$3.75 & -- & \citep{GoogleVertexAIPricing} \\
+Gemini 3.5 Flash-Lite & Router Classifier / Fast Tier ($M_4$) & \$0.075 & \$0.01875 & \$0.30 & -- & \citep{GoogleVertexAIPricing} \\
+Gemini 3.1 Pro & Complex Multi-Hop Tier ($M_4$) & \$1.25 & \$0.3125 & \$5.00 & -- & \citep{GoogleVertexAIPricing} \\
+\midrule
+Vertex AI Ranking & Cross-Encoder Re-ranking ($M_2$) & -- & -- & -- & \$0.00010/doc & \citep{GoogleVertexAIRankingPricing} \\
+gemini-embedding-2 & Dense Vectorization & \$0.025 & -- & -- & -- & \citep{GoogleVertexAIPricing} \\
+\midrule
+Claude Sonnet 5 & Evaluation Judge (RAGAS) & \$3.00 & \$0.30 & \$15.00 & -- & \citep{AnthropicPricing} \\
+\bottomrule
+\end{tabularx}
+\end{table}

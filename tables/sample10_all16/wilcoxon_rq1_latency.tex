@@ -1,0 +1,31 @@
+\begin{table}[!htbp]
+\centering
+\small
+\caption{Paired Wilcoxon signed-rank test results for end-to-end latency (RQ1) against baseline ($C_0$).}
+\label{tab:wilcoxon_rq1}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l r r r r r r c @{}}
+\toprule
+\textbf{Configuration} & \textbf{$C_0$ Med} & \textbf{$C_k$ Med} & \textbf{$\tilde{\mu}_\Delta$} & \textbf{$W$-Stat} & \textbf{$p_{\text{raw}}$} & \textbf{$p_{\text{adj}}$} & \textbf{Sig} \\
+ & \scriptsize{(ms)} & \scriptsize{(ms)} & \scriptsize{(ms)} & & & & \\
+\midrule
+C1\_M1 & 2226.5 & 1953.5 & -449.0 & 12.0 & 0.1309 & 1.0000 & ns \\
+C2\_M2 & 2226.5 & 2381.5 & -222.0 & 19.0 & 0.4316 & 1.0000 & ns \\
+C3\_M3 & 2226.5 & 4127.5 & +1519.0 & 20.0 & 0.4922 & 1.0000 & ns \\
+C4\_M4 & 2175.0 & 2565.0 & +219.0 & 18.0 & 0.6523 & 1.0000 & ns \\
+C5\_M1\_M2 & 2226.5 & 2711.5 & -44.0 & 22.0 & 0.6250 & 1.0000 & ns \\
+C6\_M1\_M3 & 2226.5 & 6170.5 & +3184.0 & 7.0 & 0.0371 & 0.5566 & ns \\
+C7\_M1\_M4 & 2226.5 & 3908.0 & +1008.0 & 27.0 & 1.0000 & 1.0000 & ns \\
+C8\_M2\_M3 & 2226.5 & 6005.0 & +2359.0 & 18.0 & 0.3750 & 1.0000 & ns \\
+C9\_M2\_M4 & 2226.5 & 2644.0 & -23.0 & 27.0 & 1.0000 & 1.0000 & ns \\
+C10\_M3\_M4 & 2226.5 & 5159.5 & +2598.5 & 11.0 & 0.1055 & 1.0000 & ns \\
+C11\_M1\_M2\_M3 & 2226.5 & 4697.0 & +1813.0 & 17.0 & 0.3223 & 1.0000 & ns \\
+C12\_M1\_M2\_M4 & 2226.5 & 2657.5 & +494.5 & 26.0 & 0.9219 & 1.0000 & ns \\
+C13\_M1\_M3\_M4 & 2226.5 & 8083.5 & +4068.5 & 14.0 & 0.1934 & 1.0000 & ns \\
+C14\_M2\_M3\_M4 & 2226.5 & 5312.0 & +2830.0 & 17.0 & 0.3223 & 1.0000 & ns \\
+C15\_M1\_M2\_M3\_M4 & 2226.5 & 7736.0 & +4757.5 & 7.0 & 0.0371 & 0.5566 & ns \\
+\bottomrule
+\end{tabular*}
+\vspace{0.5em}
+\parbox{\textwidth}{\footnotesize
+\textbf{Notes:} $\tilde{\mu}_\Delta$ represents the median paired difference ($C_k - C_0$). Two-tailed Wilcoxon signed-rank test evaluated at $\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\text{adj}}$). Significance flags: $^{***}\,p < 0.001$, $^{**}\,p < 0.01$, $^{*}\,p < 0.05$, $\text{ns}\,p \ge 0.05$.}
+\end{table}

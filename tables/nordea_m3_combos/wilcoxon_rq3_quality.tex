@@ -1,0 +1,72 @@
+\begin{table}[p]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.4pt}
+\renewcommand{\arraystretch}{0.92}
+\caption{Paired Wilcoxon signed-rank test results for response quality metrics (RQ3) against baseline ($C_0$).}
+\label{tab:wilcoxon_rq3}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l l r r r r r r c @{}}
+\toprule
+\textbf{Configuration} & \textbf{Evaluation Metric} & \textbf{$C_0$ Med} & \textbf{$C_k$ Med} & \textbf{$\tilde{\mu}_\Delta$} & \textbf{$W$-Stat} & \textbf{$p_{\text{raw}}$} & \textbf{$p_{\text{adj}}$} & \textbf{Sig} \\
+\midrule
+C11\_M1\_M2\_M3 & Exact Match (EM)     & 0.0000 & 0.0000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Token F1 Score       & 0.5714 & 0.0544 & -0.5122 & 1.0 & 0.1250 & 1.0000 & ns \\
+                & Faithfulness         & 1.0000 & 0.3103 & -0.6897 & 0.0 & 0.0625 & 1.0000 & ns \\
+                & Answer Relevancy     & 0.9703 & 1.0000 & +0.0062 & 1.0 & 0.2500 & 1.0000 & ns \\
+                & Context Precision    & 0.3333 & 1.0000 & +0.5000 & 0.0 & 0.1250 & 1.0000 & ns \\
+                & Context Recall       & 0.0000 & 1.0000 & +1.0000 & 0.0 & 0.2500 & 1.0000 & ns \\
+                & Composite Quality Q  & 0.0004 & 0.5533 & +0.4442 & 2.0 & 0.1875 & 1.0000 & ns \\
+\addlinespace
+C1\_M1          & Exact Match (EM)     & 0.0000 & 0.0000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Token F1 Score       & 0.5714 & 0.2683 & -0.3030 & 6.0 & 0.8125 & 1.0000 & ns \\
+                & Faithfulness         & 1.0000 & 1.0000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Answer Relevancy     & 0.9703 & 0.8520 & +0.0000 & 4.0 & 0.8750 & 1.0000 & ns \\
+                & Context Precision    & 0.3333 & 0.7500 & +0.4167 & 5.0 & 0.6250 & 1.0000 & ns \\
+                & Context Recall       & 0.0000 & 0.5000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Composite Quality Q  & 0.0004 & 0.6668 & +0.0000 & 5.0 & 0.6250 & 1.0000 & ns \\
+\addlinespace
+C2\_M2          & Exact Match (EM)     & 0.0000 & 0.0000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Token F1 Score       & 0.5714 & 0.1754 & +0.0000 & 3.0 & 0.6250 & 1.0000 & ns \\
+                & Faithfulness         & 1.0000 & 1.0000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Answer Relevancy     & 0.9703 & 0.8834 & -0.0053 & 1.0 & 0.2500 & 1.0000 & ns \\
+                & Context Precision    & 0.3333 & 0.8875 & +0.4708 & 0.0 & 0.2500 & 1.0000 & ns \\
+                & Context Recall       & 0.0000 & 1.0000 & +0.0000 & 0.0 & 0.5000 & 1.0000 & ns \\
+                & Composite Quality Q  & 0.0004 & 0.9143 & +0.3867 & 3.0 & 0.3125 & 1.0000 & ns \\
+\addlinespace
+C3\_M3          & Exact Match (EM)     & 0.0000 & 0.0000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Token F1 Score       & 0.5714 & 0.0557 & -0.4733 & 1.0 & 0.1250 & 1.0000 & ns \\
+                & Faithfulness         & 1.0000 & 0.1923 & -0.8077 & 0.0 & 0.0625 & 1.0000 & ns \\
+                & Answer Relevancy     & 0.9703 & 1.0000 & +0.0062 & 3.0 & 0.3125 & 1.0000 & ns \\
+                & Context Precision    & 0.3333 & 0.5000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Context Recall       & 0.0000 & 0.0000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Composite Quality Q  & 0.0004 & 0.0004 & -0.0000 & 1.0 & 0.2500 & 1.0000 & ns \\
+\addlinespace
+C5\_M1\_M2      & Exact Match (EM)     & 0.0000 & 0.0000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Token F1 Score       & 0.5714 & 0.3000 & -0.2714 & 6.0 & 0.8125 & 1.0000 & ns \\
+                & Faithfulness         & 1.0000 & 1.0000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Answer Relevancy     & 0.9703 & 0.9745 & +0.0022 & 7.0 & 1.0000 & 1.0000 & ns \\
+                & Context Precision    & 0.3333 & 0.9500 & +0.5000 & 0.0 & 0.2500 & 1.0000 & ns \\
+                & Context Recall       & 0.0000 & 1.0000 & +1.0000 & 0.0 & 0.2500 & 1.0000 & ns \\
+                & Composite Quality Q  & 0.0004 & 0.8001 & +0.7559 & 0.0 & 0.0625 & 1.0000 & ns \\
+\addlinespace
+C6\_M1\_M3      & Exact Match (EM)     & 0.0000 & 0.0000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Token F1 Score       & 0.5714 & 0.0575 & -0.4956 & 1.0 & 0.1250 & 1.0000 & ns \\
+                & Faithfulness         & 1.0000 & 0.1333 & -0.8667 & 0.0 & 0.0625 & 1.0000 & ns \\
+                & Answer Relevancy     & 0.9703 & 0.9760 & +0.0078 & 5.0 & 0.6250 & 1.0000 & ns \\
+                & Context Precision    & 0.3333 & 1.0000 & +0.6667 & 3.0 & 0.3125 & 1.0000 & ns \\
+                & Context Recall       & 0.0000 & 0.5000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Composite Quality Q  & 0.0004 & 0.0004 & +0.0000 & 7.0 & 1.0000 & 1.0000 & ns \\
+\addlinespace
+C8\_M2\_M3      & Exact Match (EM)     & 0.0000 & 0.0000 & +0.0000 & 0.0 & 1.0000 & 1.0000 & ns \\
+                & Token F1 Score       & 0.5714 & 0.0590 & -0.5124 & 1.0 & 0.1250 & 1.0000 & ns \\
+                & Faithfulness         & 1.0000 & 0.3429 & -0.6571 & 0.0 & 0.0625 & 1.0000 & ns \\
+                & Answer Relevancy     & 0.9703 & 0.9809 & +0.0022 & 4.0 & 0.4375 & 1.0000 & ns \\
+                & Context Precision    & 0.3333 & 0.8042 & +0.0000 & 0.0 & 0.5000 & 1.0000 & ns \\
+                & Context Recall       & 0.0000 & 1.0000 & +0.0000 & 0.0 & 0.5000 & 1.0000 & ns \\
+                & Composite Quality Q  & 0.0004 & 0.5784 & +0.1855 & 3.0 & 0.3125 & 1.0000 & ns \\
+\bottomrule
+\end{tabular*}
+\vspace{0.5em}
+\parbox{\textwidth}{\footnotesize
+\textbf{Notes:} $\tilde{\mu}_\Delta$ represents the median paired difference ($C_k - C_0$). Two-tailed Wilcoxon signed-rank test evaluated at $\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\text{adj}}$). Significance flags: $^{***}\,p < 0.001$, $^{**}\,p < 0.01$, $^{*}\,p < 0.05$, $\text{ns}\,p \ge 0.05$.}
+\end{table}
