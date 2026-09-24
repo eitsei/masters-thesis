@@ -125,3 +125,47 @@ def test_plot_cost_breakdown(tmp_path: Path):
     comp_keys = [k for k in plotted_bars if "generation" in k.lower() or "comp" in k.lower()]
     assert len(comp_keys) == 1
     assert plotted_bars[comp_keys[0]][0] == pytest.approx(0.50, rel=1e-5)
+
+
+def test_categorize_radar_tiers():
+    from src.plot_results import _categorize_radar_tiers
+
+    configs = [
+        "run_C0_baseline",
+        "run_C1_M1", "run_C2_M2", "run_C3_M3", "run_C4_M4",
+        "run_C5_M1_M2", "run_C6_M1_M3", "run_C7_M1_M4", "run_C8_M2_M3", "run_C9_M2_M4", "run_C10_M3_M4",
+        "run_C11_M1_M2_M3", "run_C12_M1_M2_M4", "run_C13_M1_M3_M4", "run_C14_M2_M3_M4", "run_C15_M1_M2_M3_M4",
+    ]
+    base, sing, duo, trio = _categorize_radar_tiers(configs)
+
+    assert len(base) == 1 and base[0] == "run_C0_baseline"
+    assert len(sing) == 4
+    assert len(duo) == 6
+    assert len(trio) == 5
+
+
+def test_plot_ragas_metrics_radar_three_panel(tmp_path: Path):
+    from src.plot_results import plot_ragas_metrics_radar
+
+    out_pdf = tmp_path / "quality_radar_enterprise.pdf"
+    configs = [
+        "run_C0_baseline",
+        "run_C1_M1", "run_C2_M2", "run_C3_M3", "run_C4_M4",
+        "run_C5_M1_M2", "run_C6_M1_M3", "run_C7_M1_M4", "run_C8_M2_M3", "run_C9_M2_M4", "run_C10_M3_M4",
+        "run_C11_M1_M2_M3", "run_C12_M1_M2_M4", "run_C13_M1_M3_M4", "run_C14_M2_M3_M4", "run_C15_M1_M2_M3_M4",
+    ]
+    data = {
+        cfg: [
+            {
+                "context_precision": 0.85,
+                "context_recall": 0.80,
+                "faithfulness": 0.90,
+                "answer_relevancy": 0.88,
+            }
+        ]
+        for cfg in configs
+    }
+
+    result = plot_ragas_metrics_radar(data, output_path=out_pdf, dataset_name="Enterprise")
+    assert result.exists()
+    assert result.stat().st_size > 1000

@@ -11,8 +11,9 @@ Generates:
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 import matplotlib
 matplotlib.use("Agg")  # Headless backend for Linux environments
@@ -82,6 +83,7 @@ def _compute_pareto_frontier(
 def plot_pareto_frontier(
     data: dict[str, Sequence[Mapping[str, Any]]],
     output_path: Path | str = "thesis/figures/pareto_frontier.pdf",
+    dataset_name: Optional[str] = None,
 ) -> Path:
     """Generates dual-panel Quality vs Latency and Quality vs Cost Pareto trade-off figure."""
     _set_publication_style()
@@ -171,7 +173,11 @@ def plot_pareto_frontier(
         frameon=True,
     )
 
-    plt.tight_layout(rect=[0, 0.08, 1, 1])
+    if dataset_name:
+        fig.suptitle(f"Multi-Objective Pareto Frontier for {dataset_name}", fontsize=12, fontweight="bold", y=0.98)
+        plt.tight_layout(rect=[0, 0.08, 1, 0.95])
+    else:
+        plt.tight_layout(rect=[0, 0.08, 1, 1])
     plt.savefig(out_file, bbox_inches="tight", dpi=300)
     plt.close(fig)
     return out_file
@@ -180,6 +186,7 @@ def plot_pareto_frontier(
 def plot_latency_breakdown(
     data: dict[str, Sequence[Mapping[str, Any]]],
     output_path: Path | str = "thesis/figures/latency_breakdown.pdf",
+    dataset_name: Optional[str] = None,
 ) -> Path:
     """Generates stacked bar chart isolating all micro-phase latency components across configurations."""
     _set_publication_style()
@@ -369,7 +376,8 @@ def plot_latency_breakdown(
         )
 
     ax.set_ylabel("Execution Latency (ms)")
-    ax.set_title("End-to-End Latency Micro-Phase Breakdown", fontweight="bold")
+    title_suffix = f" for {dataset_name}" if dataset_name else ""
+    ax.set_title(f"End-to-End Latency Micro-Phase Breakdown{title_suffix}", fontweight="bold")
     ax.set_xticks(x)
 
     display_labels = [c.replace("_", " ") for c in configs]
@@ -391,11 +399,75 @@ def plot_latency_breakdown(
     return out_file
 
 
+def _categorize_radar_tiers(
+    configs: list[str],
+) -> tuple[list[str], list[str], list[str], list[str]]:
+    """Categorizes configuration names into (baseline, singulars, duos, trios_fullstack).
+
+    Classification rules:
+    - Baseline: 'C0' or 'C_0' or 'base' in name.
+    - If C-number pattern (e.g. C1..C15 or C_1..C_15) is present:
+        - 0: baseline
+        - 1..4: singulars (k=1)
+        - 5..10: duos (k=2)
+        - 11..15: trios & full-stack (k>=3)
+    - Fallback heuristic based on module separators:
+        - Count number of module tokens (M1, M2, M3, M4, S2B, SR, PC, ROUTE, etc.):
+        - 1 module -> singular
+        - 2 modules -> duo
+        - >=3 modules -> trio/fullstack
+    """
+    baseline_list: list[str] = []
+    singulars: list[str] = []
+    duos: list[str] = []
+    trios_full: list[str] = []
+
+    for name in configs:
+        lower = name.lower()
+        # Check for C<number> or C_<number>
+        m = re.search(r"c_?(\d+)", lower)
+        if m:
+            c_num = int(m.group(1))
+            if c_num == 0:
+                baseline_list.append(name)
+            elif 1 <= c_num <= 4:
+                singulars.append(name)
+            elif 5 <= c_num <= 10:
+                duos.append(name)
+            else:
+                trios_full.append(name)
+            continue
+
+        if "base" in lower or "c0" in lower:
+            baseline_list.append(name)
+            continue
+
+        # Heuristic fallback: count '+' or count 'm[1-4]' occurrences
+        m_matches = re.findall(r"m[1-4]", lower)
+        plus_count = name.count("+")
+        if len(m_matches) >= 3 or plus_count >= 2:
+            trios_full.append(name)
+        elif len(m_matches) == 2 or plus_count == 1:
+            duos.append(name)
+        else:
+            singulars.append(name)
+
+    return baseline_list, singulars, duos, trios_full
+
+
 def plot_ragas_metrics_radar(
     data: dict[str, Sequence[Mapping[str, Any]]],
     output_path: Path | str = "thesis/figures/ragas_metrics_radar.pdf",
+    dataset_name: Optional[str] = None,
 ) -> Path:
-    """Generates radar chart across the 4 core RAGAS metrics."""
+    """Generates radar chart across the 4 core RAGAS metrics.
+
+    If >= 5 configurations are provided, generates a 3-panel figure comparing each
+    architectural tier against baseline (k=0):
+    1. Single-Factor Isolated (k=1) vs. Baseline
+    2. Pairwise Combinations (k=2) vs. Baseline
+    3. Higher-Order Triplets & Full-Stack (k>=3) vs. Baseline
+    """
     _set_publication_style()
     out_file = Path(output_path)
     out_file.parent.mkdir(parents=True, exist_ok=True)
@@ -406,39 +478,137 @@ def plot_ragas_metrics_radar(
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
     angles += angles[:1]  # Close the radar polygon
 
-    fig, ax = plt.subplots(figsize=(6.2, 5.8), subplot_kw=dict(polar=True), dpi=300)
+    palette = [
+        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+        "#8c564b", "#e377c2", "#17becf",
+    ]
 
-    palette = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+    base_names, sing_names, duo_names, trio_names = _categorize_radar_tiers(list(data.keys()))
 
-    for idx, (name, records) in enumerate(data.items()):
-        s = summarize_run_records(records)
-        if not s:
-            continue
+    # Fallback to single radar plot if fewer than 5 configs or tiers cannot be formed
+    if len(data) < 5 or (not sing_names and not duo_names and not trio_names):
+        fig, ax = plt.subplots(figsize=(6.2, 5.8), subplot_kw=dict(polar=True), dpi=300)
 
-        values = [
-            s["context_precision_mean"],
-            s["context_recall_mean"],
-            s["faithfulness_mean"],
-            s["answer_relevancy_mean"],
-        ]
-        values += values[:1]  # Close polygon
+        for idx, (name, records) in enumerate(data.items()):
+            s = summarize_run_records(records)
+            if not s:
+                continue
 
-        color = palette[idx % len(palette)]
-        ax.plot(angles, values, color=color, linewidth=2.0, label=name)
-        ax.fill(angles, values, color=color, alpha=0.15)
+            values = [
+                s["context_precision_mean"],
+                s["context_recall_mean"],
+                s["faithfulness_mean"],
+                s["answer_relevancy_mean"],
+            ]
+            values += values[:1]  # Close polygon
 
-    ax.set_theta_offset(np.pi / 2)
-    ax.set_theta_direction(-1)
+            color = palette[idx % len(palette)]
+            ax.plot(angles, values, color=color, linewidth=2.0, label=name)
+            ax.fill(angles, values, color=color, alpha=0.15)
 
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(categories, fontsize=9, fontweight="bold")
-    ax.set_ylim(0.0, 1.0)
-    ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
-    ax.set_yticklabels(["0.2", "0.4", "0.6", "0.8", "1.0"], fontsize=7, color="gray")
+        ax.set_theta_offset(np.pi / 2)
+        ax.set_theta_direction(-1)
 
-    plt.title("RAGAS Four Core Quality Dimensions", fontweight="bold", y=1.08)
-    plt.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1), fontsize=8)
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(categories, fontsize=9, fontweight="bold")
+        ax.set_ylim(0.0, 1.0)
+        ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
+        ax.set_yticklabels(["0.2", "0.4", "0.6", "0.8", "1.0"], fontsize=7, color="gray")
 
+        title_suffix = f" for {dataset_name}" if dataset_name else ""
+        plt.title(f"RAGAS Four Core Quality Dimensions{title_suffix}", fontweight="bold", y=1.08)
+        plt.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1), fontsize=8)
+
+        plt.tight_layout()
+        plt.savefig(out_file, bbox_inches="tight", dpi=300)
+        plt.close(fig)
+        return out_file
+
+    # 3-Panel Side-by-Side Radar Chart
+    fig, axes = plt.subplots(1, 3, figsize=(15.5, 5.2), subplot_kw=dict(polar=True), dpi=300)
+
+    panels = [
+        ("(a) Single-Factor Isolated ($k=1$) vs. Baseline", sing_names),
+        ("(b) Pairwise Combinations ($k=2$) vs. Baseline", duo_names),
+        ("(c) Higher-Order Triplets & Full-Stack ($k \\geq 3$) vs. Baseline", trio_names),
+    ]
+
+    base_name = base_names[0] if base_names else None
+    base_values = None
+    if base_name and base_name in data:
+        sb = summarize_run_records(data[base_name])
+        if sb:
+            base_values = [
+                sb["context_precision_mean"],
+                sb["context_recall_mean"],
+                sb["faithfulness_mean"],
+                sb["answer_relevancy_mean"],
+            ]
+            base_values += base_values[:1]
+
+    for p_idx, (panel_title, tier_configs) in enumerate(panels):
+        ax = axes[p_idx]
+
+        # 1. Plot Baseline in distinct dashed style
+        if base_values is not None:
+            ax.plot(
+                angles,
+                base_values,
+                color="#2c3e50",
+                linestyle="--",
+                linewidth=2.0,
+                label="$C_0$ (Baseline)",
+                zorder=4,
+            )
+            ax.fill(angles, base_values, color="#2c3e50", alpha=0.08)
+
+        # 2. Plot configurations in this tier
+        for idx, name in enumerate(tier_configs):
+            records = data.get(name)
+            if not records:
+                continue
+            s = summarize_run_records(records)
+            if not s:
+                continue
+
+            values = [
+                s["context_precision_mean"],
+                s["context_recall_mean"],
+                s["faithfulness_mean"],
+                s["answer_relevancy_mean"],
+            ]
+            values += values[:1]
+
+            color = palette[idx % len(palette)]
+            clean_lbl = name.replace("run_", "").replace("_evaluated", "").replace("_", " ")
+            ax.plot(angles, values, color=color, linewidth=1.8, label=clean_lbl, zorder=5)
+            ax.fill(angles, values, color=color, alpha=0.12)
+
+        # Polar axis styling
+        ax.set_theta_offset(np.pi / 2)
+        ax.set_theta_direction(-1)
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(categories, fontsize=8.5, fontweight="bold")
+        ax.set_ylim(0.0, 1.0)
+        ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
+        ax.set_yticklabels(["0.2", "0.4", "0.6", "0.8", "1.0"], fontsize=6.5, color="gray")
+        ax.set_title(panel_title, fontweight="bold", pad=20, fontsize=10.5)
+
+        ax.legend(
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.10),
+            ncol=min(3, len(tier_configs) + 1),
+            fontsize=7.5,
+            framealpha=0.9,
+        )
+
+    title_suffix = f" for {dataset_name}" if dataset_name else ""
+    fig.suptitle(
+        f"Multi-Dimensional Quality Trade-offs across Architectural Tiers (RAGAS){title_suffix}",
+        fontsize=12,
+        fontweight="bold",
+        y=1.04,
+    )
     plt.tight_layout()
     plt.savefig(out_file, bbox_inches="tight", dpi=300)
     plt.close(fig)
@@ -489,6 +659,7 @@ def plot_pareto_frontier_3d(
     data: dict[str, Sequence[Mapping[str, Any]]],
     output_path: Path | str = "thesis/figures/pareto_frontier_3d.pdf",
     subtitle: str | None = None,
+    dataset_name: Optional[str] = None,
 ) -> Path:
     """Generates empirical 3D Pareto frontier surface figure across QPS, QPD, and Composite Q."""
     _set_publication_style()
@@ -669,6 +840,8 @@ def plot_pareto_frontier_3d(
     title_text = "Empirical 3D Pareto Frontier ($\\mathcal{P}_{3D}$): Multi-Objective Trade-off Surface"
     if subtitle:
         title_text += f"\n{subtitle}"
+    elif dataset_name:
+        title_text += f"\nfor {dataset_name}"
     ax.set_title(title_text, fontweight="bold", pad=15)
 
     if par_scatter is not None:
@@ -687,6 +860,7 @@ def plot_cost_breakdown(
     data: dict[str, Sequence[Mapping[str, Any]]],
     output_path: Path | str = "thesis/figures/cost_breakdown.pdf",
     pricing_tier: str = "gemini-3.8-flash",
+    dataset_name: Optional[str] = None,
 ) -> Path:
     """Generates stacked bar chart isolating all micro-phase operational cost components across configurations.
 
@@ -921,7 +1095,8 @@ def plot_cost_breakdown(
         )
 
     ax.set_ylabel("Operational Cost per 1,000 Queries (USD)")
-    ax.set_title("Operational Cost Micro-Phase Breakdown (per 1,000 Queries)", fontweight="bold")
+    title_suffix = f" for {dataset_name}" if dataset_name else ""
+    ax.set_title(f"Operational Cost Micro-Phase Breakdown (per 1,000 Queries){title_suffix}", fontweight="bold")
     ax.set_xticks(x)
 
     display_labels = [c.replace("run_", "").replace("_", " ") for c in configs]

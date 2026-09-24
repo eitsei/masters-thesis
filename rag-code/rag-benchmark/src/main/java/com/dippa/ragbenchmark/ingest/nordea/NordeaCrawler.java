@@ -39,31 +39,37 @@ public class NordeaCrawler {
         Set<String> pdfUrls = new LinkedHashSet<>();
         List<CrawledPage> pages = new ArrayList<>();
         Queue<String> queue = new ArrayDeque<>();
-        queue.add(properties.baseUrl());
+        String rawBase = properties.baseUrl();
+        String normalizedBase = (rawBase != null && !rawBase.endsWith("/")) ? rawBase + "/" : (rawBase != null ? rawBase : "");
+        queue.add(normalizedBase.isBlank() ? "https://www.nordea.fi/henkiloasiakkaat/" : normalizedBase);
 
         while (!queue.isEmpty() && pages.size() < properties.maxPages()) {
             String url = queue.poll();
-            if (!visited.add(url)) {
+            String cleanUrl = cleanUrl(url);
+            if (!visited.add(cleanUrl)) {
                 continue;
             }
 
             Document doc;
             try {
-                doc = Jsoup.connect(url)
+                doc = Jsoup.connect(cleanUrl)
                         .userAgent(properties.userAgent())
                         .timeout(FETCH_TIMEOUT_MILLIS)
                         .get();
             } catch (IOException ex) {
-                logger.warn("Skipping page " + url + ": " + ex.getMessage());
+                logger.warn("Skipping page " + cleanUrl + ": " + ex.getMessage());
                 continue;
             } finally {
                 politeDelay();
             }
 
-            pages.add(new CrawledPage(url, doc.title(), NordeaHtmlToMarkdownConverter.convert(doc)));
+            String markdown = NordeaHtmlToMarkdownConverter.convert(doc);
+            if (!markdown.isBlank()) {
+                pages.add(new CrawledPage(cleanUrl, doc.title(), markdown));
+            }
 
             for (Element link : doc.select("a[href]")) {
-                String absHref = stripFragment(link.absUrl("href"));
+                String absHref = cleanUrl(link.absUrl("href"));
                 if (absHref.isBlank()) {
                     continue;
                 }
@@ -71,7 +77,7 @@ public class NordeaCrawler {
                     if (pdfUrls.size() < properties.maxPdfs()) {
                         pdfUrls.add(absHref);
                     }
-                } else if (absHref.startsWith(properties.baseUrl()) && !visited.contains(absHref)) {
+                } else if (isEligibleContentPage(absHref, normalizedBase) && !visited.contains(absHref)) {
                     queue.add(absHref);
                 }
             }
@@ -80,9 +86,37 @@ public class NordeaCrawler {
         return new CrawlResult(pages, List.copyOf(pdfUrls));
     }
 
-    private static String stripFragment(String url) {
+    private static String cleanUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return "";
+        }
         int hashIndex = url.indexOf('#');
-        return hashIndex >= 0 ? url.substring(0, hashIndex) : url;
+        String clean = hashIndex >= 0 ? url.substring(0, hashIndex) : url;
+        int queryIndex = clean.indexOf('?');
+        if (queryIndex >= 0) {
+            String query = clean.substring(queryIndex + 1);
+            if (query.contains("intcmp") || query.contains("icid") || query.contains("utm_") || query.contains("adobe_mc")) {
+                clean = clean.substring(0, queryIndex);
+            }
+        }
+        return clean.trim();
+    }
+
+    private static boolean isEligibleContentPage(String url, String basePrefix) {
+        if (!url.startsWith(basePrefix)) {
+            return false;
+        }
+        String lower = url.toLowerCase(Locale.ROOT);
+        if (lower.contains("/kirjaudu") || lower.contains("/login") || lower.contains("/logout")
+                || lower.contains("/sv/") || lower.contains("/en/")
+                || lower.contains("verkkopankki.nordea.fi")) {
+            return false;
+        }
+        if (lower.endsWith(".zip") || lower.endsWith(".xlsx") || lower.endsWith(".docx")
+                || lower.endsWith(".jpg") || lower.endsWith(".png") || lower.endsWith(".svg")) {
+            return false;
+        }
+        return true;
     }
 
     private void politeDelay() {

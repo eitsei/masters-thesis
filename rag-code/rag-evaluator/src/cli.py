@@ -12,6 +12,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import json
 import os
 import re
+import shutil
 import sys
 import time
 from datetime import datetime
@@ -706,7 +707,13 @@ def export_thesis(
         None,
         "--subfolder",
         "-s",
-        help="Optional subfolder inside tables-dir and figures-dir to isolate run outputs (e.g., 'sample_runs', 'musique', 'nordea', 'comparisons', 'runs/<run_name>')",
+        help="Optional subfolder inside tables-dir and figures-dir to isolate run outputs (e.g., 'sample_runs', 'musique', 'nordea', 'enterprise', 'comparisons', 'runs/<run_name>')",
+    ),
+    dataset_name: Optional[str] = typer.Option(
+        None,
+        "--dataset-name",
+        "-d",
+        help="Dataset name for figure titles and filenames (e.g. 'MuSiQue', 'Enterprise'). If not provided, inferred from subfolder or input.",
     ),
     family_scope: str = typer.Option(
         "metric",
@@ -724,6 +731,18 @@ def export_thesis(
 
     tables_dir.mkdir(parents=True, exist_ok=True)
     figures_dir.mkdir(parents=True, exist_ok=True)
+
+    if not dataset_name:
+        sub_str = str(subfolder).lower() if subfolder else ""
+        inp_str = str(input_target).lower()
+        if "musique" in sub_str or "musique" in inp_str or "sample10" in sub_str or "sample10" in inp_str:
+            dataset_name = "MuSiQue"
+        elif "enterprise" in sub_str or "enterprise" in inp_str or "nordea" in sub_str or "nordea" in inp_str:
+            dataset_name = "Enterprise"
+        elif subfolder:
+            dataset_name = subfolder.capitalize()
+
+    slug = dataset_name.lower().replace(" ", "_") if dataset_name else (subfolder.lower() if subfolder else "")
 
     target_path = Path(input_target)
     run_dict: dict[str, list[dict[str, Any]]] = {}
@@ -746,7 +765,7 @@ def export_thesis(
         console.print("[red]No records found to export.[/red]")
         return
 
-    console.print(f"Exporting thesis artifacts for [bold]{len(run_dict)}[/bold] configurations...")
+    console.print(f"Exporting thesis artifacts for [bold]{len(run_dict)}[/bold] configurations (Dataset: [yellow]{dataset_name or 'Default'}[/yellow])...")
 
     # 1. Export LaTeX Tables
     t_summary = export_benchmark_summary_latex(run_dict, tables_dir / "benchmark_summary.tex")
@@ -769,20 +788,36 @@ def export_thesis(
         console.print(f"  [green]✓[/green] Tables (Decomposed): [cyan]{tables_dir / 'wilcoxon_rq*.tex'}[/cyan]")
 
     # 2. Export Publication Vector Figures
-    p1 = plot_pareto_frontier(run_dict, figures_dir / "pareto_frontier.pdf")
+    slug_suffix = f"_{slug}" if slug else ""
+
+    p1 = plot_pareto_frontier(run_dict, figures_dir / f"pareto_frontier{slug_suffix}.pdf", dataset_name=dataset_name)
     console.print(f"  [green]✓[/green] Figure: [cyan]{p1}[/cyan]")
 
-    p2 = plot_pareto_frontier_3d(run_dict, figures_dir / "pareto_frontier_3d.pdf")
+    p2 = plot_pareto_frontier_3d(run_dict, figures_dir / f"pareto_frontier_3d{slug_suffix}.pdf", dataset_name=dataset_name)
     console.print(f"  [green]✓[/green] Figure: [cyan]{p2}[/cyan]")
 
-    p3 = plot_latency_breakdown(run_dict, figures_dir / "latency_breakdown.pdf")
+    p3 = plot_latency_breakdown(run_dict, figures_dir / f"latency_breakdown{slug_suffix}.pdf", dataset_name=dataset_name)
     console.print(f"  [green]✓[/green] Figure: [cyan]{p3}[/cyan]")
 
-    p4 = plot_cost_breakdown(run_dict, figures_dir / "cost_breakdown.pdf")
+    p4 = plot_cost_breakdown(run_dict, figures_dir / f"cost_breakdown{slug_suffix}.pdf", dataset_name=dataset_name)
     console.print(f"  [green]✓[/green] Figure: [cyan]{p4}[/cyan]")
 
-    p5 = plot_ragas_metrics_radar(run_dict, figures_dir / "ragas_metrics_radar.pdf")
+    p5 = plot_ragas_metrics_radar(run_dict, figures_dir / f"quality_radar{slug_suffix}.pdf", dataset_name=dataset_name)
     console.print(f"  [green]✓[/green] Figure: [cyan]{p5}[/cyan]")
+
+    def _safe_copy(src: Path, dst: Path) -> None:
+        if src.resolve() != dst.resolve():
+            shutil.copy2(src, dst)
+
+    # Always ensure default names exist for compatibility
+    _safe_copy(p5, figures_dir / "ragas_metrics_radar.pdf")
+    _safe_copy(p5, figures_dir / "quality_radar.pdf")
+    if slug:
+        _safe_copy(p1, figures_dir / "pareto_frontier.pdf")
+        _safe_copy(p2, figures_dir / "pareto_frontier_3d.pdf")
+        _safe_copy(p3, figures_dir / "latency_breakdown.pdf")
+        _safe_copy(p4, figures_dir / "cost_breakdown.pdf")
+        _safe_copy(p5, figures_dir / f"ragas_metrics_radar_{slug}.pdf")
 
     console.print("\n[bold green]All thesis tables and figures exported successfully![/bold green]")
 
@@ -1069,6 +1104,84 @@ def generate_nordea_testset(
         judge_model=judge_model,
         limit_docs=limit_docs,
         console=console,
+    )
+
+
+@app.command("build-nordea-musique-dataset")
+def build_nordea_musique_dataset(
+    csv_file: Path = typer.Option(
+        Path("data/nordea/qs_fi.csv"),
+        "--csv-file",
+        "-c",
+        help="Path to questions CSV file (e.g. qs_fi.csv)",
+    ),
+    corpus_dir: Path = typer.Option(
+        Path("../rag-benchmark/data/nordea/md"),
+        "--corpus-dir",
+        "-d",
+        help="Path to directory containing crawled personal banking markdown documents (pages/ and pdfs/)",
+    ),
+    output: Path = typer.Option(
+        Path("data/nordea/nordea_ans_v1.0_dev.jsonl"),
+        "--output",
+        "-o",
+        help="Target JSONL file path conforming to MuSiQue schema",
+    ),
+    size: int = typer.Option(
+        100,
+        "--size",
+        "-s",
+        help="Target number of benchmark questions (Thesis §4.4: 40% single-hop, 40% multi-hop, 20% out-of-domain)",
+    ),
+    judge_model: str = typer.Option(
+        "gemini-3.8-flash",
+        "--judge-model",
+        "-m",
+        help="Synthesizer/verifier LLM model on Vertex AI global endpoint",
+    ),
+    limit_input: Optional[int] = typer.Option(
+        None,
+        "--limit-input",
+        help="Limit number of candidate input questions to process (useful for fast smoke runs)",
+    ),
+) -> None:
+    """Builds a MuSiQue-schema enterprise benchmark dataset from Finnish questions and Nordea corpus."""
+    from src.dataset_builder import CorpusIndexer, NordeaMusiqueDatasetBuilder, load_questions_from_csv
+
+    # Resolve paths relative to working directory / project root
+    resolved_csv = csv_file if csv_file.is_absolute() else (Path.cwd() / csv_file).resolve()
+    if not resolved_csv.exists():
+        alt_csv = Path(__file__).resolve().parent.parent / "data" / "nordea" / "qs_fi.csv"
+        if alt_csv.exists():
+            resolved_csv = alt_csv
+
+    resolved_corpus = corpus_dir if corpus_dir.is_absolute() else (Path.cwd() / corpus_dir).resolve()
+    if not resolved_corpus.exists():
+        alt_corpus = Path(__file__).resolve().parent.parent.parent / "rag-benchmark" / "data" / "nordea" / "md"
+        if alt_corpus.exists():
+            resolved_corpus = alt_corpus
+
+    resolved_out = output if output.is_absolute() else (Path.cwd() / output).resolve()
+
+    console.print(f"Loading questions from: [cyan]{resolved_csv}[/cyan]")
+    questions = load_questions_from_csv(resolved_csv)
+    console.print(f"Loaded [bold]{len(questions)}[/bold] unique questions from CSV.")
+
+    console.print(f"Indexing corpus from: [cyan]{resolved_corpus}[/cyan]")
+    indexer = CorpusIndexer(resolved_corpus)
+    console.print(f"Indexed [bold]{len(indexer.paragraphs)}[/bold] substantive paragraphs.")
+
+    builder = NordeaMusiqueDatasetBuilder(
+        corpus_indexer=indexer,
+        judge_model=judge_model,
+        console=console,
+    )
+
+    builder.build_dataset(
+        questions=questions,
+        output_file=resolved_out,
+        target_size=size,
+        limit_input=limit_input,
     )
 
 

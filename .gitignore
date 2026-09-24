@@ -6,6 +6,8 @@ target/
 *.iml
 data/
 rag-benchmark/data/
+rag-code/rag-benchmark/data/
+rag-code/rag-evaluator/data/nordea/
 
 # LaTeX compilation auxiliary files
 thesis/*.aux
