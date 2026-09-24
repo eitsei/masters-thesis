@@ -59,7 +59,8 @@ fi
   --output "$OUTPUT_FILE" \
   --size "$SIZE" \
   --judge-model "$JUDGE_MODEL" \
-  "${EXTRA_ARGS[@]}"
+  "${EXTRA_ARGS[@]}" \
+  "$@"
 
 echo -e "\n========================================================================"
 echo " Dataset construction completed successfully!"

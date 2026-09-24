@@ -403,9 +403,14 @@ class NordeaMusiqueDatasetBuilder:
         out_path = Path(output_file)
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
-        target_single = int(target_size * single_hop_ratio)
-        target_multi = int(target_size * multi_hop_ratio)
-        target_ood = target_size - target_single - target_multi
+        if target_size >= 3:
+            target_single = max(1, int(round(target_size * single_hop_ratio)))
+            target_multi = max(1, int(round(target_size * multi_hop_ratio)))
+            target_ood = max(1, target_size - target_single - target_multi)
+        else:
+            target_single = 1
+            target_multi = 0
+            target_ood = max(0, target_size - 1)
 
         self.console.print(f"[bold cyan]Building Nordea MuSiQue Benchmark Dataset (Target: {target_size})[/bold cyan]")
         self.console.print(
