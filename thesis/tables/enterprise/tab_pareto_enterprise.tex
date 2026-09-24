@@ -1,0 +1,39 @@
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\caption{Multi-objective trade-off equilibrium, operational efficiency ratios (QPD, QPS), and Pareto optimality on the Enterprise Production Corpus.}
+\label{tab:pareto_enterprise}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c c c @{}}
+\toprule
+\textbf{Config} & \textbf{Pipeline} & \makecell[c]{\textbf{Composite} \\ \textbf{Quality $Q$}} & \makecell[c]{\textbf{$\text{Cost}_{1\text{k}}$} \\ \textbf{(\$)}} & \makecell[c]{\textbf{$T_{\text{total}}\ P_{50}$} \\ \textbf{(s)}} & \makecell[c]{\textbf{Quality per} \\ \textbf{Dollar (QPD)}} & \makecell[c]{\textbf{Quality per} \\ \textbf{Second (QPS)}} & \makecell[c]{\textbf{Pareto} \\ \textbf{Optimal}} \\
+\midrule
+\multicolumn{8}{l}{\textbf{Baseline ($k=0$)}} \\
+$C_{0}$ & Naive RAG Baseline & 0.6831 & 4.367 & 6.850 & 156.41 & 0.0997 & No \\
+\midrule
+\multicolumn{8}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\
+$C_{1}$ & S2B & 0.7355 & 6.503 & 3.541 & 113.10 & 0.2077 & \textbf{Yes} \\
+$C_{2}$ & SR & 0.6599 & 10.026 & 4.382 & 65.82 & 0.1506 & No \\
+$C_{3}$ & PC & 0.2251 & 7.084 & 12.742 & 31.77 & 0.0177 & No \\
+$C_{4}$ & MC & 0.6001 & 4.117 & 3.695 & 145.78 & 0.1624 & \textbf{Yes} \\
+\midrule
+\multicolumn{8}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\
+$C_{5}$ & S2B + SR & 0.7311 & 11.278 & 2.882 & 64.83 & 0.2537 & No \\
+$C_{6}$ & S2B + PC & 0.2649 & 7.748 & 10.694 & 34.19 & 0.0248 & No \\
+$C_{7}$ & S2B + MC & 0.7315 & 4.174 & 2.766 & 175.24 & 0.2645 & \textbf{Yes} \\
+$C_{8}$ & SR + PC & 0.1404 & 11.523 & 16.558 & 12.19 & 0.0085 & No \\
+$C_{9}$ & SR + MC & 0.6943 & 8.235 & 3.404 & 84.31 & 0.2040 & No \\
+$C_{10}$ & PC + MC & 0.2456 & 5.031 & 7.261 & 48.81 & 0.0338 & No \\
+\midrule
+\multicolumn{8}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\
+$C_{11}$ & S2B + SR + PC & 0.3096 & 12.333 & 9.877 & 25.11 & 0.0313 & No \\
+$C_{12}$ & S2B + SR + MC & 0.7191 & 7.603 & 2.872 & 94.58 & 0.2504 & No \\
+$C_{13}$ & S2B + PC + MC & 0.3203 & 5.787 & 10.508 & 55.36 & 0.0305 & No \\
+$C_{14}$ & SR + PC + MC & 0.1545 & 9.147 & 7.534 & 16.89 & 0.0205 & No \\
+$C_{15}$ & \makecell[l]{S2B + SR + PC + MC \\ (Full-Stack)} & 0.4253 & 8.747 & 9.552 & 48.62 & 0.0445 & No \\
+\bottomrule
+\end{tabular*}
+\vspace{0.5em}
+\parbox{\linewidth}{\footnotesize
+\textbf{Notes:} Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across Context Precision, Context Recall, Faithfulness, and Answer Relevancy (Eq.~\ref{eq:composite_quality}). $\text{Cost}_{1\text{k}}$ denotes monetary operational expenditure normalized per 1,000 queries in USD. $T_{\text{total}}\ P_{50}$ is median end-to-end execution latency in seconds. Quality per Dollar (QPD, Eq.~\ref{eq:qpd}) and Quality per Second (QPS, Eq.~\ref{eq:qps}) measure economic and computational efficiency. Pareto Optimal indicates non-dominated configurations across the three-dimensional objective space ($\max Q, \min \text{Cost}, \min T_{\text{total}}$).}
+\end{table}

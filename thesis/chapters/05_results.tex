@@ -1,0 +1,107 @@
+\subsection{Latency Profiles and Computational Overhead}
+\label{subsec:results_latency}
+
+\subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
+\label{subsubsec:latency_musique}
+
+\input{tables/musique/tab_latency_musique}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/musique/latency_breakdown_musique.pdf}
+\caption{Component-wise latency breakdown across all 16 pipeline configurations on the academic multi-hop benchmark (MuSiQue), decomposing execution latency across retrieval, re-ranking, prompt caching, model routing, and token generation phases.}
+\label{fig:latency_breakdown_musique}
+\end{figure}
+
+\subsubsection{Enterprise Production Corpus}
+\label{subsubsec:latency_enterprise}
+
+\input{tables/enterprise/tab_latency_enterprise}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/enterprise/latency_breakdown_enterprise.pdf}
+\caption{Component-wise latency breakdown across all 16 pipeline configurations on the enterprise production corpus, detailing execution duration across retrieval, semantic re-ranking, cache management, and model tier generation phases.}
+\label{fig:latency_breakdown_enterprise}
+\end{figure}
+
+\subsection{Operational Expenditure and Token Dynamics}
+\label{subsec:results_cost}
+
+\subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
+\label{subsubsec:cost_musique}
+
+\input{tables/musique/tab_cost_musique}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/musique/cost_breakdown_musique.pdf}
+\caption{Component-wise operational expenditure breakdown per 1,000 queries across all 16 pipeline configurations on the academic multi-hop benchmark (MuSiQue), decomposing total monetary cost across uncached prompt tokens, context caching read tokens, generation completion tokens, semantic re-ranking, and model routing.}
+\label{fig:cost_breakdown_musique}
+\end{figure}
+
+\subsubsection{Enterprise Production Corpus}
+\label{subsubsec:cost_enterprise}
+
+\input{tables/enterprise/tab_cost_enterprise}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/enterprise/cost_breakdown_enterprise.pdf}
+\caption{Component-wise operational expenditure breakdown per 1,000 queries across all 16 pipeline configurations on the enterprise production corpus, detailing monetary expenditure across uncached context prefill, context cache lookups, generative completion, and auxiliary neural re-ranking services.}
+\label{fig:cost_breakdown_enterprise}
+\end{figure}
+
+\subsection{Retrieval and Generation Quality}
+\label{subsec:results_quality}
+
+\subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
+\label{subsubsec:quality_musique}
+
+\input{tables/musique/tab_quality_musique}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/musique/quality_radar_musique.pdf}
+\caption{Multi-dimensional response quality profiles across architectural tiers on the academic multi-hop benchmark (MuSiQue), comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy.}
+\label{fig:quality_radar_musique}
+\end{figure}
+
+\subsubsection{Enterprise Production Corpus}
+\label{subsubsec:quality_enterprise}
+
+\input{tables/enterprise/tab_quality_enterprise}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/enterprise/quality_radar_enterprise.pdf}
+\caption{Multi-dimensional response quality profiles across architectural tiers on the enterprise production corpus, comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy.}
+\label{fig:quality_radar_enterprise}
+\end{figure}
+
+\subsection{Trade-off Equilibrium and Pareto Frontier}
+\label{subsec:results_pareto}
+
+\subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
+\label{subsubsec:pareto_musique}
+
+\input{tables/musique/tab_pareto_musique}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/musique/pareto_frontier_musique.pdf}
+\caption{Empirical Pareto frontier of Composite Quality ($Q$) versus median end-to-end execution latency ($T_{\text{total}}\ P_{50}$) and operational expenditure ($\text{Cost}_{1\text{k}}$) on the academic multi-hop benchmark (MuSiQue). Solid lines delineate the non-dominated empirical Pareto frontier across configurations.}
+\label{fig:pareto_frontier_musique}
+\end{figure}
+
+\subsubsection{Enterprise Production Corpus}
+\label{subsubsec:pareto_enterprise}
+
+\input{tables/enterprise/tab_pareto_enterprise}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/enterprise/pareto_frontier_enterprise.pdf}
+\caption{Empirical Pareto frontier of Composite Quality ($Q$) versus median end-to-end execution latency ($T_{\text{total}}\ P_{50}$) and operational expenditure ($\text{Cost}_{1\text{k}}$) on the enterprise production corpus. Solid lines delineate the non-dominated empirical Pareto frontier across configurations.}
+\label{fig:pareto_frontier_enterprise}
+\end{figure}
