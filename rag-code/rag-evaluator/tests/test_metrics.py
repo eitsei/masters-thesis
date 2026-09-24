@@ -165,6 +165,66 @@ def test_compute_cost_prompt_is_total():
     assert math.isclose(cost, expected, rel_tol=1e-9)
 
 
+def test_compute_cost_cache_write():
+    # Cache write tokens must be billed at tier.prompt_price_per_million ($0.75/1M for gemini-3.8-flash)
+    # 1,000 prompt @ $0.75/1M = $0.00075
+    # 4,000 cache_write @ $0.75/1M = $0.00300
+    # 500 comp @ $3.75/1M = $0.001875
+    # Total = 0.00075 + 0.00300 + 0.001875 = 0.005625
+    cost = compute_cost(
+        prompt_tokens=1000,
+        completion_tokens=500,
+        cache_write_tokens=4000,
+        tier="gemini-3.8-flash",
+    )
+    assert math.isclose(cost, 0.005625, rel_tol=1e-9)
+
+    # Test with custom pricing tier to verify dynamic prompt rate matching
+    custom = PricingTier(
+        name="custom-cache-tier",
+        prompt_price_per_million=2.50,
+        comp_price_per_million=5.00,
+        cached_price_per_million=0.25,
+    )
+    cost_custom = compute_cost(
+        prompt_tokens=0,
+        completion_tokens=0,
+        cache_write_tokens=1_000_000,
+        tier=custom,
+    )
+    # 1M cache write tokens * $2.50/1M = $2.50
+    assert math.isclose(cost_custom, 2.50, rel_tol=1e-9)
+
+
+def test_compute_cost_routing_split():
+    # Routing classifier always uses gemini-3.5-flash-lite:
+    # prompt: $0.075 / 1M tokens
+    # completion: $0.30 / 1M tokens
+    cost_routing_only = compute_cost(
+        prompt_tokens=0,
+        completion_tokens=0,
+        routing_prompt_tokens=200_000,    # 200k * 0.075 / 1M = 0.015
+        routing_completion_tokens=50_000,  # 50k * 0.30 / 1M = 0.015
+        tier="gemini-3.8-flash",
+    )
+    assert math.isclose(cost_routing_only, 0.030, rel_tol=1e-9)
+
+    # Combined with generation tokens on main tier (gemini-3.8-flash):
+    # 10,000 prompt @ $0.75/1M = $0.0075
+    # 2,000 comp @ $3.75/1M = $0.0075
+    # 1,000 router prompt @ $0.075/1M = $0.000075
+    # 100 router comp @ $0.30/1M = $0.000030
+    # Total = 0.0075 + 0.0075 + 0.000075 + 0.000030 = 0.015105
+    cost_combined = compute_cost(
+        prompt_tokens=10000,
+        completion_tokens=2000,
+        routing_prompt_tokens=1000,
+        routing_completion_tokens=100,
+        tier="gemini-3.8-flash",
+    )
+    assert math.isclose(cost_combined, 0.015105, rel_tol=1e-9)
+
+
 # =====================================================================
 # RQ3 Quality Metrics Tests (Exact Match, Token F1, Composite Q)
 # =====================================================================

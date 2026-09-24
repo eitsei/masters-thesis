@@ -13,6 +13,7 @@ This directory contains executable shell scripts for launching automated benchma
 | [`run_sample5_m3.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_sample5_m3.sh) | **$C_0, C_1, C_2, C_3, C_5$** (Baseline, S2B, Re-rank, Cache, S2B+Re-rank) | `runs/sample5_m3` | `thesis/tables/sample5_m3`<br>`thesis/figures/sample5_m3` |
 | [`run_sample5_m3_combos.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_sample5_m3_combos.sh) | **$C_0, C_1, C_2, C_3, C_5, C_6, C_8, C_{11}$** (All 8 factorial combinations of M1, M2, M3) | `runs/sample5_m3_combos` | `thesis/tables/sample5_m3_combos`<br>`thesis/figures/sample5_m3_combos` |
 | [`run_sample5_m1_m2.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_sample5_m1_m2.sh) | **$C_0, C_1, C_2, C_5$** (Baseline, S2B, Re-rank, S2B+Re-rank) | `runs/sample5` | `thesis/tables/sample5`<br>`thesis/figures/sample5` |
+| [`generate_nordea_testset.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/generate_nordea_testset.sh) | **Test Set Generator** (Generates 100-question benchmark with 40% single-hop, 40% multi-hop, 20% OOD via RAGAS) | `data/nordea/nordea_benchmark_100.jsonl` | N/A (Test set generation) |
 | [`run_baseline_claude.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_baseline_claude.sh) | **$C_0$** (Baseline connectivity test with Claude Sonnet 5 judge) | `runs/baseline_claude` | N/A (Smoke/connection test) |
 
 ---

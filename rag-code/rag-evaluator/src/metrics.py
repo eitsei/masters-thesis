@@ -239,6 +239,10 @@ def compute_cost(
     prompt_tokens: int,
     completion_tokens: int,
     cached_tokens: int = 0,
+    cache_write_tokens: int = 0,
+    routing_prompt_tokens: int = 0,
+    routing_completion_tokens: int = 0,
+    routing_tokens: int = 0,
     rerank_docs: int = 0,
     embed_tokens: int = 0,
     tier: PricingTier | str | None = "gemini-3.8-flash",
@@ -246,14 +250,19 @@ def compute_cost(
 ) -> float:
     """Computes query operational execution cost (Thesis Eq. 178 / 181).
 
-    Cost(q) = N_prompt * P_prompt + N_comp * P_comp + N_cached * P_cached
-              + N_rerank * P_rerank + N_embed * P_embed
+    Cost(q) = N_prompt * P_prompt + N_cache_write * P_prompt + N_comp * P_comp
+              + N_cached * P_cached + N_rerank * P_rerank + N_embed * P_embed
+              + N_route_prompt * P_router_prompt + N_route_comp * P_router_comp
 
     Args:
         prompt_tokens: Count of prompt tokens. If prompt_is_uncached is True (default),
                        treated as N_prompt directly. If False, uncached tokens = prompt_tokens - cached_tokens.
         completion_tokens: Count of generated completion tokens N_comp.
-        cached_tokens: Count of cached context tokens N_cached.
+        cached_tokens: Count of cached context read tokens N_cached.
+        cache_write_tokens: Count of tokens written into context cache N_cache_write (billed at prompt rate).
+        routing_prompt_tokens: Count of prompt tokens consumed by routing classifier.
+        routing_completion_tokens: Count of completion tokens consumed by routing classifier.
+        routing_tokens: Total tokens consumed by routing classifier (fallback if prompt/comp not separated).
         rerank_docs: Count of candidate passages scored by cross-encoder N_rerank.
         embed_tokens: Count of query tokens embedded N_embed.
         tier: PricingTier instance or string identifier from PRICING_CATALOG.
@@ -269,6 +278,7 @@ def compute_cost(
 
     token_cost = (
         (uncached_tokens * resolved_tier.prompt_price_per_million)
+        + (cache_write_tokens * resolved_tier.prompt_price_per_million)
         + (completion_tokens * resolved_tier.comp_price_per_million)
         + (cached_tokens * resolved_tier.cached_price_per_million)
         + (embed_tokens * resolved_tier.embed_price_per_million)
@@ -276,7 +286,20 @@ def compute_cost(
 
     rerank_cost = rerank_docs * resolved_tier.rerank_price_per_doc
 
-    return float(token_cost + rerank_cost)
+    router_tier = PRICING_CATALOG["gemini-3.5-flash-lite"]
+    r_prompt = routing_prompt_tokens
+    r_comp = routing_completion_tokens
+    if r_prompt == 0 and r_comp == 0 and routing_tokens > 0:
+        r_prompt = routing_tokens
+
+    routing_cost = 0.0
+    if r_prompt > 0 or r_comp > 0:
+        routing_cost = (
+            (r_prompt * router_tier.prompt_price_per_million)
+            + (r_comp * router_tier.comp_price_per_million)
+        ) / 1_000_000.0
+
+    return float(token_cost + rerank_cost + routing_cost)
 
 
 # =====================================================================

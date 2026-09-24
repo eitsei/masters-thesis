@@ -41,6 +41,7 @@ from src.metrics import (
     compute_cost,
     compute_qpd,
     compute_qps,
+    compute_ttft,
     exact_match,
     get_pricing_tier,
     token_f1,
@@ -123,22 +124,58 @@ def _process_item_metrics(
         or (isinstance(item.get("runName"), str) and "m3" in item["runName"].lower())
     )
 
-    tu = item.get("tokenUsage", {})
-    prompt_tokens = int(tu.get("promptTokens", 0))
-    completion_tokens = int(tu.get("completionTokens", 0))
+    tu = item.get("tokenUsage", {}) or {}
+    prompt_tokens = int(tu.get("promptTokens", 0) or 0)
+    completion_tokens = int(tu.get("completionTokens", 0) or 0)
 
+    cached_read_tokens = 0
+    cache_write_tokens = 0
     if has_m3:
-        cached_tokens = int(tu.get("cachedTokens", 0))
-        if cached_tokens == 0:
-            cached_tokens = int(
-                tu.get("cacheWriteTokens", 0)
-                or (item.get("cacheMetadata", {}) or {}).get("tokenCount", 0)
-            )
+        cached_read_tokens = int(tu.get("cachedTokens", 0) or 0)
+        cache_write_tokens = int(tu.get("cacheWriteTokens", 0) or 0)
+        if cached_read_tokens == 0 and cache_write_tokens == 0:
+            cache_meta = item.get("cacheMetadata", {}) or {}
+            token_count = int(cache_meta.get("tokenCount", 0) or 0)
+            status = str(item.get("cacheStatus", "") or "").upper()
+            if "HIT" in status:
+                cached_read_tokens = token_count
+            elif "MISS" in status:
+                cache_write_tokens = token_count
     else:
-        # Non-M3 runs represent naive baseline or non-cached variants; ignore transient server prefix cache
-        cached_tokens = 0
+        cached_read_tokens = 0
+        cache_write_tokens = 0
 
-    total_tokens = prompt_tokens + completion_tokens + cached_tokens
+    item["cached_tokens"] = cached_read_tokens
+    item["cache_write_tokens"] = cache_write_tokens
+
+    routing_prompt_tokens = int(
+        tu.get("routingPromptTokens")
+        or tu.get("routing_prompt_tokens")
+        or item.get("routingPromptTokens")
+        or item.get("routing_prompt_tokens")
+        or 0
+    )
+    routing_completion_tokens = int(
+        tu.get("routingCompletionTokens")
+        or tu.get("routing_completion_tokens")
+        or item.get("routingCompletionTokens")
+        or item.get("routing_completion_tokens")
+        or 0
+    )
+    route_tokens = int(
+        item.get("routingTokens")
+        or item.get("route_tokens")
+        or tu.get("routingTokens")
+        or tu.get("route_tokens")
+        or (routing_prompt_tokens + routing_completion_tokens)
+        or 0
+    )
+
+    api_total = int(tu.get("totalTokens", 0) or 0)
+    if api_total > 0:
+        total_tokens = api_total + route_tokens
+    else:
+        total_tokens = prompt_tokens + completion_tokens + route_tokens
     item["total_tokens"] = total_tokens
 
     rerank_docs = int(
@@ -161,14 +198,6 @@ def _process_item_metrics(
     if embed_tokens == 0:
         embed_tokens = max(1, len(question.split())) if question else 20
 
-    route_tokens = int(
-        item.get("routingTokens")
-        or item.get("route_tokens")
-        or tu.get("routingTokens")
-        or tu.get("route_tokens")
-        or 0
-    )
-
     model_used = item.get("modelUsed") or item.get("model_used")
     if model_used:
         item["model_used"] = model_used
@@ -177,32 +206,32 @@ def _process_item_metrics(
     item["rerank_docs"] = rerank_docs
     item["embed_tokens"] = embed_tokens
     item["routing_tokens"] = route_tokens
+    item["routing_prompt_tokens"] = routing_prompt_tokens
+    item["routing_completion_tokens"] = routing_completion_tokens
 
     cost = compute_cost(
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
-        cached_tokens=cached_tokens,
+        cached_tokens=cached_read_tokens,
+        cache_write_tokens=cache_write_tokens,
+        routing_prompt_tokens=routing_prompt_tokens,
+        routing_completion_tokens=routing_completion_tokens,
+        routing_tokens=route_tokens,
         rerank_docs=rerank_docs,
         embed_tokens=embed_tokens,
         tier=effective_tier,
         prompt_is_uncached=True,
     )
-    if route_tokens > 0:
-        try:
-            router_tier = get_pricing_tier("gemini-3.5-flash-lite")
-            cost += (route_tokens * router_tier.prompt_price_per_million) / 1_000_000.0
-        except Exception:
-            pass
     item["cost_usd"] = cost
 
     # Latency parsing
     timings = item.get("timings") or item.get("timingsMs") or {}
-    ret_ms = timings.get("retrievalMs", item.get("retrieval_ms", 0.0))
-    gen_ms = timings.get("generationMs", item.get("generation_ms", 0.0))
-    route_ms = timings.get("routeMs", item.get("route_ms", 0.0))
-    rerank_ms = timings.get("rerankMs", item.get("rerank_ms", 0.0))
-    expand_ms = timings.get("expansionMs", item.get("expansion_ms", 0.0))
-    cache_ms = timings.get("cacheMs", item.get("cache_ms", 0.0))
+    ret_ms = float(timings.get("retrievalMs", item.get("retrieval_ms", 0.0)) or 0.0)
+    gen_ms = float(timings.get("generationMs", item.get("generation_ms", 0.0)) or 0.0)
+    route_ms = float(timings.get("routeMs", item.get("route_ms", 0.0)) or 0.0)
+    rerank_ms = float(timings.get("rerankMs", item.get("rerank_ms", 0.0)) or 0.0)
+    expand_ms = float(timings.get("expansionMs", item.get("expansion_ms", 0.0)) or 0.0)
+    cache_ms = float(timings.get("cacheMs", item.get("cache_ms", 0.0)) or 0.0)
 
     item["retrieval_ms"] = ret_ms
     item["generation_ms"] = gen_ms
@@ -211,14 +240,28 @@ def _process_item_metrics(
     item["expansion_ms"] = expand_ms
     item["cache_ms"] = cache_ms
 
-    tot_ms = item.get(
+    tot_ms = float(item.get(
         "totalLatencyMs",
         item.get(
             "total_latency_ms",
             ret_ms + gen_ms + route_ms + rerank_ms + expand_ms + cache_ms,
         ),
-    )
+    ) or 0.0)
     item["total_latency_ms"] = tot_ms
+
+    prefill_ms = float(timings.get("prefillMs", item.get("prefill_ms", 0.0)) or 0.0)
+    stream_ms = float(timings.get("streamMs", item.get("stream_ms", 0.0)) or 0.0)
+    if stream_ms == 0.0 and prefill_ms > 0.0 and gen_ms >= prefill_ms:
+        stream_ms = max(0.0, gen_ms - prefill_ms)
+
+    raw_ttft = timings.get("ttftMs")
+    if raw_ttft is None:
+        raw_ttft = item.get("ttft_ms")
+    ttft_ms = float(raw_ttft) if raw_ttft is not None else compute_ttft(tot_ms, stream_ms)
+
+    item["prefill_ms"] = prefill_ms
+    item["stream_ms"] = stream_ms
+    item["ttft_ms"] = ttft_ms
 
     # RAGAS evaluation
     if ragas_evaluator and ragas_evaluator.llm is not None:
@@ -972,6 +1015,61 @@ def run_questions(
         console.print(f"\n[bold green]✓ Evaluated results saved to:[/bold green] [cyan]{out_path}[/cyan]")
     else:
         console.print("[yellow]No questions were successfully evaluated.[/yellow]")
+
+
+@app.command("generate-nordea-testset")
+def generate_nordea_testset(
+    md_dir: Path = typer.Option(
+        Path("../rag-benchmark/data/nordea/md"),
+        "--md-dir",
+        "-d",
+        help="Path to directory containing crawled Nordea markdown documents (pages/ and pdfs/)",
+    ),
+    output: Path = typer.Option(
+        Path("data/nordea/nordea_benchmark_100.jsonl"),
+        "--output",
+        "-o",
+        help="Target JSONL file path for generated questions",
+    ),
+    size: int = typer.Option(
+        100,
+        "--size",
+        "-s",
+        help="Total number of benchmark questions to generate (Thesis §4.4: 40% single-hop, 40% multi-hop, 20% out-of-domain)",
+    ),
+    judge_model: str = typer.Option(
+        "gemini-3.8-flash",
+        "--judge-model",
+        "-m",
+        help="Generator LLM model on Vertex AI global endpoint",
+    ),
+    limit_docs: Optional[int] = typer.Option(
+        None,
+        "--limit-docs",
+        help="Limit number of canonical documents to ingest (useful for fast smoke runs)",
+    ),
+) -> None:
+    """Generates a stratified synthetic benchmark dataset (Thesis §4.4) for Nordea Private Banking."""
+    from src.generator import generate_nordea_dataset
+
+    # Resolve relative md_dir if needed
+    resolved_md = md_dir if md_dir.is_absolute() else (Path.cwd() / md_dir).resolve()
+    if not resolved_md.exists():
+        # Fallback check relative to project root
+        alt_path = Path(__file__).resolve().parent.parent.parent / "rag-benchmark" / "data" / "nordea" / "md"
+        if alt_path.exists():
+            resolved_md = alt_path
+
+    resolved_out = output if output.is_absolute() else (Path.cwd() / output).resolve()
+
+    generate_nordea_dataset(
+        md_dir=resolved_md,
+        output_file=resolved_out,
+        total_size=size,
+        judge_model=judge_model,
+        limit_docs=limit_docs,
+        console=console,
+    )
 
 
 if __name__ == "__main__":

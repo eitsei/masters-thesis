@@ -58,6 +58,8 @@ def _extract_metric_values(records: Sequence[Mapping[str, Any]], key: str) -> li
                 v = tu.get("completionTokens", 0)
             elif key == "cached_tokens":
                 v = tu.get("cachedTokens", 0)
+            elif key == "cache_write_tokens":
+                v = tu.get("cacheWriteTokens", 0)
 
         # Common aliases
         if v is None:
@@ -65,6 +67,12 @@ def _extract_metric_values(records: Sequence[Mapping[str, Any]], key: str) -> li
                 "total_latency_ms": ["totalLatencyMs", "latency_ms", "latency"],
                 "retrieval_ms": ["retrievalMs"],
                 "generation_ms": ["generationMs"],
+                "ttft_ms": ["ttftMs", "ttft", "ttft_ms"],
+                "prefill_ms": ["prefillMs", "prefill_ms"],
+                "stream_ms": ["streamMs", "stream_ms"],
+                "cached_tokens": ["cachedTokens", "cached_tokens"],
+                "cache_write_tokens": ["cacheWriteTokens", "cache_write_tokens"],
+                "total_tokens": ["totalTokens", "total_tokens"],
                 "cost_usd": ["cost", "costUsd"],
                 "exact_match": ["em"],
                 "token_f1": ["f1"],
@@ -73,6 +81,15 @@ def _extract_metric_values(records: Sequence[Mapping[str, Any]], key: str) -> li
             for alias in alias_map.get(key, []):
                 if alias in r:
                     v = r[alias]
+                    break
+                if "timings" in r and isinstance(r["timings"], dict) and alias in r["timings"]:
+                    v = r["timings"][alias]
+                    break
+                if "tokenUsage" in r and isinstance(r["tokenUsage"], dict) and alias in r["tokenUsage"]:
+                    v = r["tokenUsage"][alias]
+                    break
+                if "metrics" in r and isinstance(r["metrics"], dict) and alias in r["metrics"]:
+                    v = r["metrics"][alias]
                     break
 
         vals.append(_safe_float(v, 0.0))

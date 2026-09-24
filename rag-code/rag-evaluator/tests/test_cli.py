@@ -363,21 +363,45 @@ def test_process_item_metrics_caching_attribution():
     res_non_m3 = _process_item_metrics(non_m3_item)
     # 1000 uncached prompt * 0.75/1M + 50 comp * 3.75/1M + 3 embed * 0.025/1M = 0.000937575
     assert res_non_m3["cost_usd"] == pytest.approx(0.000937575, rel=1e-5)
+    assert res_non_m3["cached_tokens"] == 0
+    assert res_non_m3["cache_write_tokens"] == 0
+    assert res_non_m3["total_tokens"] == 1050  # 1000 prompt + 50 comp (cachedTokens ignored)
 
     # 2. M3 item with cache miss (cachedTokens 0, but cacheWriteTokens 4000)
-    m3_item = {
+    m3_item_miss = {
         "question": "What is RAG?",
         "generatedAnswer": "Retrieval Augmented Generation",
         "groundTruthAnswer": "Retrieval Augmented Generation",
         "modulesApplied": ["M3"],
         "tokenUsage": {"promptTokens": 25, "completionTokens": 50, "cachedTokens": 0, "cacheWriteTokens": 4000},
     }
-    res_m3 = _process_item_metrics(m3_item)
-    # 25 prompt * 0.75/1M + 4000 cached * 0.075/1M (90% discount) + 50 comp * 3.75/1M + 3 embed * 0.025/1M
-    # = 0.00001875 + 0.000300 + 0.0001875 + 0.000000075 = 0.000506325
-    assert res_m3["cost_usd"] == pytest.approx(0.000506325, rel=1e-5)
+    res_m3_miss = _process_item_metrics(m3_item_miss)
+    # Cache write tokens are billed at prompt rate ($0.75/1M); cache reads at 90% discount ($0.075/1M)
+    # 25 prompt * 0.75/1M + 4000 write * 0.75/1M + 50 comp * 3.75/1M + 3 embed * 0.025/1M
+    # = 0.00001875 + 0.003000 + 0.0001875 + 0.000000075 = 0.003206325
+    assert res_m3_miss["cost_usd"] == pytest.approx(0.003206325, rel=1e-5)
+    assert res_m3_miss["cached_tokens"] == 0
+    assert res_m3_miss["cache_write_tokens"] == 4000
+    assert res_m3_miss["total_tokens"] == 75  # 25 prompt + 50 comp
 
-    # 3. Explicit legacy tier check (gemini-2.5-flash)
+    # 3. M3 item with cache hit (cachedTokens: 4000, cacheWriteTokens: 0, cacheStatus: "EXPLICIT_HIT")
+    m3_item_hit = {
+        "question": "What is RAG?",
+        "generatedAnswer": "Retrieval Augmented Generation",
+        "groundTruthAnswer": "Retrieval Augmented Generation",
+        "modulesApplied": ["M3"],
+        "cacheStatus": "EXPLICIT_HIT",
+        "tokenUsage": {"promptTokens": 25, "completionTokens": 50, "cachedTokens": 4000, "cacheWriteTokens": 0},
+    }
+    res_m3_hit = _process_item_metrics(m3_item_hit)
+    # 25 prompt ($0.75/1M) + 4000 cached ($0.075/1M) + 50 comp ($3.75/1M) + 3 embed ($0.025/1M) = 0.000506325
+    assert res_m3_hit["cost_usd"] == pytest.approx(0.000506325, rel=1e-5)
+    assert res_m3_hit["cached_tokens"] == 4000
+    assert res_m3_hit["cache_write_tokens"] == 0
+    # Verify total_tokens uses prompt + comp + route without adding cached_tokens on top
+    assert res_m3_hit["total_tokens"] == 75
+
+    # 4. Explicit legacy tier check (gemini-2.5-flash)
     # 1000 prompt * 0.15/1M + 50 comp * 0.60/1M + 3 embed * 0.025/1M = 0.000180075
     res_legacy = _process_item_metrics(non_m3_item, pricing_tier="gemini-2.5-flash")
     assert res_legacy["cost_usd"] == pytest.approx(0.000180075, rel=1e-5)
@@ -386,7 +410,7 @@ def test_process_item_metrics_caching_attribution():
 def test_process_item_metrics_model_routing_attribution():
     from src.cli import _process_item_metrics
 
-    # M4 routed item targeting gemini-3.5-flash-lite
+    # M4 routed item targeting gemini-3.5-flash-lite with prefill and generation timings
     m4_item = {
         "question": "What is RAG?",
         "generatedAnswer": "Retrieval Augmented Generation",
@@ -397,12 +421,14 @@ def test_process_item_metrics_model_routing_attribution():
             "retrievalMs": 100.0,
             "routeMs": 25.0,
             "generationMs": 200.0,
+            "prefillMs": 50.0,
         },
         "tokenUsage": {
             "promptTokens": 500,
             "completionTokens": 30,
-            "cachedTokens": 0,
+            "cachedTokens": 200,
             "routingTokens": 80,
+            "totalTokens": 530,
         },
     }
 
@@ -415,6 +441,15 @@ def test_process_item_metrics_model_routing_attribution():
     assert res["total_latency_ms"] == 325.0
     assert res["routing_tokens"] == 80
 
+    # Verify stream_ms, prefill_ms, and ttft_ms
+    assert res["prefill_ms"] == 50.0
+    assert res["stream_ms"] == 150.0  # Derived as generationMs (200.0) - prefillMs (50.0)
+    assert res["ttft_ms"] == 175.0    # Derived as totalLatencyMs (325.0) - stream_ms (150.0)
+
+    # Verify total_tokens uses API totalTokens + routingTokens without adding cached_tokens on top
+    # 530 totalTokens + 80 routingTokens = 610 (cachedTokens 200 is NOT added)
+    assert res["total_tokens"] == 610
+
     # Pricing calculation check:
     # generation tier: gemini-3.5-flash-lite (prompt $0.075/1M, comp $0.30/1M, embed $0.025/1M)
     # 500 prompt * 0.075/1M = 0.0000375
@@ -423,6 +458,18 @@ def test_process_item_metrics_model_routing_attribution():
     # routing overhead: 80 * 0.075/1M = 0.000006
     # expected total = 0.0000375 + 0.000009 + 0.000000075 + 0.000006 = 0.000052575
     assert res["cost_usd"] == pytest.approx(0.000052575, rel=1e-5)
+
+    # Also verify fallback total_tokens when API totalTokens is omitted: prompt + comp + route
+    m4_item_no_tot = dict(m4_item)
+    m4_item_no_tot["tokenUsage"] = {
+        "promptTokens": 500,
+        "completionTokens": 30,
+        "cachedTokens": 200,
+        "routingTokens": 80,
+    }
+    res_no_tot = _process_item_metrics(m4_item_no_tot, pricing_tier="gemini-3.8-flash")
+    # 500 prompt + 30 comp + 80 route = 610
+    assert res_no_tot["total_tokens"] == 610
 
 
 def test_evaluate_item_with_feedback_no_judge():

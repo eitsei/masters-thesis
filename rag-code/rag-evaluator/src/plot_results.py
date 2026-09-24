@@ -255,6 +255,9 @@ def plot_latency_breakdown(
                 or r.get("generation_ms") or r.get("generationMs") or 0.0
             )
 
+            if stream == 0.0 and prefill > 0.0 and gen >= prefill:
+                stream = max(0.0, gen - prefill)
+
             if prefill > 0.0 or stream > 0.0:
                 has_split_generation = True
 
@@ -729,25 +732,45 @@ def plot_cost_breakdown(
                 or (isinstance(r.get("runName"), str) and "m3" in r["runName"].lower())
             )
 
-            # 1. Prompt tokens (uncached) and Context Cache tokens
+            # Per-record pricing tier resolution
+            model_used = r.get("modelUsed") or r.get("model_used")
+            record_tier = get_pricing_tier(model_used) if model_used else tier
+
+            # 1. Prompt tokens (uncached) and Context Cache tokens (read vs write)
             p_tok = float(tu.get("promptTokens") or tu.get("prompt_tokens") or r.get("prompt_tokens") or 0.0)
             comp_tok = float(tu.get("completionTokens") or tu.get("completion_tokens") or r.get("completion_tokens") or 0.0)
 
             if has_m3:
-                cached_tok = float(tu.get("cachedTokens") or tu.get("cached_tokens") or r.get("cached_tokens") or 0.0)
-                if cached_tok == 0.0:
-                    cached_tok = float(
-                        tu.get("cacheWriteTokens")
-                        or (r.get("cacheMetadata") or {}).get("tokenCount")
-                        or 0.0
-                    )
+                cached_read_tok = float(
+                    tu.get("cachedTokens")
+                    or tu.get("cached_tokens")
+                    or r.get("cached_tokens")
+                    or r.get("cachedTokens")
+                    or 0.0
+                )
+                cache_write_tok = float(
+                    tu.get("cacheWriteTokens")
+                    or tu.get("cache_write_tokens")
+                    or r.get("cache_write_tokens")
+                    or r.get("cacheWriteTokens")
+                    or 0.0
+                )
+                if cached_read_tok == 0.0 and cache_write_tok == 0.0:
+                    cache_meta = (r.get("cacheMetadata") or tu.get("cacheMetadata")) if isinstance(r.get("cacheMetadata") or tu.get("cacheMetadata"), dict) else {}
+                    fallback_count = float(cache_meta.get("tokenCount") or cache_meta.get("token_count") or 0.0)
+                    cache_status = str(r.get("cacheStatus") or r.get("cache_status") or tu.get("cacheStatus") or tu.get("cache_status") or "").upper()
+                    if "HIT" in cache_status:
+                        cached_read_tok = fallback_count
+                    elif "MISS" in cache_status:
+                        cache_write_tok = fallback_count
             else:
                 # Without M3, pipeline operates without context caching; ignore server internal prefix cache
-                cached_tok = 0.0
+                cached_read_tok = 0.0
+                cache_write_tok = 0.0
 
-            c_prompt = (p_tok * tier.prompt_price_per_million) / 1_000_000.0
-            c_cache = (cached_tok * tier.cached_price_per_million) / 1_000_000.0
-            c_comp = (comp_tok * tier.comp_price_per_million) / 1_000_000.0
+            c_prompt = ((p_tok + cache_write_tok) * record_tier.prompt_price_per_million) / 1_000_000.0
+            c_cache = (cached_read_tok * record_tier.cached_price_per_million) / 1_000_000.0
+            c_comp = (comp_tok * record_tier.comp_price_per_million) / 1_000_000.0
 
             # 2. Semantic Re-ranking (if explicit rerank candidate count or price is recorded)
             rerank_docs = float(
@@ -765,7 +788,7 @@ def plot_cost_breakdown(
             ):
                 rerank_docs = 50.0  # Candidate pool size per Thesis Table 4.1
 
-            c_rerank = rerank_docs * tier.rerank_price_per_doc
+            c_rerank = rerank_docs * record_tier.rerank_price_per_doc
 
             # 3. Query Vectorization Embedding (if explicit embed tokens recorded)
             embed_tok = float(
@@ -779,22 +802,43 @@ def plot_cost_breakdown(
                 q_text = str(r.get("question") or r.get("query") or "")
                 embed_tok = float(max(1, len(q_text.split()))) if q_text else 20.0
 
-            c_embed = (embed_tok * tier.embed_price_per_million) / 1_000_000.0
+            c_embed = (embed_tok * record_tier.embed_price_per_million) / 1_000_000.0
 
             # 4. Dynamic Routing Classifier (if explicit routing tokens recorded)
             route_tok = float(
                 r.get("routingTokens")
                 or r.get("route_tokens")
+                or r.get("routing_tokens")
                 or tu.get("routingTokens")
                 or tu.get("route_tokens")
+                or tu.get("routing_tokens")
                 or 0.0
             )
-            router_tier = PRICING_CATALOG.get("gemini-3.5-flash-lite")
-            c_route = (
-                (route_tok * router_tier.prompt_price_per_million) / 1_000_000.0
-                if route_tok > 0 and router_tier
-                else 0.0
+            route_prompt_tok = float(
+                tu.get("routingPromptTokens")
+                or tu.get("routing_prompt_tokens")
+                or r.get("routingPromptTokens")
+                or r.get("routing_prompt_tokens")
+                or 0.0
             )
+            route_comp_tok = float(
+                tu.get("routingCompletionTokens")
+                or tu.get("routing_completion_tokens")
+                or r.get("routingCompletionTokens")
+                or r.get("routing_completion_tokens")
+                or 0.0
+            )
+            if route_prompt_tok == 0.0 and route_comp_tok == 0.0 and route_tok > 0.0:
+                route_prompt_tok = route_tok
+
+            router_tier = PRICING_CATALOG.get("gemini-3.5-flash-lite")
+            if router_tier and (route_prompt_tok > 0.0 or route_comp_tok > 0.0):
+                c_route = (
+                    (route_prompt_tok * router_tier.prompt_price_per_million)
+                    + (route_comp_tok * router_tier.comp_price_per_million)
+                ) / 1_000_000.0
+            else:
+                c_route = 0.0
 
             sub_sum = c_prompt + c_cache + c_comp + c_rerank + c_embed + c_route
 

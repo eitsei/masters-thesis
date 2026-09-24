@@ -380,7 +380,15 @@ def export_wilcoxon_rq1_ttft_latex(
     target_path = Path(output_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
-    ttft_comps = [c for c in comparisons if c.target_rq == "RQ1" and "token" in c.metric_name.lower()]
+    ttft_comps = [
+        c
+        for c in comparisons
+        if c.target_rq == "RQ1"
+        and (
+            c.metric_name.lower().startswith("time to first token")
+            or getattr(c, "metric_key", "") == "ttft_ms"
+        )
+    ]
     if not ttft_comps:
         ttft_comps = [c for c in comparisons if c.target_rq == "RQ1"]
 

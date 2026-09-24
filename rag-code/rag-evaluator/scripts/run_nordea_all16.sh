@@ -13,9 +13,13 @@ cd "$PROJECT_DIR"
 
 PYTHON="${PYTHON:-venv/bin/python}"
 URL="${RAG_APP_URL:-http://localhost:8080}"
-LIMIT="${LIMIT:-5}"
+LIMIT="${LIMIT:-10}"
 TABLE_NAME="${TABLE_NAME:-vector_store_nordea}"
-QUESTIONS_FILE="${QUESTIONS_FILE:-data/nordea/sample_questions.jsonl}"
+DEFAULT_QUESTIONS="data/nordea/sample_questions.jsonl"
+if [ -f "data/nordea/nordea_benchmark_100.jsonl" ]; then
+  DEFAULT_QUESTIONS="data/nordea/nordea_benchmark_100.jsonl"
+fi
+QUESTIONS_FILE="${QUESTIONS_FILE:-$DEFAULT_QUESTIONS}"
 JUDGE="${JUDGE:-gemini}"
 JUDGE_MODEL="${JUDGE_MODEL:-gemini-3.5-flash-lite}"
 

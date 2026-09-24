@@ -12,6 +12,7 @@ from src.export_latex import (
     export_benchmark_summary_latex,
     export_hop_breakdown_latex,
     export_wilcoxon_decomposed_latex,
+    export_wilcoxon_rq1_ttft_latex,
     export_wilcoxon_tests_latex,
 )
 from src.plot_results import (
@@ -113,6 +114,77 @@ def test_export_wilcoxon_decomposed_latex(tmp_path: Path):
     assert "\\label{tab:wilcoxon_rq1}" in results["rq1"]
     assert "\\label{tab:wilcoxon_rq2}" in results["rq2"]
     assert "\\label{tab:wilcoxon_rq3}" in results["rq3"]
+
+
+def test_export_wilcoxon_rq1_ttft_latex(tmp_path: Path):
+    out_tex = tmp_path / "wilcoxon_rq1_ttft.tex"
+    comparisons = [
+        WilcoxonComparison(
+            target_rq="RQ1",
+            metric_name="Time to First Token (ms)",
+            config_name="C1: S2B",
+            baseline_median=850.0,
+            treatment_median=650.0,
+            median_diff=-200.0,
+            w_statistic=10.0,
+            p_raw=0.001,
+            p_adjusted=0.002,
+            significance="**",
+        ),
+        WilcoxonComparison(
+            target_rq="RQ1",
+            metric_name="End-to-End Latency (ms)",
+            config_name="C1: S2B",
+            baseline_median=1400.0,
+            treatment_median=1200.0,
+            median_diff=-200.0,
+            w_statistic=0.0,
+            p_raw=0.001,
+            p_adjusted=0.002,
+            significance="**",
+        ),
+        WilcoxonComparison(
+            target_rq="RQ2",
+            metric_name="Total Token Usage",
+            config_name="C1: S2B",
+            baseline_median=1500.0,
+            treatment_median=1000.0,
+            median_diff=-500.0,
+            w_statistic=5.0,
+            p_raw=0.005,
+            p_adjusted=0.010,
+            significance="*",
+        ),
+        WilcoxonComparison(
+            target_rq="RQ2",
+            metric_name="Operational Cost ($)",
+            config_name="C1: S2B",
+            baseline_median=0.0004,
+            treatment_median=0.0003,
+            median_diff=-0.0001,
+            w_statistic=2.0,
+            p_raw=0.004,
+            p_adjusted=0.008,
+            significance="**",
+        ),
+    ]
+
+    content = export_wilcoxon_rq1_ttft_latex(comparisons, output_path=out_tex)
+
+    assert out_tex.exists()
+    assert "\\label{tab:wilcoxon_rq1_ttft}" in content
+    # Only TTFT metric should be exported
+    assert "850.0" in content
+    assert "650.0" in content
+    assert "C1: S2B" in content
+
+    # Verify that general latency (1400.0) and total token usage (1500.0) or cost are NOT selected
+    assert "1400.0" not in content
+    assert "1200.0" not in content
+    assert "1500.0" not in content
+    assert "1000.0" not in content
+    assert "End-to-End Latency" not in content
+    assert "Total Token Usage" not in content
 
 
 def test_plot_pareto_frontier(tmp_path: Path, sample_benchmark_records):
