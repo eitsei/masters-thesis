@@ -308,15 +308,31 @@
 % DRAFT NOTES: 5.4.5 Pareto Frontier & Deployment Archetypes (RQ4)
 % 1. Embed Figure 5.3 (figures/pareto_frontier.pdf):
 %    - Dual-panel trade-off: (a) Quality vs Median Latency, (b) Quality vs Cost per Query.
-% 2. Efficiency indicators:
-%    - Quality per Dollar: QPD = Q(q) / Cost(q) (Eq. 249).
-%    - Quality per Second: QPS = Q(q) / (T_total / 1000) (Eq. 253).
-% 3. Non-dominated Pareto frontier (P):
-%    - Identify non-dominated configurations along the efficient frontier.
-% 4. Define 3 Enterprise Production Archetypes:
-%    - Interactive / Real-Time Tier (optimized for low TTFT and high TPS: C3, C10).
-%    - Cost-Optimized Enterprise Tier (optimized for maximum QPD in high-volume workloads: C10, C4).
-%    - High-Assurance / Maximum Fidelity Tier (optimized for compliance and accuracy: C5, C12).
+%    - Highlights non-dominated frontier configurations in independent 2D projections.
+% 2. Practical Efficiency Ratios (Thesis Eq. 250 & 255):
+%    - Quality per Dollar: QPD(q) = Q(q) / Cost(q) (monetary efficiency).
+%    - Quality per Second: QPS(q) = Q(q) / (T_total(q) / 1000) (throughput efficiency).
+% 3. Tri-Objective Empirical 3D Pareto Surface (P_3D) - Figure 5.4 (figures/pareto_frontier_3d.pdf):
+%    - X-axis: Throughput efficiency (QPS).
+%    - Y-axis: Cost efficiency (QPD).
+%    - Z-axis: Composite Generative Quality Q(q) in [0, 1].
+%    - Vertical drop-lines anchor 3D points to ground floor (z = z_min) for depth perception.
+%    - Triangulated surface maps the non-dominated Pareto hull P_3D.
+%    - Reveals that maximizing both QPS and QPD simultaneously requires trading off against
+%      peak response quality Q.
+% 4. Enterprise Trade-off Continuum & Sensitivity Sweep - Figure 5.5 (figures/tradeoff_sensitivity.pdf):
+%    - Formal utility model:
+%      U(C_i, alpha) = w_Q * \tilde{Q}(C_i) + (1 - w_Q) * [alpha * \tilde{QPS}(C_i) + (1 - alpha) * \tilde{QPD}(C_i)]
+%      where w_Q = 0.35 represents the baseline quality floor, and alpha in [0, 1] sweeps
+%      from pure cost focus (alpha = 0.0) to pure speed focus (alpha = 1.0).
+%    - Upper Pareto envelope identifies optimal configuration transitions.
+% 5. Define 3 Enterprise Production Archetypes:
+%    - Cost-Optimized Enterprise Tier (alpha in [0.0, 0.35]): High-volume batch automation,
+%      back-office document triaging (prioritizing QPD; e.g., C10, C4).
+%    - Balanced Production Tier (alpha in [0.35, 0.70]): General enterprise assistants
+%      balancing speed, operational cost, and high precision (e.g., C15 full stack, C13).
+%    - Latency-Critical Real-Time Tier (alpha in [0.70, 1.0]): Interactive conversational search
+%      and voice interfaces requiring sub-second TTFT and high TPS (e.g., C3, C10).
 % =========================================================================
 
 \begin{figure}[!htbp]
@@ -324,6 +340,20 @@
 \includegraphics[width=\textwidth]{figures/pareto_frontier.pdf}
 \caption[Dual-panel Pareto trade-off frontier]{Empirical Pareto frontiers across RAG pipeline configurations: (a) Composite Quality vs. Median Latency ($P_{50}$), and (b) Composite Quality vs. Operational Cost per Query \textbf{[PLACEHOLDER VISUALIZATION]}. Dashed red lines denote the non-dominated Pareto frontier ($\mathcal{P}$).}
 \label{fig:pareto_frontier}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.92\textwidth]{figures/pareto_frontier_3d.pdf}
+\caption[Empirical 3D tri-objective Pareto frontier]{Empirical 3D Pareto frontier ($\mathcal{P}_{3D}$) across RAG pipeline configurations in tri-objective space: Throughput Efficiency (Quality per Second, QPS), Cost Efficiency (Quality per Dollar, QPD), and Composite Generative Quality $Q(q)$ \textbf{[SYNTHETIC MOCK DATA --- FOR STRUCTURAL VALIDATION ONLY]}. Dashed vertical drop-lines connect coordinates to floor shadow projections; the shaded amber mesh outlines the non-dominated Pareto hull.}
+\label{fig:pareto_frontier_3d}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/tradeoff_sensitivity.pdf}
+\caption[Enterprise trade-off sensitivity continuum]{Enterprise trade-off continuum: Composite business utility $U(C_i, \alpha)$ as organizational priority shifts from pure cost efficiency ($\alpha = 0.0$) to pure throughput/speed ($\alpha = 1.0$) across the three Enterprise Production Archetypes \textbf{[SYNTHETIC MOCK DATA --- FOR STRUCTURAL VALIDATION ONLY]}. The dashed black curve represents the upper Pareto envelope.}
+\label{fig:tradeoff_sensitivity}
 \end{figure}
 
 \subsubsection{Summary Resolution of Research Questions}
