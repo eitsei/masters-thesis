@@ -27,6 +27,8 @@ public class NordeaCrawler {
 
     private static final Log logger = LogFactory.getLog(NordeaCrawler.class);
     private static final int FETCH_TIMEOUT_MILLIS = 10_000;
+    private static final int MAX_FETCH_RETRIES = 3;
+    private static final long[] FETCH_RETRY_BACKOFFS_MS = {1000L, 2000L, 4000L};
 
     private final NordeaIngestionProperties properties;
 
@@ -43,7 +45,7 @@ public class NordeaCrawler {
         String normalizedBase = (rawBase != null && !rawBase.endsWith("/")) ? rawBase + "/" : (rawBase != null ? rawBase : "");
         queue.add(normalizedBase.isBlank() ? "https://www.nordea.fi/henkiloasiakkaat/" : normalizedBase);
 
-        while (!queue.isEmpty() && pages.size() < properties.maxPages()) {
+        while (!queue.isEmpty() && pages.size() < properties.maxPages() && !Thread.currentThread().isInterrupted()) {
             String url = queue.poll();
             String cleanUrl = cleanUrl(url);
             if (!visited.add(cleanUrl)) {
@@ -52,15 +54,13 @@ public class NordeaCrawler {
 
             Document doc;
             try {
-                doc = Jsoup.connect(cleanUrl)
-                        .userAgent(properties.userAgent())
-                        .timeout(FETCH_TIMEOUT_MILLIS)
-                        .get();
-            } catch (IOException ex) {
-                logger.warn("Skipping page " + cleanUrl + ": " + ex.getMessage());
-                continue;
+                doc = fetchDocumentWithRetry(cleanUrl);
             } finally {
                 politeDelay();
+            }
+
+            if (doc == null) {
+                continue;
             }
 
             String markdown = NordeaHtmlToMarkdownConverter.convert(doc);
@@ -117,6 +117,31 @@ public class NordeaCrawler {
             return false;
         }
         return true;
+    }
+
+    private Document fetchDocumentWithRetry(String cleanUrl) {
+        for (int attempt = 0; attempt <= MAX_FETCH_RETRIES; attempt++) {
+            try {
+                return Jsoup.connect(cleanUrl)
+                        .userAgent(properties.userAgent())
+                        .timeout(FETCH_TIMEOUT_MILLIS)
+                        .get();
+            } catch (IOException ex) {
+                if (attempt < MAX_FETCH_RETRIES) {
+                    int retryAttempt = attempt + 1;
+                    logger.warn("Retrying page fetch (attempt " + retryAttempt + "/3) for URL " + cleanUrl + ": " + ex.getMessage());
+                    try {
+                        Thread.sleep(FETCH_RETRY_BACKOFFS_MS[attempt]);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return null;
+                    }
+                } else {
+                    logger.warn("Skipping page " + cleanUrl + ": " + ex.getMessage());
+                }
+            }
+        }
+        return null;
     }
 
     private void politeDelay() {

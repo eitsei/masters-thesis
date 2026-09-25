@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -37,6 +38,36 @@ public final class NordeaHtmlToMarkdownConverter {
             "lue artikkeli"
     );
 
+    private static final Pattern AVAUTUU_IKKUNAAN_PATTERN = Pattern.compile(
+            "(?i)\\s*[,\\-–—]?\\s*\\(?\\s*avautuu uuteen ikkunaan\\s*\\)?"
+    );
+    private static final Pattern AVAUTUU_RAW_PATTERN = Pattern.compile(
+            "(?i)avautuu uuteen ikkunaan"
+    );
+    private static final Pattern HUPS_LINE_PATTERN = Pattern.compile(
+            "(?m)^.*Hups! Jos haluat nähdä tällaista sisältöä.*$\\R?"
+    );
+    private static final Pattern STANDARD_HELP_BLOCK_PATTERN = Pattern.compile(
+            "##\\s*Apua asiointiin\\s*\\R+###\\s*Henkilöasiakkaat\\s*\\R+-\\s*Kysy heti chatissa\\s*\\R+-\\s*Usein kysytyt\\s*\\R+-\\s*Soita meille.*?\\R+-\\s*Nordea Omaposti[^\r\n]*",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern HELP_SUB_LIST_PATTERN = Pattern.compile(
+            "###\\s*Henkilöasiakkaat\\s*\\R+-\\s*Kysy heti chatissa\\s*\\R+-\\s*Usein kysytyt\\s*\\R+-\\s*Soita meille.*?\\R+-\\s*Nordea Omaposti[^\r\n]*",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern APUA_HEADING_PATTERN = Pattern.compile(
+            "(?im)^##\\s*Apua asiointiin\\s*$\\R?"
+    );
+    private static final Pattern EMPTY_HEADING_PATTERN = Pattern.compile(
+            "(?m)^#{1,6}\\s*$\\R?"
+    );
+    private static final Pattern TRAILING_SPACES_PATTERN = Pattern.compile(
+            "(?m)[ \\t]+$"
+    );
+    private static final Pattern CONSECUTIVE_NEWLINES_PATTERN = Pattern.compile(
+            "\\n{3,}"
+    );
+
     private NordeaHtmlToMarkdownConverter() {
     }
 
@@ -59,6 +90,66 @@ public final class NordeaHtmlToMarkdownConverter {
         copy.select("[class*=modal], [id*=modal], [class*=dialog]").remove();
         copy.select("[class*=social-share], [class*=share-buttons], [class*=share-bar]").remove();
         copy.select("[class*=quick-links], [class*=breadcrumb]").remove();
+        copy.select("span.sr-only, span[class*=screen-reader], span[class*=visually-hidden]").remove();
+
+        // Remove cookie/marketing placeholder elements containing 'markkinointievästeet' or 'Hups! Jos haluat nähdä tällaista sisältöä'
+        for (Element el : copy.select("*:containsOwn(markkinointievästeet), *:containsOwn(Hups! Jos haluat nähdä tällaista sisältöä)")) {
+            if (el.parent() == null) {
+                continue;
+            }
+            Element block = el;
+            while (block.parent() != null
+                    && !block.parent().tagName().equalsIgnoreCase("main")
+                    && !block.parent().tagName().equalsIgnoreCase("body")
+                    && !block.parent().tagName().equalsIgnoreCase("article")
+                    && block.parent().text().length() < 300) {
+                block = block.parent();
+            }
+            block.remove();
+        }
+
+        for (Element el : copy.select("div, p, section, aside")) {
+            if (el.parent() == null) {
+                continue;
+            }
+            String text = el.text();
+            if (text.contains("markkinointievästeet") || text.contains("Hups! Jos haluat nähdä tällaista sisältöä")) {
+                if ("p".equalsIgnoreCase(el.tagName()) || text.length() < 300) {
+                    el.remove();
+                }
+            }
+        }
+
+        // Handle 'Apua asiointiin' footer help block in Jsoup pass
+        for (Element heading : copy.select("h1, h2, h3, h4, h5, h6")) {
+            if (heading.parent() == null) {
+                continue;
+            }
+            String headingText = normalizeWhitespace(heading.text()).toLowerCase(Locale.ROOT);
+            if ("apua asiointiin".equals(headingText)) {
+                Element parent = heading.parent();
+                if (parent != null && !parent.tagName().equalsIgnoreCase("body")
+                        && !parent.tagName().equalsIgnoreCase("main")
+                        && !parent.tagName().equalsIgnoreCase("article")) {
+                    String parentText = parent.text();
+                    if (parentText.contains("Henkilöasiakkaat") || parentText.contains("chatissa") || parentText.contains("Omaposti")) {
+                        parent.remove();
+                        continue;
+                    }
+                }
+                Element next = heading.nextElementSibling();
+                if (next != null && next.text().toLowerCase(Locale.ROOT).contains("henkilöasiakkaat")) {
+                    Element list = next.nextElementSibling();
+                    if (list != null && ("ul".equalsIgnoreCase(list.tagName()) || "ol".equalsIgnoreCase(list.tagName())
+                            || list.text().toLowerCase(Locale.ROOT).contains("chatissa")
+                            || list.text().toLowerCase(Locale.ROOT).contains("omaposti"))) {
+                        list.remove();
+                    }
+                    next.remove();
+                }
+                heading.remove();
+            }
+        }
 
         // 2. Locate main content root
         Element main = copy.selectFirst("main");
@@ -139,7 +230,32 @@ public final class NordeaHtmlToMarkdownConverter {
             }
         }
 
-        return md.toString().trim();
+        String res = md.toString();
+
+        // Post-processing removals
+        // 1. Remove any occurrence of 'Avautuu uuteen ikkunaan' (case-insensitive)
+        res = AVAUTUU_IKKUNAAN_PATTERN.matcher(res).replaceAll("");
+        res = AVAUTUU_RAW_PATTERN.matcher(res).replaceAll("");
+
+        // 2. Remove any line matching 'Hups! Jos haluat nähdä tällaista sisältöä.*'
+        res = HUPS_LINE_PATTERN.matcher(res).replaceAll("");
+
+        // 3. Remove standard trailing help block
+        res = STANDARD_HELP_BLOCK_PATTERN.matcher(res).replaceAll("");
+        res = HELP_SUB_LIST_PATTERN.matcher(res).replaceAll("");
+        res = APUA_HEADING_PATTERN.matcher(res).replaceAll("");
+
+        // 4. Clean up any empty headings left behind
+        res = EMPTY_HEADING_PATTERN.matcher(res).replaceAll("");
+
+        // 5. Clean up space before punctuation
+        res = res.replaceAll(" +([.,!?:;])", "$1");
+
+        // 6. Clean up trailing spaces and consecutive blank lines (max 2 newlines)
+        res = TRAILING_SPACES_PATTERN.matcher(res).replaceAll("");
+        res = CONSECUTIVE_NEWLINES_PATTERN.matcher(res).replaceAll("\n\n");
+
+        return res.trim();
     }
 
     private static boolean isDescendantOfProcessedContainer(Element el, Set<Element> processedElements) {

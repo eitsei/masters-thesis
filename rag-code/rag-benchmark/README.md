@@ -108,40 +108,68 @@ rag:
 
 ## Local test data: Nordea site ingestion
 
-For local development you need something realistic in `vector_store_test` to query against.
-`com.dippa.ragbenchmark.ingest.nordea` is a one-off admin tool that crawls
-[nordea.fi/private-banking](https://www.nordea.fi/private-banking/) (bounded to that path prefix,
-same host), extracts text from any linked PDFs, chunks everything with the same 512-token
-splitter `DocumentIngestionService` uses for the M0 baseline, and writes the chunks into
-`vector_store_test`.
+For local benchmarking you need realistic banking content in the vector store (`vector_store_nordea` or `vector_store_nordea_large`/`small`).
+The package `com.dippa.ragbenchmark.ingest.nordea` provides a comprehensive pipeline that crawls [nordea.fi/henkiloasiakkaat/](https://www.nordea.fi/henkiloasiakkaat/), extracts text from discovered PDFs, exports clean Markdown to disk (`data/nordea/md/`), strips boilerplate noise, and writes chunks to PgVector (either 512-token baseline chunks or S2B 1024-token parent / 128-token child pairs).
 
-It's disabled by default, so a normal `mvn spring-boot:run` never triggers a live crawl. Run it
-explicitly with:
+It is disabled by default so a normal `mvn spring-boot:run` never triggers an automatic crawl. You can control the pipeline via the REST API or run the crawler on startup.
 
+### 1. Triggering via REST API (`POST /api/ingest/nordea`)
+
+Once the app is running (`mvn spring-boot:run`), you can execute any stage of the pipeline dynamically:
+
+```bash
+# Ingest already downloaded & cleaned files directly from disk into S2B tables (fastest, no web crawling):
+curl -X POST http://localhost:8080/api/ingest/nordea \
+  -H "Content-Type: application/json" \
+  -d '{"action": "ingest", "mode": "s2b", "clearDatabase": true}'
+
+# Clean existing markdown files on disk without crawling or re-indexing:
+curl -X POST http://localhost:8080/api/ingest/nordea \
+  -H "Content-Type: application/json" \
+  -d '{"action": "clean"}'
+
+# Full end-to-end pipeline from a clean slate (crawl -> clean -> ingest):
+curl -X POST http://localhost:8080/api/ingest/nordea \
+  -H "Content-Type: application/json" \
+  -d '{"action": "all", "clearDatabase": true, "clearFiles": true, "mode": "s2b"}'
 ```
+
+**Request Payload Options (`NordeaIngestRequest`):**
+* `mode` (default `"s2b"`): `"s2b"` (stores to `vector_store_nordea_large` and `_small`) or `"original"` (stores to `vector_store_nordea`).
+* `action` (default `"all"`):
+  * `"ingest"`: Chunks and writes existing Markdown files from `data/nordea/md/` to PgVector without fetching from the web.
+  * `"clean"`: Cleans noise from Markdown files on disk.
+  * `"crawl"`: Crawls pages and PDFs, converting to Markdown on disk without database writes.
+  * `"all"`: Runs full pipeline in sequence.
+* `clearDatabase` (default `false`): Truncates target vector store tables before ingestion.
+* `clearFiles` (default `false`): Deletes existing `.md` files in `data/nordea/md/pages` and `pdfs` before a new crawl.
+
+### 2. Standalone Python Cleaning Script
+
+You can also inspect or clean the Markdown corpus directly from the terminal without running the Spring server:
+
+```bash
+# Preview modifications (dry-run, shows affected files, metrics, and diff preview):
+python3 data/nordea/clean_nordea_markdown.py --dry-run
+
+# Clean files in-place with automatic .bak backups:
+python3 data/nordea/clean_nordea_markdown.py --in-place --backup
+```
+
+**Automated Noise Filtering:**
+* Strips video/marketing cookie placeholders (`Hups! Jos haluat nähdä tällaista sisältöä, hyväksy ensin Nordean markkinointievästeet`).
+* Removes screen reader artifacts (`Avautuu uuteen ikkunaan`) from headings and link prose.
+* Strips the repeated contact footer (`## Apua asiointiin ... - Nordea Omaposti`) across pages while preserving actual contact information on the dedicated contact page.
+* Strictly preserves YAML frontmatter (`url`, `title`, `type`) and document structure.
+
+### 3. Resilience & Retries
+Both `NordeaCrawler` and `NordeaPdfExtractor` feature automatic 3x retries with exponential backoff (1s, 2s, 4s) to survive transient network or HTTP 5xx errors during live crawls.
+
+### 4. Running on Startup (Alternative)
+
+```bash
 mvn spring-boot:run -Dspring-boot.run.arguments=--ingest.nordea.enabled=true
 ```
-
-The app starts normally, runs the crawl/ingest once on startup, logs a summary (pages crawled,
-PDFs extracted, chunks written), and then keeps running as usual — stop it with Ctrl-C once the
-summary line appears if you don't need the rest of the app up.
-
-Notes:
-
-- **Data persists across restarts already** — `vector_store_test` lives in the `postgres`
-  service's named Docker volume (`rag-benchmark-pgdata` in `docker-compose.yml`), which survives
-  `mvn spring-boot:run` being stopped/restarted. It's only gone if you explicitly run
-  `docker compose down -v` or delete the volume.
-- **Safe to re-run.** Each chunk's id is deterministic (derived from its source URL + chunk
-  index), so re-running this tool overwrites the same rows instead of duplicating them.
-- **Only extracted plain text ever touches disk.** Each page/PDF's cleaned text is staged in a
-  temp file under the OS temp dir before chunking; raw HTML/PDF bytes are never written to disk,
-  and the whole staging directory is deleted once ingestion finishes (success or failure).
-- Crawl scope, page/PDF caps, request delay, and the crawler's `User-Agent` string are all
-  configurable under `ingest.nordea.*` in `application.yml`.
-- Nordea's exact page DOM wasn't available to hand-verify ahead of time, so the nav/footer/
-  cookie-banner stripping in `NordeaCrawler` is a best-effort heuristic — spot-check a few
-  ingested chunks after a run and tune the CSS selectors there if you see leftover site chrome.
 
 ## Multi-hop benchmark dataset: MuSiQue
 

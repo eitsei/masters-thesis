@@ -24,6 +24,8 @@ import org.springframework.stereotype.Component;
 public class NordeaPdfExtractor {
 
     private static final Log logger = LogFactory.getLog(NordeaPdfExtractor.class);
+    private static final int MAX_DOWNLOAD_RETRIES = 3;
+    private static final long[] DOWNLOAD_RETRY_BACKOFFS_MS = {1000L, 2000L, 4000L};
 
     private final NordeaIngestionProperties properties;
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -47,9 +49,36 @@ public class NordeaPdfExtractor {
                     .timeout(Duration.ofSeconds(20))
                     .GET()
                     .build();
-            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-            if (response.statusCode() / 100 != 2) {
-                logger.warn("Skipping PDF " + url + ": HTTP " + response.statusCode());
+
+            HttpResponse<byte[]> response = null;
+            for (int attempt = 0; attempt <= MAX_DOWNLOAD_RETRIES; attempt++) {
+                try {
+                    response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+                    if (response.statusCode() >= 500 && response.statusCode() < 600) {
+                        if (attempt < MAX_DOWNLOAD_RETRIES) {
+                            int retryAttempt = attempt + 1;
+                            logger.warn("Retrying PDF download (attempt " + retryAttempt + "/3) for URL " + url
+                                    + ": HTTP " + response.statusCode());
+                            Thread.sleep(DOWNLOAD_RETRY_BACKOFFS_MS[attempt]);
+                            continue;
+                        }
+                    }
+                    break;
+                } catch (IOException ex) {
+                    if (attempt < MAX_DOWNLOAD_RETRIES) {
+                        int retryAttempt = attempt + 1;
+                        logger.warn("Retrying PDF download (attempt " + retryAttempt + "/3) for URL " + url
+                                + ": " + ex.getMessage());
+                        Thread.sleep(DOWNLOAD_RETRY_BACKOFFS_MS[attempt]);
+                    } else {
+                        throw ex;
+                    }
+                }
+            }
+
+            if (response == null || response.statusCode() / 100 != 2) {
+                int status = response != null ? response.statusCode() : -1;
+                logger.warn("Skipping PDF " + url + ": HTTP " + status);
                 return Optional.empty();
             }
 

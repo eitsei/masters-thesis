@@ -106,4 +106,84 @@ class NordeaHtmlToMarkdownConverterTest {
         assertThat(markdown).contains("| Salkunhoito | 0.50% |");
         assertThat(markdown).contains("| Neuvonta | Maksuton |");
     }
+
+    @Test
+    void stripsCookieAndMarketingPlaceholderNotices() {
+        String html = """
+                <main>
+                    <h1>Säästäminen ja sijoittaminen</h1>
+                    <p>Säästämisen aloittaminen on helppoa ja kannattavaa.</p>
+                    <div class="video-container">
+                        <p>Hups! Jos haluat nähdä tällaista sisältöä, hyväksy ensin Nordean markkinointievästeet</p>
+                    </div>
+                    <p>Rahastosäästäminen sopii pitkäjänteiseen varallisuuden kerryttämiseen.</p>
+                </main>
+                """;
+
+        Document doc = Jsoup.parse(html);
+        String markdown = NordeaHtmlToMarkdownConverter.convert(doc);
+
+        assertThat(markdown).contains("# Säästäminen ja sijoittaminen");
+        assertThat(markdown).contains("Säästämisen aloittaminen on helppoa ja kannattavaa.");
+        assertThat(markdown).contains("Rahastosäästäminen sopii pitkäjänteiseen varallisuuden kerryttämiseen.");
+        assertThat(markdown).doesNotContain("Hups! Jos haluat nähdä tällaista sisältöä");
+        assertThat(markdown).doesNotContain("markkinointievästeet");
+    }
+
+    @Test
+    void stripsAvautuuUuteenIkkunaanInHeadingsAndLinks() {
+        String html = """
+                <main>
+                    <h1>Asuntolainat ja luotot</h1>
+                    <h2>Lainalaskuri (Avautuu uuteen ikkunaan)</h2>
+                    <p>Laske itsellesi sopiva kuukausierä.</p>
+                    <h2>Korkosuojaukset avautuu uuteen ikkunaan</h2>
+                    <p>
+                        <a href="https://www.nordea.fi/laskuri">Hae lainaa verkossa (Avautuu uuteen ikkunaan)</a>
+                    </p>
+                    <p>
+                        Voit tutustua ehtoihin <a href="/ehdot">täällä</a>
+                        <span class="sr-only">Avautuu uuteen ikkunaan</span>.
+                    </p>
+                </main>
+                """;
+
+        Document doc = Jsoup.parse(html);
+        String markdown = NordeaHtmlToMarkdownConverter.convert(doc);
+
+        assertThat(markdown).contains("## Lainalaskuri");
+        assertThat(markdown).contains("## Korkosuojaukset");
+        assertThat(markdown).contains("Hae lainaa verkossa");
+        assertThat(markdown).contains("Voit tutustua ehtoihin täällä");
+        assertThat(markdown).doesNotContainIgnoringCase("Avautuu uuteen ikkunaan");
+    }
+
+    @Test
+    void stripsStandardApuaAsiointiinFooterBlock() {
+        String html = """
+                <main>
+                    <h1>Päivittäiset pankkipalvelut</h1>
+                    <p>Kortit, tilit ja verkkopalvelut arjen sujuvaan hoitamiseen.</p>
+                    
+                    <h2>Apua asiointiin</h2>
+                    <h3>Henkilöasiakkaat</h3>
+                    <ul>
+                        <li>Kysy heti chatissa</li>
+                        <li>Usein kysytyt</li>
+                        <li>Soita meille</li>
+                        <li>Nordea Omaposti</li>
+                    </ul>
+                </main>
+                """;
+
+        Document doc = Jsoup.parse(html);
+        String markdown = NordeaHtmlToMarkdownConverter.convert(doc);
+
+        assertThat(markdown).contains("# Päivittäiset pankkipalvelut");
+        assertThat(markdown).contains("Kortit, tilit ja verkkopalvelut arjen sujuvaan hoitamiseen.");
+        assertThat(markdown).doesNotContain("Apua asiointiin");
+        assertThat(markdown).doesNotContain("Henkilöasiakkaat");
+        assertThat(markdown).doesNotContain("Kysy heti chatissa");
+        assertThat(markdown).doesNotContain("Nordea Omaposti");
+    }
 }
