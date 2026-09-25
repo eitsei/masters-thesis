@@ -136,15 +136,16 @@ def test_categorize_radar_tiers():
         "run_C5_M1_M2", "run_C6_M1_M3", "run_C7_M1_M4", "run_C8_M2_M3", "run_C9_M2_M4", "run_C10_M3_M4",
         "run_C11_M1_M2_M3", "run_C12_M1_M2_M4", "run_C13_M1_M3_M4", "run_C14_M2_M3_M4", "run_C15_M1_M2_M3_M4",
     ]
-    base, sing, duo, trio = _categorize_radar_tiers(configs)
+    base, sing, duo, trio, quad = _categorize_radar_tiers(configs)
 
     assert len(base) == 1 and base[0] == "run_C0_baseline"
     assert len(sing) == 4
     assert len(duo) == 6
-    assert len(trio) == 5
+    assert len(trio) == 4
+    assert len(quad) == 1 and quad[0] == "run_C15_M1_M2_M3_M4"
 
 
-def test_plot_ragas_metrics_radar_three_panel(tmp_path: Path):
+def test_plot_ragas_metrics_radar_four_panel(tmp_path: Path):
     from src.plot_results import plot_ragas_metrics_radar
 
     out_pdf = tmp_path / "quality_radar_enterprise.pdf"

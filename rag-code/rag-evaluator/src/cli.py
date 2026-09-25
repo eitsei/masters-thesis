@@ -114,6 +114,7 @@ def _process_item_metrics(
         item.get("groundTruthAliases")
         or item.get("aliases")
         or item.get("answer_aliases")
+        or item.get("answerAliases")
         or []
     )
     pred = item.get("generatedAnswer") or item.get("answer") or ""
@@ -423,10 +424,11 @@ def run(
         "--judge-delay",
         help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Claude/Gemini, 0s for Ollama)",
     ),
+    timeout: float = typer.Option(300.0, "--timeout", help="Timeout in seconds for RAG service requests (default: 300s)"),
 ) -> None:
     """Executes a benchmark evaluation run against the Spring Boot RAG service."""
     rag_url = url or os.getenv("RAG_APP_URL", "http://localhost:8080")
-    client = RagBenchmarkClient(base_url=rag_url, debug=debug, timeout=180.0)
+    client = RagBenchmarkClient(base_url=rag_url, debug=debug, timeout=timeout)
 
     module_list = [m.strip() for m in modules.split(",") if m.strip()]
     module_label = "+".join(module_list) if module_list else "C0_Baseline"
@@ -816,19 +818,10 @@ def export_thesis(
     p5 = plot_ragas_metrics_radar(run_dict, figures_dir / f"quality_radar{slug_suffix}.pdf", dataset_name=dataset_name)
     console.print(f"  [green]✓[/green] Figure: [cyan]{p5}[/cyan]")
 
-    def _safe_copy(src: Path, dst: Path) -> None:
-        if src.resolve() != dst.resolve():
-            shutil.copy2(src, dst)
-
-    # Always ensure default names exist for compatibility
-    _safe_copy(p5, figures_dir / "ragas_metrics_radar.pdf")
-    _safe_copy(p5, figures_dir / "quality_radar.pdf")
-    if slug:
-        _safe_copy(p1, figures_dir / "pareto_frontier.pdf")
-        _safe_copy(p2, figures_dir / "pareto_frontier_3d.pdf")
-        _safe_copy(p3, figures_dir / "latency_breakdown.pdf")
-        _safe_copy(p4, figures_dir / "cost_breakdown.pdf")
-        _safe_copy(p5, figures_dir / f"ragas_metrics_radar_{slug}.pdf")
+    # For un-slugged root export, provide backwards compatibility alias for legacy ragas_metrics_radar.pdf
+    if not slug:
+        if (figures_dir / "ragas_metrics_radar.pdf").resolve() != p5.resolve():
+            shutil.copy2(p5, figures_dir / "ragas_metrics_radar.pdf")
 
     console.print("\n[bold green]All thesis tables and figures exported successfully![/bold green]")
 
@@ -844,10 +837,11 @@ def query_cmd(
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Optional path to save evaluation result JSONL"),
     url: Optional[str] = typer.Option(None, "--url", help="RAG service URL"),
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable verbose debug logging"),
+    timeout: float = typer.Option(300.0, "--timeout", help="Timeout in seconds for RAG service requests (default: 300s)"),
 ) -> None:
     """Executes a single RAG query against any vector table and evaluates it with RAGAS."""
     rag_url = url or os.getenv("RAG_APP_URL", "http://localhost:8080")
-    client = RagBenchmarkClient(base_url=rag_url, debug=debug, timeout=180.0)
+    client = RagBenchmarkClient(base_url=rag_url, debug=debug, timeout=timeout)
 
     module_list = [m.strip() for m in modules.split(",") if m.strip()]
     console.print(Panel.fit(
@@ -943,10 +937,11 @@ def run_questions(
         "--judge-delay",
         help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Claude/Gemini, 0s for Ollama)",
     ),
+    timeout: float = typer.Option(300.0, "--timeout", help="Timeout in seconds for RAG service requests (default: 300s)"),
 ) -> None:
     """Runs a batch of questions from a file against a vector store table and evaluates with RAGAS."""
     rag_url = url or os.getenv("RAG_APP_URL", "http://localhost:8080")
-    client = RagBenchmarkClient(base_url=rag_url, debug=debug, timeout=180.0)
+    client = RagBenchmarkClient(base_url=rag_url, debug=debug, timeout=timeout)
 
     # Load input file (supports JSON array or JSONL)
     records: list[dict[str, Any]] = []
@@ -1006,6 +1001,7 @@ def run_questions(
             rec.get("aliases")
             or rec.get("groundTruthAliases")
             or rec.get("answer_aliases")
+            or rec.get("answerAliases")
             or []
         )
         qid = rec.get("id", f"q{i}")

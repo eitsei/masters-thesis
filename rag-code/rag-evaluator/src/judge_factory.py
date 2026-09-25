@@ -135,6 +135,56 @@ def _patch_vertex_ai_async_prediction_client() -> None:
 
 
 # ---------------------------------------------------------------------------
+# RAGAS Pydantic Prompt JSON parsing patch (handles LLM conversational preamble)
+# ---------------------------------------------------------------------------
+
+_RAGAS_JSON_PATCHED = False
+
+
+def _patch_ragas_pydantic_json_parsing() -> None:
+    """Patches RAGAS PydanticPrompt to extract JSON substrings from LLMs that emit conversational preamble."""
+    global _RAGAS_JSON_PATCHED
+    if _RAGAS_JSON_PATCHED:
+        return
+
+    try:
+        import re
+        import ragas.prompt.pydantic_prompt as pp
+
+        orig_generate_multiple = pp.PydanticPrompt.generate_multiple
+
+        def _clean_json_str(text: str) -> str:
+            m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+            if m:
+                return m.group(1).strip()
+            start = text.find("{")
+            end = text.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                return text[start : end + 1].strip()
+            return text.strip()
+
+        async def robust_generate_multiple(self, *args, **kwargs):
+            orig_validate = self.output_model.model_validate_json
+
+            def robust_validate(s):
+                try:
+                    return orig_validate(s)
+                except Exception:
+                    return orig_validate(_clean_json_str(s))
+
+            self.output_model.model_validate_json = robust_validate
+            try:
+                return await orig_generate_multiple(self, *args, **kwargs)
+            finally:
+                self.output_model.model_validate_json = orig_validate
+
+        pp.PydanticPrompt.generate_multiple = robust_generate_multiple
+        _RAGAS_JSON_PATCHED = True
+    except Exception as exc:
+        logger.debug(f"Failed to patch RAGAS PydanticPrompt JSON parsing: {exc}")
+
+
+# ---------------------------------------------------------------------------
 # Shared config resolution helpers
 # ---------------------------------------------------------------------------
 
@@ -405,6 +455,7 @@ class JudgeFactory:
             Tuple of (llm_judge, embedding_model).
         """
         selected = (provider or os.getenv("JUDGE_PROVIDER") or "claude").strip().lower()
+        _patch_ragas_pydantic_json_parsing()
         key = _PROVIDER_ALIASES.get(selected)
         if key is None:
             raise ValueError(

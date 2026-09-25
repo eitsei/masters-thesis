@@ -107,6 +107,50 @@ This appendix documents the enterprise knowledge corpus extraction, deduplicatio
 % - Baseline -> S2B -migraatio (s2b-baseline):
 %     * Mahdollistaa Small-to-Big -indeksien rakentamisen suoraan olemassa olevan
 %       vector_store_nordea -kannan pohjalta ilman levy- tai verkkotoimenpiteitä.
+% 7. VERTAILUASETELMA: OPEN-CORPUS VS. CLOSED-CORPUS (Enterprise Closed & MuSiQue Parity)
+% ------------------------------------------------------------------------------
+% - Tausta ja metodologinen ongelma (The Confounding Variable Problem):
+%     * MuSiQue-vertailuaineisto ingestoitiin alun perin suljettuna korpuksena (closed corpus):
+%       vektorikantaan ladattiin vain 100 benchmark-kysymyksen mukana tulevat 20 kandidaattikappaletta
+%       per kysymys, jolloin deduplikoinnin jälkeen kannassa oli vain ~1 700 kappaletta.
+%     * Nordea-yritysaineiston osalta oli sen sijaan crawlattu ja indeksoitu koko verkkopalvelu
+%       (open corpus: 250 sivua + 50 PDF:ää, tuhansia chunkkeja).
+%     * Tämä muodosti tutkimukseen vakavan sekoittavan muuttujan (confounding variable):
+%       - Suora vertailu MuSiQuen ja Nordean välillä vääristyi, sillä hakuavaruuden vaikeusaste oli
+%         täysin eri ("neula heinäsuovassa" vs. kontrolloitu 20 kappaleen häirikköjoukko).
+%       - Esimerkiksi Context Precision ja Context Recall olivat Nordeassa matalampia puhtaasti
+%         laajemman hakuavaruuden vuoksi, ei järjestelmän heikomman suorituskyvyn takia.
+%       - Optimointimoduulien hyödyt vääristyivät: Re-ranking (M2) tuottaa suhteettoman suuren
+%         lisäarvon laajan korpuksen kohinassa verrattuna 1 700 kappaleen rajattuun aineistoon.
+% - Ratkaisu: Kolmitahoinen koesarja (Three-way Experimental Paradigm / Vaihtoehto C):
+%     * Toteutettiin Nordealle vastaava suljettu korpus (enterprise_closed), jotta aineistojen
+%       välille saadaan tieteellisesti 1:1 vertailukelpoinen testiasetelma.
+%     * Samalla säilytettiin täysi avoimen korpuksen aineisto ja sen ajotulokset koskemattomina.
+%     * Diplomityöhön muodostuu poikkeuksellisen vahva vertaileva tutkimusasetelma:
+%       1. MuSiQue (EN Closed) <-> Nordea Closed (FI Closed):
+%          -> Puhdas kieli- ja toimialariippuvuuden vertailu ilman hakuavaruuden kokoeroa.
+%       2. Nordea Closed (FI Closed) <-> Nordea Open (FI Open):
+%          -> Korpuksen laajuuden ja kohinan vaikutus RAG-optimointiin (Pareto-rintaman
+%             muutos ja M2 Re-rankingin kriittisyys reaalimaailman tuotantoskaalassa).
+% - Tekninen toteutus (Technical Implementation):
+%     * Lähdeaineisto: nordea_100_final.jsonl (sisältää 100 kysymystä x 20 kappaletta = 2 000 kpl).
+%     * Deduplikointi: Identtisellä MuSiQue-logiikalla (title + "\n" + paragraph_text) saatiin
+%       tarkalleen 1 333 uniikkia kappaletta (hyvin lähellä MuSiQuen ~1 700 kappaleen mittakaavaa).
+%     * Uudet erilliset pgvector-taulut (ei kosketa olemassa oleviin):
+%       1. vector_store_nordea_closed:
+%          Perushaku (C0 Baseline, C2 Reranker, C3 Prompt Cache, C4 Router) 1 333 kappaleelle.
+%       2. vector_store_nordea_closed_large:
+%          Small-to-Big (M1) kontekstilaajennus (parent-chunkit 1024 tokenia).
+%       3. vector_store_nordea_closed_small:
+%          Small-to-Big (M1) tiheä hakuindeksi (child-chunkit 128 tokenia, parent_id -linkitys).
+%     * Dynaaminen kyselyreititys:
+%       RagQueryService reitittää kyselyn taulun nimen mukaan:
+%       Jos tableName = "vector_store_nordea_closed", M1-kyselyt ohjataan automaattisesti
+%       pariin vector_store_nordea_closed_small -> vector_store_nordea_closed_large.
+%     * Eristys ja hakemistorakenne:
+%       Kaikki suljetun korpuksen ajot, taulukot ja kuvaajat eriytetään omaan alikansioonsa:
+%       - Tulokset: rag-evaluator/runs/enterprise_closed/
+%       - Taulukot: thesis/tables/enterprise_closed/
+%       - Kuvaajat: thesis/figures/enterprise_closed/
+%       Tämä takaa, että alkuperäiset open-corpus -tulokset (enterprise/) eivät ylikirjoitu.
 % ==============================================================================
-
-

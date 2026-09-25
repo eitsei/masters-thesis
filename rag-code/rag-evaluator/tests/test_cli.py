@@ -186,9 +186,12 @@ def test_cli_export_thesis_with_subfolder(tmp_path: Path, synthetic_run_data):
     assert res.exit_code == 0
     assert (tables_dir / "sample_runs" / "benchmark_summary.tex").exists()
     assert (tables_dir / "sample_runs" / "hop_breakdown.tex").exists()
-    assert (figures_dir / "sample_runs" / "pareto_frontier.pdf").exists()
-    assert (figures_dir / "sample_runs" / "pareto_frontier_3d.pdf").exists()
-    assert (figures_dir / "sample_runs" / "cost_breakdown.pdf").exists()
+    assert (figures_dir / "sample_runs" / "pareto_frontier_sample_runs.pdf").exists()
+    assert (figures_dir / "sample_runs" / "pareto_frontier_3d_sample_runs.pdf").exists()
+    assert (figures_dir / "sample_runs" / "cost_breakdown_sample_runs.pdf").exists()
+    assert (figures_dir / "sample_runs" / "latency_breakdown_sample_runs.pdf").exists()
+    assert (figures_dir / "sample_runs" / "quality_radar_sample_runs.pdf").exists()
+    assert not (figures_dir / "sample_runs" / "pareto_frontier.pdf").exists()
 
 
 @patch("src.cli.RagBenchmarkClient")

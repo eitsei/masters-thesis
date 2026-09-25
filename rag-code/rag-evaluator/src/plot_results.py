@@ -400,9 +400,9 @@ def plot_latency_breakdown(
 
 
 def _categorize_radar_tiers(
-    configs: list[str],
-) -> tuple[list[str], list[str], list[str], list[str]]:
-    """Categorizes configuration names into (baseline, singulars, duos, trios_fullstack).
+    configs: Sequence[str],
+) -> tuple[list[str], list[str], list[str], list[str], list[str]]:
+    """Categorizes configuration names into (baseline, singulars, duos, trios, quads).
 
     Classification rules:
     - Baseline: 'C0' or 'C_0' or 'base' in name.
@@ -410,17 +410,20 @@ def _categorize_radar_tiers(
         - 0: baseline
         - 1..4: singulars (k=1)
         - 5..10: duos (k=2)
-        - 11..15: trios & full-stack (k>=3)
+        - 11..14: trios (k=3)
+        - >=15: full-stack (k=4)
     - Fallback heuristic based on module separators:
         - Count number of module tokens (M1, M2, M3, M4, S2B, SR, PC, ROUTE, etc.):
         - 1 module -> singular
         - 2 modules -> duo
-        - >=3 modules -> trio/fullstack
+        - 3 modules -> trio
+        - >=4 modules -> quad
     """
     baseline_list: list[str] = []
     singulars: list[str] = []
     duos: list[str] = []
-    trios_full: list[str] = []
+    trios: list[str] = []
+    quads: list[str] = []
 
     for name in configs:
         lower = name.lower()
@@ -434,8 +437,10 @@ def _categorize_radar_tiers(
                 singulars.append(name)
             elif 5 <= c_num <= 10:
                 duos.append(name)
+            elif 11 <= c_num <= 14:
+                trios.append(name)
             else:
-                trios_full.append(name)
+                quads.append(name)
             continue
 
         if "base" in lower or "c0" in lower:
@@ -445,14 +450,17 @@ def _categorize_radar_tiers(
         # Heuristic fallback: count '+' or count 'm[1-4]' occurrences
         m_matches = re.findall(r"m[1-4]", lower)
         plus_count = name.count("+")
-        if len(m_matches) >= 3 or plus_count >= 2:
-            trios_full.append(name)
-        elif len(m_matches) == 2 or plus_count == 1:
+        count = max(len(m_matches), plus_count + 1 if plus_count > 0 else 1)
+        if count >= 4:
+            quads.append(name)
+        elif count == 3:
+            trios.append(name)
+        elif count == 2:
             duos.append(name)
         else:
             singulars.append(name)
 
-    return baseline_list, singulars, duos, trios_full
+    return baseline_list, singulars, duos, trios, quads
 
 
 def plot_ragas_metrics_radar(
@@ -462,11 +470,12 @@ def plot_ragas_metrics_radar(
 ) -> Path:
     """Generates radar chart across the 4 core RAGAS metrics.
 
-    If >= 5 configurations are provided, generates a 3-panel figure comparing each
+    If >= 5 configurations are provided, generates a 2x2 (4-panel) figure comparing each
     architectural tier against baseline (k=0):
     1. Single-Factor Isolated (k=1) vs. Baseline
     2. Pairwise Combinations (k=2) vs. Baseline
-    3. Higher-Order Triplets & Full-Stack (k>=3) vs. Baseline
+    3. Multi-Module Triplets (k=3) vs. Baseline
+    4. Full-Stack Integration (k=4) vs. Baseline
     """
     _set_publication_style()
     out_file = Path(output_path)
@@ -483,10 +492,10 @@ def plot_ragas_metrics_radar(
         "#8c564b", "#e377c2", "#17becf",
     ]
 
-    base_names, sing_names, duo_names, trio_names = _categorize_radar_tiers(list(data.keys()))
+    base_names, sing_names, duo_names, trio_names, quad_names = _categorize_radar_tiers(list(data.keys()))
 
     # Fallback to single radar plot if fewer than 5 configs or tiers cannot be formed
-    if len(data) < 5 or (not sing_names and not duo_names and not trio_names):
+    if len(data) < 5 or (not sing_names and not duo_names and not trio_names and not quad_names):
         fig, ax = plt.subplots(figsize=(6.2, 5.8), subplot_kw=dict(polar=True), dpi=300)
 
         for idx, (name, records) in enumerate(data.items()):
@@ -524,13 +533,15 @@ def plot_ragas_metrics_radar(
         plt.close(fig)
         return out_file
 
-    # 3-Panel Side-by-Side Radar Chart
-    fig, axes = plt.subplots(1, 3, figsize=(15.5, 5.2), subplot_kw=dict(polar=True), dpi=300)
+    # 2x2 (4-Panel) Grid Radar Chart for publication readability
+    fig, axes = plt.subplots(2, 2, figsize=(11.0, 10.5), subplot_kw=dict(polar=True), dpi=300)
+    axes_flat = axes.flatten()
 
     panels = [
         ("(a) Single-Factor Isolated ($k=1$) vs. Baseline", sing_names),
         ("(b) Pairwise Combinations ($k=2$) vs. Baseline", duo_names),
-        ("(c) Higher-Order Triplets & Full-Stack ($k \\geq 3$) vs. Baseline", trio_names),
+        ("(c) Multi-Module Triplets ($k=3$) vs. Baseline", trio_names),
+        ("(d) Full-Stack Integration ($k=4$) vs. Baseline", quad_names),
     ]
 
     base_name = base_names[0] if base_names else None
@@ -547,7 +558,7 @@ def plot_ragas_metrics_radar(
             base_values += base_values[:1]
 
     for p_idx, (panel_title, tier_configs) in enumerate(panels):
-        ax = axes[p_idx]
+        ax = axes_flat[p_idx]
 
         # 1. Plot Baseline in distinct dashed style
         if base_values is not None:
@@ -588,28 +599,29 @@ def plot_ragas_metrics_radar(
         ax.set_theta_offset(np.pi / 2)
         ax.set_theta_direction(-1)
         ax.set_xticks(angles[:-1])
-        ax.set_xticklabels(categories, fontsize=8.5, fontweight="bold")
+        ax.set_xticklabels(categories, fontsize=9.0, fontweight="bold")
         ax.set_ylim(0.0, 1.0)
         ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
-        ax.set_yticklabels(["0.2", "0.4", "0.6", "0.8", "1.0"], fontsize=6.5, color="gray")
-        ax.set_title(panel_title, fontweight="bold", pad=20, fontsize=10.5)
+        ax.set_yticklabels(["0.2", "0.4", "0.6", "0.8", "1.0"], fontsize=7.0, color="gray")
+        ax.set_title(panel_title, fontweight="bold", pad=22, fontsize=10.5)
 
         ax.legend(
             loc="upper center",
-            bbox_to_anchor=(0.5, -0.10),
+            bbox_to_anchor=(0.5, -0.14),
             ncol=min(3, len(tier_configs) + 1),
-            fontsize=7.5,
+            fontsize=8.0,
             framealpha=0.9,
         )
 
     title_suffix = f" for {dataset_name}" if dataset_name else ""
     fig.suptitle(
         f"Multi-Dimensional Quality Trade-offs across Architectural Tiers (RAGAS){title_suffix}",
-        fontsize=12,
+        fontsize=12.5,
         fontweight="bold",
-        y=1.04,
+        y=0.995,
     )
     plt.tight_layout()
+    plt.subplots_adjust(hspace=0.38, wspace=0.25)
     plt.savefig(out_file, bbox_inches="tight", dpi=300)
     plt.close(fig)
     return out_file

@@ -80,7 +80,7 @@ class RagClient:
         self,
         base_url: str | None = None,
         auth_token: str | None = None,
-        timeout: float = 180.0,
+        timeout: float = 300.0,
         auto_iam: bool = True,
         debug: bool = False,
         session: requests.Session | None = None,
@@ -97,6 +97,12 @@ class RagClient:
         """
         raw_url = base_url or os.getenv("RAG_APP_URL") or "http://localhost:8080"
         self.base_url = raw_url.rstrip("/")
+        env_timeout = os.getenv("RAG_CLIENT_TIMEOUT")
+        if env_timeout:
+            try:
+                timeout = float(env_timeout)
+            except ValueError:
+                pass
         self.timeout = timeout
         self.debug = debug
         self.console = Console(stderr=True)
