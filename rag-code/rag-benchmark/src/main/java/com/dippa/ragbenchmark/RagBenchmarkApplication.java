@@ -6,6 +6,7 @@ import com.dippa.ragbenchmark.infrastructure.config.PromptCacheProperties;
 import com.dippa.ragbenchmark.infrastructure.config.RerankerProperties;
 import com.dippa.ragbenchmark.infrastructure.config.RouterProperties;
 import com.dippa.ragbenchmark.infrastructure.dataset.MusiqueDatasetProperties;
+import com.dippa.ragbenchmark.infrastructure.dataset.NordeaClosedDatasetProperties;
 import com.dippa.ragbenchmark.ingest.nordea.NordeaIngestionProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.SpringApplication;
@@ -22,7 +23,8 @@ import org.springframework.context.annotation.Bean;
         RouterProperties.class,
         GenerationProperties.class,
         NordeaIngestionProperties.class,
-        MusiqueDatasetProperties.class
+        MusiqueDatasetProperties.class,
+        NordeaClosedDatasetProperties.class
 })
 public class RagBenchmarkApplication {
 

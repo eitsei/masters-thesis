@@ -447,6 +447,29 @@ class RagQueryServiceTest {
     }
 
     @Test
+    void m1_routesToNordeaClosedSmallAndLarge_whenTableNameIsVectorStoreNordeaClosed() {
+        Document childChunk = Document.builder().id("c-nordea-1").text("Nordea child text").build();
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(childChunk));
+
+        Document parentDoc = Document.builder().id("p-nordea-1").text("Nordea parent text").build();
+        when(retrievalExpander.expand(any(), org.mockito.ArgumentMatchers.eq("vector_store_nordea_closed_large"))).thenReturn(List.of(parentDoc));
+        when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("Nordea vastaus", null));
+
+        RagQueryResult result = ragQueryService.query(
+                "Miten tili avataan?",
+                Set.of(ModuleId.M1),
+                "vector_store_nordea_closed",
+                null,
+                null,
+                null
+        );
+
+        assertThat(result.answer()).isEqualTo("Nordea vastaus");
+        assertThat(result.modulesApplied()).containsExactly(ModuleId.M1);
+        verify(retrievalExpander).expand(any(), org.mockito.ArgumentMatchers.eq("vector_store_nordea_closed_large"));
+    }
+
+    @Test
     void m1m2m3Combination_executesRerankThenExpansionThenExplicitCaching() {
         Document child1 = Document.builder().id("c1").text("Child text 1").build();
         Document child2 = Document.builder().id("c2").text("Child text 2").build();

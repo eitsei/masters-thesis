@@ -209,4 +209,14 @@ rag:
       random-seed: 42
       batch-size: 100
       include-title-in-chunk-text: true
+    nordea-closed:
+      file-path: ${NORDEA_CLOSED_DATASET_PATH:data/nordea/nordea_100_final.jsonl}
+      batch-size: 100
+      parent-batch-size: 10
+      child-batch-size: 25
+      baseline-chunk-size: 512
+      parent-chunk-size: 1024
+      child-chunk-size: 128
+      include-title-in-chunk-text: true
+
 

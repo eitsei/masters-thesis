@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
  * REST endpoint for running the RAG query pipeline.
  */
 @RestController
-@RequestMapping("/api/query")
+@RequestMapping({"/api/query", "/api/v1/query"})
 public class QueryController {
 
     private final RagQueryService ragQueryService;
