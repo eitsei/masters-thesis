@@ -103,8 +103,19 @@ def _process_item_metrics(
 ) -> dict[str, Any]:
     """Enriches a benchmark result item with EM, F1, Cost, RAGAS scores, and Composite Q."""
     question = item.get("question") or item.get("query") or ""
-    gt = item.get("groundTruthAnswer") or item.get("ground_truth") or item.get("reference") or ""
-    aliases = item.get("groundTruthAliases") or item.get("aliases") or []
+    gt = (
+        item.get("groundTruthAnswer")
+        or item.get("ground_truth")
+        or item.get("reference")
+        or (item.get("answer") if "generatedAnswer" in item else "")
+        or ""
+    )
+    aliases = (
+        item.get("groundTruthAliases")
+        or item.get("aliases")
+        or item.get("answer_aliases")
+        or []
+    )
     pred = item.get("generatedAnswer") or item.get("answer") or ""
 
     item["question"] = question
@@ -984,8 +995,19 @@ def run_questions(
     evaluated_records: list[dict[str, Any]] = []
     for i, rec in enumerate(records, 1):
         q = rec.get("question") or rec.get("query") or ""
-        gt = rec.get("ground_truth") or rec.get("reference") or rec.get("groundTruthAnswer") or ""
-        aliases = rec.get("aliases") or rec.get("groundTruthAliases") or []
+        gt = (
+            rec.get("ground_truth")
+            or rec.get("reference")
+            or rec.get("groundTruthAnswer")
+            or rec.get("answer")
+            or ""
+        )
+        aliases = (
+            rec.get("aliases")
+            or rec.get("groundTruthAliases")
+            or rec.get("answer_aliases")
+            or []
+        )
         qid = rec.get("id", f"q{i}")
 
         q_disp = (q[:90] + "...") if len(q) > 90 else q
@@ -1024,6 +1046,14 @@ def run_questions(
             "cacheStatus": resp.get("cacheStatus"),
             "cacheMetadata": resp.get("cacheMetadata"),
         }
+        if "answerable" in rec:
+            item["answerable"] = rec["answerable"]
+        if "question_decomposition" in rec:
+            item["question_decomposition"] = rec["question_decomposition"]
+        if "hopCount" in rec or "hop_count" in rec:
+            item["hopCount"] = rec.get("hopCount") or rec.get("hop_count")
+        elif "question_decomposition" in rec and rec["question_decomposition"]:
+            item["hopCount"] = len(rec["question_decomposition"])
 
         processed = _evaluate_item_with_feedback(
             item=item,
@@ -1134,19 +1164,50 @@ def build_nordea_musique_dataset(
         help="Target number of benchmark questions (Thesis §4.4: 40% single-hop, 40% multi-hop, 20% out-of-domain)",
     ),
     judge_model: str = typer.Option(
-        "gemini-3.8-flash",
+        "gemini-3.5-flash",
         "--judge-model",
         "-m",
-        help="Synthesizer/verifier LLM model on Vertex AI global endpoint",
+        help="Synthesizer/verifier LLM model on Vertex AI global endpoint (default: gemini-3.5-flash)",
     ),
     limit_input: Optional[int] = typer.Option(
         None,
         "--limit-input",
         help="Limit number of candidate input questions to process (useful for fast smoke runs)",
     ),
+    delay: float = typer.Option(
+        2.0,
+        "--delay",
+        help="Pacing delay in seconds between Vertex AI LLM calls to prevent 429 rate limit errors (default: 2.0s)",
+    ),
+    multihop_csv: Path = typer.Option(
+        Path("data/nordea/qs_multihop_fi.csv"),
+        "--multihop-csv",
+        "-mhc",
+        help="Path to composite multi-hop questions CSV (composite_question,sub_question_1,sub_question_2)",
+    ),
+    shuffle: bool = typer.Option(
+        True,
+        "--shuffle/--no-shuffle",
+        help="Randomize candidate question order to sample diversely across banking topics (default: True)",
+    ),
+    seed: int = typer.Option(
+        42,
+        "--seed",
+        help="Random seed for reproducible question shuffling (default: 42)",
+    ),
+    resume: bool = typer.Option(
+        True,
+        "--resume/--no-resume",
+        help="Resume incrementally if the output file already contains partially generated questions (default: True)",
+    ),
 ) -> None:
     """Builds a MuSiQue-schema enterprise benchmark dataset from Finnish questions and Nordea corpus."""
-    from src.dataset_builder import CorpusIndexer, NordeaMusiqueDatasetBuilder, load_questions_from_csv
+    from src.dataset_builder import (
+        CorpusIndexer,
+        NordeaMusiqueDatasetBuilder,
+        load_multihop_questions_from_csv,
+        load_questions_from_csv,
+    )
 
     # Resolve paths relative to working directory / project root
     resolved_csv = csv_file if csv_file.is_absolute() else (Path.cwd() / csv_file).resolve()
@@ -1161,19 +1222,36 @@ def build_nordea_musique_dataset(
         if alt_corpus.exists():
             resolved_corpus = alt_corpus
 
+    resolved_mh = multihop_csv if multihop_csv.is_absolute() else (Path.cwd() / multihop_csv).resolve()
+    if not resolved_mh.exists():
+        alt_mh = Path(__file__).resolve().parent.parent / "data" / "nordea" / "qs_multihop_fi.csv"
+        if alt_mh.exists():
+            resolved_mh = alt_mh
+
     resolved_out = output if output.is_absolute() else (Path.cwd() / output).resolve()
 
-    console.print(f"Loading questions from: [cyan]{resolved_csv}[/cyan]")
+    console.print(f"Loading single-hop questions from: [cyan]{resolved_csv}[/cyan]")
     questions = load_questions_from_csv(resolved_csv)
-    console.print(f"Loaded [bold]{len(questions)}[/bold] unique questions from CSV.")
+    console.print(f"Loaded [bold]{len(questions)}[/bold] unique single-hop questions from CSV.")
+
+    multihop_questions = []
+    if resolved_mh.exists():
+        console.print(f"Loading multi-hop questions from: [cyan]{resolved_mh}[/cyan]")
+        multihop_questions = load_multihop_questions_from_csv(resolved_mh)
+        console.print(f"Loaded [bold]{len(multihop_questions)}[/bold] composite multi-hop questions from CSV.")
+    else:
+        console.print(f"[yellow]Multi-hop CSV not found at {resolved_mh}. Multi-hop pool will be empty.[/yellow]")
 
     console.print(f"Indexing corpus from: [cyan]{resolved_corpus}[/cyan]")
     indexer = CorpusIndexer(resolved_corpus)
     console.print(f"Indexed [bold]{len(indexer.paragraphs)}[/bold] substantive paragraphs.")
+    if delay > 0:
+        console.print(f"Pacing delay: [yellow]{delay:.1f}s[/yellow] between Vertex AI LLM calls to prevent 429 quota exhaustion.")
 
     builder = NordeaMusiqueDatasetBuilder(
         corpus_indexer=indexer,
         judge_model=judge_model,
+        delay_seconds=delay,
         console=console,
     )
 
@@ -1182,6 +1260,10 @@ def build_nordea_musique_dataset(
         output_file=resolved_out,
         target_size=size,
         limit_input=limit_input,
+        multihop_questions=multihop_questions,
+        shuffle=shuffle,
+        seed=seed,
+        resume=resume,
     )
 
 

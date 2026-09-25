@@ -295,6 +295,69 @@ def _build_gemini_vertex(
     return llm, embeddings
 
 
+def _build_vertex_maas_openai(
+    model: str | None,
+    embedding_model: str | None,
+    temperature: float,
+    **kwargs: Any,
+) -> tuple[BaseChatModel, Embeddings]:
+    """Build a Vertex AI MaaS judge via the OpenAI-compatible endpoint.
+
+    Third-party models hosted on Vertex AI Model Garden (e.g. Meta Llama 4)
+    expose an OpenAI-compatible ``/chat/completions`` endpoint rather than
+    the Gemini ``GenerateContent`` API.  This builder constructs the correct
+    regional URL and uses a GCP OAuth2 access token as the API key.
+    """
+    import google.auth
+    from google.auth.transport.requests import Request
+    from langchain_google_vertexai import VertexAIEmbeddings
+
+    judge_model = model or os.getenv("JUDGE_MODEL") or "meta/llama-4-scout-17b-16e-instruct-maas"
+    project = _resolve_gcp_project(kwargs)
+
+    # MaaS models are regional (e.g. us-east5), never "global"
+    maas_location = (
+        kwargs.pop("location", None)
+        or os.getenv("VERTEX_MAAS_LOCATION")
+        or os.getenv("GOOGLE_CLOUD_MAAS_LOCATION")
+        or "us-east5"
+    )
+    emb_loc = (
+        kwargs.pop("embedding_location", None)
+        or os.getenv("GOOGLE_CLOUD_EMBEDDING_LOCATION")
+        or "us-central1"
+    )
+    emb_model = _resolve_embedding_model(embedding_model)
+    max_tokens = kwargs.pop("max_output_tokens", kwargs.pop("max_tokens", 4096))
+
+    # Obtain GCP access token for authentication
+    credentials, _ = google.auth.default(
+        scopes=["https://www.googleapis.com/auth/cloud-platform"],
+    )
+    credentials.refresh(Request())
+
+    base_url = (
+        f"https://{maas_location}-aiplatform.googleapis.com/v1beta1"
+        f"/projects/{project}/locations/{maas_location}/endpoints/openapi"
+    )
+
+    llm = ChatOpenAI(
+        model=judge_model,
+        base_url=base_url,
+        api_key=credentials.token,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        max_retries=2,
+        **kwargs,
+    )
+    embeddings = VertexAIEmbeddings(
+        model_name=emb_model,
+        project=project,
+        location=emb_loc,
+    )
+    return llm, embeddings
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -307,6 +370,9 @@ _PROVIDER_ALIASES: dict[str, str] = {
     "vertexai": "vertex",
     "claude": "vertex-claude",
     "anthropic": "vertex-claude",
+    "llama": "vertex-maas",
+    "meta": "vertex-maas",
+    "maas": "vertex-maas",
 }
 
 
@@ -355,10 +421,16 @@ class JudgeFactory:
         if key == "vertex-gemini":
             return _build_gemini_vertex(model, embedding_model, temperature, **kwargs)
 
+        if key == "vertex-maas":
+            return _build_vertex_maas_openai(model, embedding_model, temperature, **kwargs)
+
         # key == "vertex" → auto-detect from model name
         effective_model = model or os.getenv("JUDGE_MODEL") or ""
-        if "claude" in effective_model.lower() or "sonnet" in effective_model.lower():
+        model_lower = effective_model.lower()
+        if "claude" in model_lower or "sonnet" in model_lower:
             return _build_claude_vertex(model, embedding_model, temperature, **kwargs)
+        if "llama" in model_lower or "meta/" in model_lower or "-maas" in model_lower:
+            return _build_vertex_maas_openai(model, embedding_model, temperature, **kwargs)
         return _build_gemini_vertex(model, embedding_model, temperature, **kwargs)
 
 

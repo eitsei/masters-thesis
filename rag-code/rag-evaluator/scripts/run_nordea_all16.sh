@@ -2,8 +2,8 @@
 # ==============================================================================
 # Full Multi-Module Benchmark Suite on Nordea Data: 16 Configurations (C0 - C15)
 # Evaluates all 2^4 = 16 combinations of M1, M2, M3, and M4 against
-# vector_store_nordea using sample questions from sample_questions.jsonl and
-# Gemini judge (Vertex AI).
+# vector_store_nordea using nordea_100_final.jsonl (N=100) and
+# Llama 4 Scout judge via Vertex AI MaaS (OpenAI-compatible endpoint).
 # ==============================================================================
 set -euo pipefail
 
@@ -15,18 +15,16 @@ PYTHON="${PYTHON:-venv/bin/python}"
 URL="${RAG_APP_URL:-http://localhost:8080}"
 LIMIT="${LIMIT:-10}"
 TABLE_NAME="${TABLE_NAME:-vector_store_nordea}"
-DEFAULT_QUESTIONS="data/nordea/sample_questions.jsonl"
-if [ -f "data/nordea/nordea_benchmark_100.jsonl" ]; then
-  DEFAULT_QUESTIONS="data/nordea/nordea_benchmark_100.jsonl"
-fi
-QUESTIONS_FILE="${QUESTIONS_FILE:-$DEFAULT_QUESTIONS}"
-JUDGE="${JUDGE:-gemini}"
-JUDGE_MODEL="${JUDGE_MODEL:-gemini-3.5-flash-lite}"
+DEFAULT_QUESTIONS="data/nordea/nordea_100_final.jsonl"
 
-RUN_DIR="${RUN_DIR:-runs/nordea_all16}"
+QUESTIONS_FILE="${QUESTIONS_FILE:-$DEFAULT_QUESTIONS}"
+JUDGE="${JUDGE:-llama}"
+JUDGE_MODEL="${JUDGE_MODEL:-meta/llama-4-scout-17b-16e-instruct-maas}"
+
+RUN_DIR="${RUN_DIR:-runs/nordea_all16_final}"
 TABLES_DIR="${TABLES_DIR:-../../thesis/tables}"
 FIGURES_DIR="${FIGURES_DIR:-../../thesis/figures}"
-SUBFOLDER="${SUBFOLDER:-nordea_all16}"
+SUBFOLDER="${SUBFOLDER:-enterprise}"
 
 mkdir -p "$RUN_DIR"
 
@@ -49,6 +47,17 @@ fi
 # 0. Check Judge Connectivity
 echo -e "\n>>> [0/16] Verifying Judge Connectivity..."
 "$PYTHON" src/cli.py test-judge --judge "$JUDGE" --judge-model "$JUDGE_MODEL"
+
+# Warm-up: 2 unmeasured queries to eliminate JVM JIT, connection pool, and TLS
+# cold-start distortions (Thesis §4.1)
+WARMUP="${WARMUP:-2}"
+echo -e "\n>>> Executing $WARMUP unmeasured warm-up queries..."
+for i in $(seq 1 "$WARMUP"); do
+  curl -s -o /dev/null -w "  Warm-up $i: HTTP %{http_code} (%{time_total}s)\n" \
+    "${URL}/api/v1/query" \
+    -H "Content-Type: application/json" \
+    -d "{\"query\": \"warm-up query $i\", \"tableName\": \"$TABLE_NAME\"}"
+done
 
 # ------------------------------------------------------------------------------
 # Stage 0: Naive Baseline (k=0)
