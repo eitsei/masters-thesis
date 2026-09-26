@@ -1,0 +1,31 @@
+\begin{table}[!htbp]
+\centering
+\small
+\caption{Paired Wilcoxon signed-rank test results for Time to First Token (RQ1) against baseline ($C_0$).}
+\label{tab:wilcoxon_rq1_ttft}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l r r r r r r c @{}}
+\toprule
+\textbf{Configuration} & \textbf{$C_0$ Med} & \textbf{$C_k$ Med} & \textbf{$\tilde{\mu}_\Delta$} & \textbf{$W$-Stat} & \textbf{$p_{\text{raw}}$} & \textbf{$p_{\text{adj}}$} & \textbf{Sig} \\
+ & \scriptsize{(ms)} & \scriptsize{(ms)} & \scriptsize{(ms)} & & & & \\
+\midrule
+C1\_M1 & 1746.5 & 1626.5 & -153.5 & 27.0 & 1.0000 & 1.0000 & ns \\
+C2\_M2 & 1746.5 & 1605.5 & +72.0 & 26.0 & 0.9219 & 1.0000 & ns \\
+C3\_M3 & 1746.5 & 3057.5 & +1300.5 & 0.0 & 0.0020 & 0.0293 & \textbf{*} \\
+C4\_M4 & 1746.5 & 1803.5 & +10.0 & 27.0 & 1.0000 & 1.0000 & ns \\
+C5\_M1\_M2 & 1746.5 & 1626.5 & +92.0 & 22.0 & 0.6250 & 1.0000 & ns \\
+C6\_M1\_M3 & 1746.5 & 2940.5 & +1412.5 & 2.0 & 0.0059 & 0.0586 & ns \\
+C7\_M1\_M4 & 1746.5 & 1811.0 & +68.5 & 27.0 & 1.0000 & 1.0000 & ns \\
+C8\_M2\_M3 & 1746.5 & 3010.0 & +1433.5 & 0.0 & 0.0020 & 0.0293 & \textbf{*} \\
+C9\_M2\_M4 & 1746.5 & 1934.0 & +221.5 & 25.0 & 0.8457 & 1.0000 & ns \\
+C10\_M3\_M4 & 1746.5 & 3014.5 & +1581.5 & 3.0 & 0.0098 & 0.0781 & ns \\
+C11\_M1\_M2\_M3 & 1746.5 & 2946.5 & +977.0 & 2.0 & 0.0059 & 0.0586 & ns \\
+C12\_M1\_M2\_M4 & 1746.5 & 2173.5 & +400.0 & 14.0 & 0.1934 & 1.0000 & ns \\
+C13\_M1\_M3\_M4 & 1746.5 & 3672.5 & +1432.0 & 0.0 & 0.0020 & 0.0293 & \textbf{*} \\
+C14\_M2\_M3\_M4 & 1746.5 & 3481.5 & +1868.0 & 0.0 & 0.0020 & 0.0293 & \textbf{*} \\
+C15\_M1\_M2\_M3\_M4 & 1746.5 & 3308.0 & +1469.0 & 0.0 & 0.0020 & 0.0293 & \textbf{*} \\
+\bottomrule
+\end{tabular*}
+\vspace{0.5em}
+\parbox{\textwidth}{\footnotesize
+\textbf{Notes:} $\tilde{\mu}_\Delta$ represents the median paired difference ($C_k - C_0$). Two-tailed Wilcoxon signed-rank test evaluated at $\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\text{adj}}$). Significance flags: $^{***}\,p < 0.001$, $^{**}\,p < 0.01$, $^{*}\,p < 0.05$, $\text{ns}\,p \ge 0.05$.}
+\end{table}

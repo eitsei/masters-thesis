@@ -281,3 +281,12 @@ Distributed computer systems and network environments introduce numerous sources
 Practically all of the systems introduced in Section~\ref{sec:literature-review} are implemented using a very homogeneous set of programming languages, relying mostly on Python. A primary motivation of this study is to examine how these optimization concepts generalize into enterprise-standard languages and frameworks, specifically Java and Spring AI. There is also a risk that the pre-training corpus of the underlying LLMs might include academic benchmarks used in this study, potentially enabling the model to answer queries based on memorized parametric knowledge rather than retrieved context. To mitigate this issue, the standardized MuSiQue dataset~\citep{trivedi2022musique} is paired with a domain-specific synthetic customer support dataset to assess model generalizability.
 
 Furthermore, evaluating hierarchical retrieval strategies such as Small-to-Big ($M_1$) on MuSiQue poses an external validity concern due to the dataset's native structure. MuSiQue passages are inherently short, pre-segmented Wikipedia paragraphs (typically 100--150 tokens). Reconstructing 1024-token parent context windows by aggregating passages sharing the same article title introduces a synthetic document hierarchy that may not fully reflect native document continuity.
+
+% TODO: Päivitä lukuun 4 (erityisesti alilukuihin 4.4 ja 4.5.3) kuvaus Refusal Accuracysta ja False Refusal Ratesta (FRR) sekä perustelut, miksi näihin päädyttiin:
+% 1. RAGAS-metriikat (Context Precision, Context Recall, Faithfulness, Answer Relevancy) arvioivat vastauksen laatua annettujen kontekstien pohjalta.
+%    Harhautuskysymyksille (unanswerable / out-of-domain true negative), joissa järjestelmän kuuluu kieltäytyä, RAGAS laskee virheellisesti nollatulokset (0.0),
+%    mikä romahduttaa harmonisen keskiarvon (Composite Quality Q) ja vääristää laatumittauksen, vaikka järjestelmä toimi täysin oikeaoppisesti kieltäytyessään.
+% 2. Siksi RAGAS-evaluointi rajataan vain vastattavissa oleviin kysymyksiin (in-domain / answerable).
+% 3. Harhautuskysymysten ja kieltäytymiskäyttäytymisen arviointiin käytetään erillisiä turvallisuus-/pidättäytymismetriikoita:
+%    - Refusal Accuracy / Abstention Rate: Osuus harhautuskysymyksistä, joissa järjestelmä kieltäytyi oikeaoppisesti vastaamasta.
+%    - False Refusal Rate (FRR): Osuus vastattavissa olevista kysymyksistä (Ryhmä 1), joissa järjestelmä kieltäytyi virheellisesti vastaamasta, vaikka vastaus oli kontekstissa.

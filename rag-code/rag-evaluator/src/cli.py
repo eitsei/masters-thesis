@@ -32,6 +32,7 @@ from src.collector import BenchmarkCollector, StreamingBenchmarkCollector
 from src.export_latex import (
     export_benchmark_summary_latex,
     export_hop_breakdown_latex,
+    export_quality_enterprise_latex,
     export_wilcoxon_decomposed_latex,
     export_wilcoxon_tests_latex,
 )
@@ -40,11 +41,16 @@ from src.metrics import (
     RagasEvaluatorWrapper,
     compute_composite_quality,
     compute_cost,
+    compute_false_refusal_rate,
     compute_qpd,
     compute_qps,
+    compute_refusal_accuracy,
     compute_ttft,
     exact_match,
     get_pricing_tier,
+    is_refusal_answer,
+    is_refusal_ground_truth,
+    is_sample_unanswerable,
     token_f1,
 )
 from src.plot_results import (
@@ -276,37 +282,57 @@ def _process_item_metrics(
     item["stream_ms"] = stream_ms
     item["ttft_ms"] = ttft_ms
 
-    # RAGAS evaluation
-    if ragas_evaluator and ragas_evaluator.llm is not None:
-        chunks = item.get("retrievedChunks", [])
-        contexts = [c.get("snippet", c.get("text", "")) for c in chunks] if chunks else []
-        ragas_scores = ragas_evaluator.evaluate_sample(
-            question=question,
-            response=pred,
-            retrieved_contexts=contexts,
-            ground_truth=gt,
-            progress_callback=progress_callback,
-        )
-        item["faithfulness"] = ragas_scores.get("faithfulness", 0.0)
-        item["answer_relevancy"] = ragas_scores.get("answer_relevancy", 0.0)
-        item["context_precision"] = ragas_scores.get("context_precision", 0.0)
-        item["context_recall"] = ragas_scores.get("context_recall", 0.0)
-    else:
-        # Default or preserve existing scores
-        item.setdefault("faithfulness", 1.0 if em == 1.0 else f1)
-        item.setdefault("answer_relevancy", f1)
-        item.setdefault("context_precision", 1.0 if item.get("supportingEvidenceFound") else 0.5)
-        item.setdefault("context_recall", 1.0 if item.get("supportingEvidenceFound") else 0.5)
+    # Check if item is unanswerable / out-of-domain (true negative)
+    is_unans = is_sample_unanswerable(item, ground_truth=gt)
+    refused = is_refusal_answer(pred)
+    item["is_refusal"] = refused
 
-    comp_q = compute_composite_quality(
-        item["context_precision"],
-        item["context_recall"],
-        item["faithfulness"],
-        item["answer_relevancy"],
-    )
-    item["composite_quality"] = comp_q
-    item["qpd"] = compute_qpd(comp_q, cost)
-    item["qps"] = compute_qps(comp_q, tot_ms)
+    if is_unans:
+        # Refusal evaluation: do NOT invoke RAGAS for unanswerable queries
+        if progress_callback:
+            try:
+                progress_callback("ragas", "skip", "unanswerable query (refusal evaluated)")
+            except Exception:
+                pass
+        item["faithfulness"] = None
+        item["answer_relevancy"] = None
+        item["context_precision"] = None
+        item["context_recall"] = None
+        item["composite_quality"] = None
+        item["qpd"] = None
+        item["qps"] = None
+    else:
+        # RAGAS evaluation on answerable queries
+        if ragas_evaluator and ragas_evaluator.llm is not None:
+            chunks = item.get("retrievedChunks", [])
+            contexts = [c.get("text") or c.get("snippet") or "" for c in chunks] if chunks else []
+            ragas_scores = ragas_evaluator.evaluate_sample(
+                question=question,
+                response=pred,
+                retrieved_contexts=contexts,
+                ground_truth=gt,
+                progress_callback=progress_callback,
+            )
+            item["faithfulness"] = ragas_scores.get("faithfulness", 0.0)
+            item["answer_relevancy"] = ragas_scores.get("answer_relevancy", 0.0)
+            item["context_precision"] = ragas_scores.get("context_precision", 0.0)
+            item["context_recall"] = ragas_scores.get("context_recall", 0.0)
+        else:
+            # Default or preserve existing scores
+            item.setdefault("faithfulness", 1.0 if em == 1.0 else f1)
+            item.setdefault("answer_relevancy", f1)
+            item.setdefault("context_precision", 1.0 if item.get("supportingEvidenceFound") else 0.5)
+            item.setdefault("context_recall", 1.0 if item.get("supportingEvidenceFound") else 0.5)
+
+        comp_q = compute_composite_quality(
+            item["context_precision"],
+            item["context_recall"],
+            item["faithfulness"],
+            item["answer_relevancy"],
+        )
+        item["composite_quality"] = comp_q
+        item["qpd"] = compute_qpd(comp_q, cost)
+        item["qps"] = compute_qps(comp_q, tot_ms)
 
     return item
 
@@ -388,19 +414,32 @@ def _evaluate_item_with_feedback(
             progress_callback=_on_progress,
         )
 
-    f_score = processed.get("faithfulness", 0.0)
-    ar_score = processed.get("answer_relevancy", 0.0)
-    cp_score = processed.get("context_precision", 0.0)
-    cr_score = processed.get("context_recall", 0.0)
-    q_comp = processed.get("composite_quality", 0.0)
+    f_score = processed.get("faithfulness")
+    ar_score = processed.get("answer_relevancy")
+    cp_score = processed.get("context_precision")
+    cr_score = processed.get("context_recall")
+    q_comp = processed.get("composite_quality")
     tot_ms = processed.get("total_latency_ms", 0.0)
     cost = processed.get("cost_usd", 0.0)
-    console.print(
-        f"  [bold green]✓[/bold green] [{item_idx}/{total_items}] Evaluated: "
-        f"Faith=[green]{f_score:.2f}[/green] | Rel=[green]{ar_score:.2f}[/green] | "
-        f"Prec=[green]{cp_score:.2f}[/green] | Rec=[green]{cr_score:.2f}[/green] | "
-        f"Q=[yellow]{q_comp:.3f}[/yellow] | Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
-    )
+
+    if f_score is None:
+        ref_status = (
+            "[green]Refused (Correct)[/green]"
+            if processed.get("is_refusal")
+            else "[bold red]False Positive (Failed to Refuse)[/bold red]"
+        )
+        console.print(
+            f"  [bold green]✓[/bold green] [{item_idx}/{total_items}] Evaluated: "
+            f"{ref_status} | Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
+        )
+    else:
+        ref_warn = " [bold red][False Refusal][/bold red]" if processed.get("is_refusal") else ""
+        console.print(
+            f"  [bold green]✓[/bold green] [{item_idx}/{total_items}] Evaluated: "
+            f"Faith=[green]{f_score:.2f}[/green] | Rel=[green]{ar_score:.2f}[/green] | "
+            f"Prec=[green]{cp_score:.2f}[/green] | Rec=[green]{cr_score:.2f}[/green] | "
+            f"Q=[yellow]{q_comp:.3f}[/yellow]{ref_warn} | Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
+        )
     return processed
 
 
@@ -527,7 +566,7 @@ def run(
     effective_delay: float
     if judge_delay is not None:
         effective_delay = max(0.0, judge_delay)
-    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai"):
+    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai", "llama", "meta", "maas", "vertex-maas", "vertex-claude", "claude-vertex"):
         effective_delay = 1.5
     else:
         effective_delay = 0.0
@@ -572,8 +611,9 @@ def run(
     display_hop_breakdown_table(processed_records, console=console)
 
     # Save output
-    _save_jsonl(processed_records, out_path)
-    console.print(f"\n[bold green]✓ Benchmark run saved to:[/bold green] [cyan]{out_path}[/cyan]")
+    if str(out_path) not in ("/dev/null", "nul"):
+        _save_jsonl(processed_records, out_path)
+        console.print(f"\n[bold green]✓ Benchmark run saved to:[/bold green] [cyan]{out_path}[/cyan]")
 
 
 @app.command("test-judge")
@@ -635,7 +675,7 @@ def evaluate(
     effective_delay: float
     if judge_delay is not None:
         effective_delay = max(0.0, judge_delay)
-    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai"):
+    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai", "llama", "meta", "maas", "vertex-maas", "vertex-claude", "claude-vertex"):
         effective_delay = 1.5
     else:
         effective_delay = 0.0
@@ -750,6 +790,8 @@ def export_thesis(
         inp_str = str(input_target).lower()
         if "musique" in sub_str or "musique" in inp_str or "sample10" in sub_str or "sample10" in inp_str:
             dataset_name = "MuSiQue"
+        elif "enterprise_closed" in sub_str or "enterprise_closed" in inp_str or "nordea_closed" in sub_str or "nordea_closed" in inp_str:
+            dataset_name = "Enterprise Closed"
         elif "enterprise" in sub_str or "enterprise" in inp_str or "nordea" in sub_str or "nordea" in inp_str:
             dataset_name = "Enterprise"
         elif subfolder:
@@ -791,6 +833,7 @@ def export_thesis(
 
     # Wilcoxon hypothesis tests if baseline C0 is present
     baseline_key = next((k for k in run_dict.keys() if "c0" in k.lower() or "base" in k.lower()), None)
+    comparisons = None
     if baseline_key and len(run_dict) > 1:
         base_recs = run_dict[baseline_key]
         treatments = {k: v for k, v in run_dict.items() if k != baseline_key}
@@ -799,6 +842,11 @@ def export_thesis(
         console.print(f"  [green]✓[/green] Table: [cyan]{tables_dir / 'wilcoxon_tests.tex'}[/cyan]")
         export_wilcoxon_decomposed_latex(comparisons, tables_dir)
         console.print(f"  [green]✓[/green] Tables (Decomposed): [cyan]{tables_dir / 'wilcoxon_rq*.tex'}[/cyan]")
+
+    # Export modular enterprise quality table
+    if "enterprise" in (dataset_name or "").lower() or (subfolder and "enterprise" in subfolder.lower()):
+        export_quality_enterprise_latex(run_dict, tables_dir / "tab_quality_enterprise.tex", comparisons=comparisons)
+        console.print(f"  [green]✓[/green] Table: [cyan]{tables_dir / 'tab_quality_enterprise.tex'}[/cyan]")
 
     # 2. Export Publication Vector Figures
     slug_suffix = f"_{slug}" if slug else ""
@@ -964,7 +1012,7 @@ def run_questions(
     effective_delay: float
     if judge_delay is not None:
         effective_delay = max(0.0, judge_delay)
-    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai", "vertex-claude", "claude-vertex"):
+    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai", "llama", "meta", "maas", "vertex-maas", "vertex-claude", "claude-vertex"):
         effective_delay = 1.5
     else:
         effective_delay = 0.0
@@ -1069,11 +1117,18 @@ def run_questions(
             _pacing_delay_with_spinner(effective_delay, current_idx=i, total_items=len(records), console=console)
 
     if evaluated_records:
-        # Display Rich Summary Table
-        display_summary_table({table_name: evaluated_records}, console=console)
+        # Display Rich Summary and Hop Breakdown Tables
+        console.print()
+        display_summary_table({f"{table_name} [{module_label}]": evaluated_records}, console=console)
+        console.print()
+        display_hop_breakdown_table(evaluated_records, console=console)
+
         # Ensure final file is cleanly written
-        _save_jsonl(evaluated_records, out_path)
-        console.print(f"\n[bold green]✓ Evaluated results saved to:[/bold green] [cyan]{out_path}[/cyan]")
+        if str(out_path) not in ("/dev/null", "nul"):
+            _save_jsonl(evaluated_records, out_path)
+            console.print(f"\n[bold green]✓ Evaluated results saved to:[/bold green] [cyan]{out_path}[/cyan]")
+        else:
+            console.print("\n[dim]Console-only run complete (output discarded to /dev/null).[/dim]")
     else:
         console.print("[yellow]No questions were successfully evaluated.[/yellow]")
 

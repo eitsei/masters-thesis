@@ -154,6 +154,17 @@ def export_hop_breakdown_latex(
         s = summarize_run_records(h_recs)
         tier_name = f"{h}-Hop Reasoning" if h > 0 else "Out-of-Domain"
 
+        if s.get("answerable_count", 1) == 0:
+            faith_str = "--"
+            ar_str = "--"
+            cp_str = "--"
+            q_str = "--"
+        else:
+            faith_str = f"{s['faithfulness_mean']:.3f}"
+            ar_str = f"{s['answer_relevancy_mean']:.3f}"
+            cp_str = f"{s['context_precision_mean']:.3f}"
+            q_str = f"\\textbf{{{s['composite_q_mean']:.4f}}}"
+
         row = (
             f"{tier_name} & "
             f"{int(s['count'])} & "
@@ -163,10 +174,10 @@ def export_hop_breakdown_latex(
             f"\\${s['cost_mean'] * 1000.0:.3f} & "
             f"{s['em_mean'] * 100:.1f}\\% & "
             f"{s['f1_mean'] * 100:.1f}\\% & "
-            f"{s['faithfulness_mean']:.3f} & "
-            f"{s['answer_relevancy_mean']:.3f} & "
-            f"{s['context_precision_mean']:.3f} & "
-            f"\\textbf{{{s['composite_q_mean']:.4f}}} \\\\"
+            f"{faith_str} & "
+            f"{ar_str} & "
+            f"{cp_str} & "
+            f"{q_str} \\\\"
         )
         latex_lines.append(row)
 
@@ -605,4 +616,145 @@ def export_wilcoxon_decomposed_latex(
         "rq2": export_wilcoxon_rq2_cost_latex(comparisons, out_dir / "wilcoxon_rq2_cost.tex"),
         "rq3": export_wilcoxon_rq3_quality_latex(comparisons, out_dir / "wilcoxon_rq3_quality.tex"),
     }
+
+
+CONFIG_METADATA: dict[str, tuple[str, str, int]] = {
+    "C0": ("C_{0}", "Naive RAG Baseline", 0),
+    "C1": ("C_{1}", "S2B", 1),
+    "C2": ("C_{2}", "SR", 1),
+    "C3": ("C_{3}", "PC", 1),
+    "C4": ("C_{4}", "MC", 1),
+    "C5": ("C_{5}", "S2B + SR", 2),
+    "C6": ("C_{6}", "S2B + PC", 2),
+    "C7": ("C_{7}", "S2B + MC", 2),
+    "C8": ("C_{8}", "SR + PC", 2),
+    "C9": ("C_{9}", "SR + MC", 2),
+    "C10": ("C_{10}", "PC + MC", 2),
+    "C11": ("C_{11}", "S2B + SR + PC", 3),
+    "C12": ("C_{12}", "S2B + SR + MC", 3),
+    "C13": ("C_{13}", "S2B + PC + MC", 3),
+    "C14": ("C_{14}", "SR + PC + MC", 3),
+    "C15": ("C_{15}", "S2B + SR + PC + MC (Full-Stack)", 4),
+}
+
+
+def _resolve_config_info(key: str) -> tuple[str, str, int]:
+    import re
+    m = re.search(r"C(\d+)", key, re.IGNORECASE)
+    if m:
+        c_tag = f"C{m.group(1)}"
+        if c_tag in CONFIG_METADATA:
+            return CONFIG_METADATA[c_tag]
+        c_num = m.group(1)
+        tier = 0 if c_num == "0" else (1 if int(c_num) <= 4 else (2 if int(c_num) <= 10 else 3))
+        return (f"C_{{{c_num}}}", key, tier)
+    return (key, key, 0)
+
+
+def export_quality_enterprise_latex(
+    run_dict: Mapping[str, Sequence[Mapping[str, Any]]],
+    output_path: Path | str = "thesis/tables/enterprise/tab_quality_enterprise.tex",
+    comparisons: Sequence[WilcoxonComparison] | None = None,
+    label: str = "tab:quality_enterprise",
+    caption: str = "Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline configurations on the Enterprise Knowledge Corpus ($N = 100$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$).",
+) -> str:
+    """Exports modular Enterprise quality LaTeX table with Refusal Acc. / FRR (%) column."""
+    target_path = Path(output_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    sig_map: dict[str, str] = {}
+    if comparisons:
+        for c in comparisons:
+            if c.target_rq == "RQ3" and "Composite Quality" in c.metric_name:
+                sig_map[c.config_name] = c.significance
+
+    # Precompute summary for all configs
+    summaries = {}
+    for name, recs in run_dict.items():
+        summaries[name] = summarize_run_records(recs)
+
+    best_q = max((s["composite_q_mean"] for s in summaries.values() if s), default=0.0)
+
+    latex_lines = [
+        r"\begin{table}[htbp]",
+        r"\centering",
+        r"\scriptsize",
+        r"\setlength{\tabcolsep}{2.2pt}",
+        f"\\caption{{{caption}}}",
+        f"\\label{{{label}}}",
+        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c c c @{}}",
+        r"\toprule",
+        r"\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Refusal Acc. /}\\\textbf{FRR (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\",
+        r"\midrule",
+    ]
+
+    current_tier = None
+    for name in run_dict.keys():
+        s = summaries[name]
+        if not s:
+            continue
+        cid_tex, pipe_name, tier = _resolve_config_info(name)
+        tier_group = 3 if tier >= 3 else tier
+        if tier_group != current_tier:
+            current_tier = tier_group
+            if tier_group == 0:
+                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Baseline ($k=0$)}} \\")
+            elif tier_group == 1:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
+            elif tier_group == 2:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\")
+            elif tier_group == 3:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\")
+
+        q_val = s["composite_q_mean"]
+        q_fmt = f"{q_val:.4f}"
+        if abs(q_val - best_q) < 1e-6 and best_q > 0:
+            q_str = f"\\textbf{{{q_fmt}}}"
+        else:
+            q_str = q_fmt
+
+        # Match significance flag
+        sig = sig_map.get(name, "")
+        if not sig:
+            for k_sig, v_sig in sig_map.items():
+                if name in k_sig or k_sig in name or cid_tex in k_sig:
+                    sig = v_sig
+                    break
+        if sig and tier > 0:
+            q_str += f"\\textsuperscript{{{sig}}}"
+
+        ref_acc_str = f"{s['refusal_accuracy'] * 100.0:.1f}\\%"
+        frr_str = f"{s['false_refusal_rate'] * 100.0:.1f}\\%"
+        ref_cell = f"{ref_acc_str} / {frr_str}"
+
+        row = (
+            f"${cid_tex}$ & {pipe_name} & "
+            f"{s['context_precision_mean']:.3f} & "
+            f"{s['context_recall_mean']:.3f} & "
+            f"{s['faithfulness_mean']:.3f} & "
+            f"{s['answer_relevancy_mean']:.3f} & "
+            f"{ref_cell} & "
+            f"{q_str} \\\\"
+        )
+        latex_lines.append(row)
+
+    latex_lines.extend(
+        [
+            r"\bottomrule",
+            r"\end{tabular*}",
+            r"\vspace{0.5em}",
+            r"\parbox{\linewidth}{\footnotesize",
+            r"\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Refusal Accuracy evaluates correct abstention on unanswerable out-of-domain (OOD) queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
+            r"\end{table}",
+            "",
+        ]
+    )
+
+    content = "\n".join(latex_lines)
+    target_path.write_text(content, encoding="utf-8")
+    return content
+
 

@@ -14,12 +14,17 @@ from src.metrics import (
     PricingTier,
     compute_composite_quality,
     compute_cost,
+    compute_false_refusal_rate,
     compute_latency_percentiles,
     compute_qpd,
     compute_qps,
+    compute_refusal_accuracy,
     compute_total_latency,
     compute_ttft,
     exact_match,
+    is_refusal_answer,
+    is_refusal_ground_truth,
+    is_sample_unanswerable,
     normalize_answer,
     token_f1,
 )
@@ -321,3 +326,109 @@ def test_compute_qps():
 def test_compute_qps_zero_latency():
     assert math.isinf(compute_qps(0.9, 0.0))
     assert compute_qps(0.0, 0.0) == 0.0
+
+
+# =====================================================================
+# Refusal Accuracy & False Refusal Rate (FRR) Tests
+# =====================================================================
+
+
+def test_is_refusal_answer_finnish():
+    assert is_refusal_answer("Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.")
+    assert is_refusal_answer("Valitettavasti annettu konteksti ei sisällä riittävästi tietoa.")
+    assert is_refusal_answer("Aineisto ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.")
+    assert not is_refusal_answer("Nordea perustettiin vuonna 1820.")
+
+
+def test_is_refusal_answer_english():
+    assert is_refusal_answer("The provided context does not contain sufficient information to answer this query.")
+    assert is_refusal_answer("Unfortunately, the context does not contain sufficient information.")
+    assert is_refusal_answer("The context does not contain sufficient information to answer this query.")
+    assert not is_refusal_answer("Operating profit increased by 14 percent.")
+
+
+def test_is_refusal_ground_truth():
+    assert is_refusal_ground_truth("Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.")
+    assert is_refusal_ground_truth("The provided context does not contain sufficient information to answer this query.")
+    assert not is_refusal_ground_truth("Pääomavaatimus on 15,2 prosenttia.")
+
+
+def test_is_sample_unanswerable():
+    # Explicit answerable flag
+    assert is_sample_unanswerable({"answerable": False})
+    assert not is_sample_unanswerable({"answerable": True, "groundTruthAnswer": "Vastaus"})
+
+    # OOD ID prefix
+    assert is_sample_unanswerable(sample_id="ood__q012")
+    assert is_sample_unanswerable(sample_id="ood_financial_01")
+    assert not is_sample_unanswerable(sample_id="mhop__q005")
+
+    # Ground truth refusal
+    assert is_sample_unanswerable(ground_truth="Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.")
+    assert not is_sample_unanswerable(ground_truth="Nordea Bank Oyj")
+
+
+def test_compute_refusal_accuracy():
+    preds = [
+        "Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.",
+        "Nordea tarjoaa asuntolainoja.",  # failed to refuse
+        "The provided context does not contain sufficient information to answer this query.",
+    ]
+    gts = [
+        "Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.",
+        "Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.",
+        "The provided context does not contain sufficient information to answer this query.",
+    ]
+    # 2 out of 3 refused correctly -> 2/3 = 0.6667
+    acc = compute_refusal_accuracy(preds, gts)
+    assert math.isclose(acc, 2.0 / 3.0, rel_tol=1e-5)
+
+
+def test_compute_refusal_accuracy_with_flags():
+    preds = ["Refusal", "Answer A", "Refusal"]
+    gts = ["Answer X", "Answer Y", "Answer Z"]
+    flags = [False, True, False]  # 0 and 2 are unanswerable
+
+    # Unanswerable: index 0 (refusal) and index 2 (refusal) -> 2/2 = 1.0
+    acc = compute_refusal_accuracy(
+        predictions=["Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.", "Kyllä", "The provided context does not contain sufficient information to answer this query."],
+        ground_truths=gts,
+        answerable_flags=flags,
+    )
+    assert acc == 1.0
+
+
+def test_compute_refusal_accuracy_no_unanswerable():
+    # When all queries are answerable, returns 1.0
+    acc = compute_refusal_accuracy(["Ans"], ["Ans"], answerable_flags=[True])
+    assert acc == 1.0
+
+
+def test_compute_false_refusal_rate():
+    preds = [
+        "Nordea perustettiin vuonna 1820.",
+        "Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.",  # false refusal!
+        "Liikevoitto kasvoi 10 %.",
+        "The provided context does not contain sufficient information to answer this query.",  # false refusal!
+    ]
+    gts = [
+        "1820",
+        "Pääomavaatimus on 15%",
+        "10%",
+        "Osinko oli 0.92 euroa",
+    ]
+    # 4 answerable queries, 2 false refusals -> 2/4 = 0.5 (50%)
+    frr = compute_false_refusal_rate(preds, gts)
+    assert math.isclose(frr, 0.5, rel_tol=1e-5)
+
+
+def test_compute_false_refusal_rate_zero():
+    preds = ["1820", "15%"]
+    gts = ["1820", "15%"]
+    assert compute_false_refusal_rate(preds, gts) == 0.0
+
+
+def test_compute_false_refusal_rate_no_answerable():
+    # When no answerable queries exist, returns 0.0
+    assert compute_false_refusal_rate([], [], answerable_flags=[]) == 0.0
+

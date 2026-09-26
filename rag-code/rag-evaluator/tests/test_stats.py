@@ -291,3 +291,53 @@ def test_batch_compare_configurations_family_scope():
     min_metric = min(c.p_adjusted for c in comps_metric)
     min_global = min(c.p_adjusted for c in comps_global)
     assert min_global >= min_metric
+
+
+def test_compare_paired_runs_with_unanswerable_samples():
+    # 8 answerable queries, 2 unanswerable queries (ood__ prefix)
+    baseline_records = [
+        {
+            "questionId": f"q_{i}" if i < 8 else f"ood__q_{i}",
+            "answerable": i < 8,
+            "total_latency_ms": 200.0 + i,
+            "cost_usd": 0.005,
+            "composite_quality": 0.80 if i < 8 else None,
+            "faithfulness": 0.85 if i < 8 else None,
+            "answer_relevancy": 0.85 if i < 8 else None,
+            "context_precision": 0.85 if i < 8 else None,
+            "context_recall": 0.85 if i < 8 else None,
+        }
+        for i in range(10)
+    ]
+    treatment_records = [
+        {
+            "questionId": f"q_{i}" if i < 8 else f"ood__q_{i}",
+            "answerable": i < 8,
+            "total_latency_ms": 150.0 + i,
+            "cost_usd": 0.002,
+            "composite_quality": 0.88 if i < 8 else None,
+            "faithfulness": 0.90 if i < 8 else None,
+            "answer_relevancy": 0.90 if i < 8 else None,
+            "context_precision": 0.90 if i < 8 else None,
+            "context_recall": 0.90 if i < 8 else None,
+        }
+        for i in range(10)
+    ]
+
+    comps = compare_paired_runs(
+        baseline_records,
+        treatment_records,
+        config_name="C1",
+        metrics_to_test=["total_latency_ms", "cost_usd", "composite_quality", "faithfulness"],
+    )
+
+    comp_dict = {c.metric_name: c for c in comps}
+
+    # Latency and cost include all 10 pairs
+    assert comp_dict["End-to-End Latency (ms)"].n_pairs == 10
+    assert comp_dict["Operational Cost ($)"].n_pairs == 10
+
+    # RAGAS quality metrics exclude the 2 unanswerable pairs -> 8 pairs
+    assert comp_dict["Composite Quality Q"].n_pairs == 8
+    assert comp_dict["Faithfulness"].n_pairs == 8
+

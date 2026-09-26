@@ -89,6 +89,7 @@ class TestJudgeFactoryCreation:
         monkeypatch.delenv("GOOGLE_CLOUD_LOCATION", raising=False)
         monkeypatch.delenv("ANTHROPIC_VERTEX_LOCATION", raising=False)
         monkeypatch.delenv("JUDGE_MODEL", raising=False)
+        monkeypatch.delenv("JUDGE_EMBEDDING_MODEL", raising=False)
 
         with patch("langchain_google_vertexai.model_garden.ChatAnthropicVertex") as mock_chat, \
              patch("langchain_google_vertexai.VertexAIEmbeddings") as mock_emb:
@@ -109,6 +110,7 @@ class TestJudgeFactoryCreation:
     def test_vertex_provider_with_claude_sonnet_5(self, monkeypatch):
         monkeypatch.setenv("GOOGLE_CLOUD_PROJECT_ID", "test-vertex-project")
         monkeypatch.setenv("ANTHROPIC_VERTEX_LOCATION", "europe-west1")
+        monkeypatch.delenv("JUDGE_EMBEDDING_MODEL", raising=False)
 
         with patch("langchain_google_vertexai.model_garden.ChatAnthropicVertex") as mock_chat, \
              patch("langchain_google_vertexai.VertexAIEmbeddings") as mock_emb:

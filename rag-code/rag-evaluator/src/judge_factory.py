@@ -148,8 +148,53 @@ def _patch_ragas_pydantic_json_parsing() -> None:
         return
 
     try:
+        import json as py_json
         import re
         import ragas.prompt.pydantic_prompt as pp
+
+        orig_extract_json = pp.extract_json
+
+        def robust_extract_json(text: str) -> str:
+            # 1. Search for markdown code blocks (```json ... ``` or ``` ... ```)
+            code_blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
+            for block in reversed(code_blocks):
+                b = block.strip()
+                if "{" in b and "}" in b:
+                    sub = b[b.find("{") : b.rfind("}") + 1]
+                    try:
+                        py_json.loads(sub)
+                        return sub
+                    except Exception:
+                        pass
+                elif "[" in b and "]" in b:
+                    sub = b[b.find("[") : b.rfind("]") + 1]
+                    try:
+                        py_json.loads(sub)
+                        return sub
+                    except Exception:
+                        pass
+
+            # 2. Search for exterior JSON delimiters from right to left (final answer is at end)
+            for end_idx in range(len(text) - 1, -1, -1):
+                if text[end_idx] in ("}", "]"):
+                    close_ch = text[end_idx]
+                    open_ch = "{" if close_ch == "}" else "["
+                    count = 0
+                    for start_idx in range(end_idx, -1, -1):
+                        if text[start_idx] == close_ch:
+                            count += 1
+                        elif text[start_idx] == open_ch:
+                            count -= 1
+                            if count == 0:
+                                candidate = text[start_idx : end_idx + 1]
+                                try:
+                                    py_json.loads(candidate)
+                                    return candidate
+                                except Exception:
+                                    break
+            return orig_extract_json(text)
+
+        pp.extract_json = robust_extract_json
 
         orig_generate_multiple = pp.PydanticPrompt.generate_multiple
 
@@ -182,6 +227,107 @@ def _patch_ragas_pydantic_json_parsing() -> None:
         _RAGAS_JSON_PATCHED = True
     except Exception as exc:
         logger.debug(f"Failed to patch RAGAS PydanticPrompt JSON parsing: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# RAGAS LangchainLLMWrapper patch (forces bypass_n for candidateCount=1 models)
+# ---------------------------------------------------------------------------
+
+_RAGAS_WRAPPER_PATCHED = False
+
+
+def _patch_ragas_langchain_wrapper() -> None:
+    """Patches LangchainLLMWrapper to default bypass_n=True.
+
+    Vertex AI endpoints (including Model Garden MaaS for Llama and standard Gemini)
+    strictly require candidateCount=1 and reject requests with n > 1 with a 400 Bad Request.
+    By setting bypass_n=True, Ragas generates multiple samples (e.g. for AnswerRelevancy
+    strictness=3) using multiple single-prompt requests instead of requesting n completions
+    in a single payload.
+    """
+    global _RAGAS_WRAPPER_PATCHED
+    if _RAGAS_WRAPPER_PATCHED:
+        return
+
+    try:
+        from ragas.llms.base import LangchainLLMWrapper
+
+        orig_init = LangchainLLMWrapper.__init__
+
+        def _patched_init(self, *args, **kwargs):
+            if "bypass_n" not in kwargs:
+                kwargs["bypass_n"] = True
+            orig_init(self, *args, **kwargs)
+            self.bypass_n = True
+
+        LangchainLLMWrapper.__init__ = _patched_init
+        _RAGAS_WRAPPER_PATCHED = True
+    except Exception as exc:
+        logger.debug(f"Failed to patch LangchainLLMWrapper: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# ChatOpenAI Event Loop Patch (recreates AsyncOpenAI client across event loops)
+# ---------------------------------------------------------------------------
+
+_CHAT_OPENAI_PATCHED = False
+
+
+def _patch_chat_openai_event_loop() -> None:
+    """Patches langchain_openai.ChatOpenAI to recreate its AsyncOpenAI client
+    when invoked across separate asyncio event loops (standard in RAGAS single_turn_score).
+
+    Without this patch, the underlying httpx.AsyncClient and connection pool remain bound
+    to the event loop of the first metric, causing 'RuntimeError: Event loop is closed'
+    and 'openai.APIConnectionError: Connection error.' on subsequent metrics.
+    """
+    global _CHAT_OPENAI_PATCHED
+    if _CHAT_OPENAI_PATCHED:
+        return
+
+    try:
+        import asyncio
+        import httpx
+        import openai
+        from langchain_openai import ChatOpenAI
+
+        orig_agenerate = ChatOpenAI._agenerate
+
+        async def _safe_agenerate(self, *args, **kwargs):
+            current_loop = asyncio.get_running_loop()
+            client_loop = getattr(self, "_active_loop", None)
+            if client_loop is None or client_loop.is_closed() or client_loop is not current_loop:
+                timeout = self.request_timeout or 120.0
+                auth = getattr(self, "_google_auth", None)
+                if auth is None and hasattr(self, "http_client"):
+                    auth = getattr(self.http_client, "auth", None)
+
+                fresh_http_client = httpx.AsyncClient(
+                    auth=auth,
+                    timeout=httpx.Timeout(timeout, connect=10.0),
+                )
+                client_params = {
+                    "api_key": (self.openai_api_key.get_secret_value() if self.openai_api_key else None),
+                    "organization": self.openai_organization,
+                    "base_url": self.openai_api_base,
+                    "timeout": timeout,
+                    "default_headers": self.default_headers,
+                    "default_query": self.default_query,
+                    "http_client": fresh_http_client,
+                }
+                if self.max_retries is not None:
+                    client_params["max_retries"] = self.max_retries
+
+                self.root_async_client = openai.AsyncOpenAI(**client_params)
+                self.async_client = self.root_async_client.chat.completions
+                self._active_loop = current_loop
+
+            return await orig_agenerate(self, *args, **kwargs)
+
+        ChatOpenAI._agenerate = _safe_agenerate
+        _CHAT_OPENAI_PATCHED = True
+    except Exception as exc:
+        logger.debug(f"Failed to patch ChatOpenAI event loop handling: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -391,15 +537,41 @@ def _build_vertex_maas_openai(
         f"/projects/{project}/locations/{maas_location}/endpoints/openapi"
     )
 
+    import httpx
+
+    # Dynamic GCP token refresh for long-running benchmarks (> 1 hour)
+    class _GoogleVertexAuth(httpx.Auth):
+        def __init__(self, creds: Any) -> None:
+            self.creds = creds
+
+        def auth_flow(self, request: httpx.Request):
+            if not self.creds.valid:
+                self.creds.refresh(Request())
+            request.headers["Authorization"] = f"Bearer {self.creds.token}"
+            yield request
+
+        async def async_auth_flow(self, request: httpx.Request):
+            if not self.creds.valid:
+                self.creds.refresh(Request())
+            request.headers["Authorization"] = f"Bearer {self.creds.token}"
+            yield request
+
+    auth = _GoogleVertexAuth(credentials)
+    http_client = kwargs.pop("http_client", None) or httpx.Client(auth=auth)
+    http_async_client = kwargs.pop("http_async_client", None) or httpx.AsyncClient(auth=auth)
+
     llm = ChatOpenAI(
         model=judge_model,
         base_url=base_url,
-        api_key=credentials.token,
+        api_key=credentials.token or "placeholder",
+        http_client=http_client,
+        http_async_client=http_async_client,
         temperature=temperature,
         max_tokens=max_tokens,
         max_retries=2,
         **kwargs,
     )
+    llm._google_auth = auth
     embeddings = VertexAIEmbeddings(
         model_name=emb_model,
         project=project,
@@ -456,6 +628,8 @@ class JudgeFactory:
         """
         selected = (provider or os.getenv("JUDGE_PROVIDER") or "claude").strip().lower()
         _patch_ragas_pydantic_json_parsing()
+        _patch_ragas_langchain_wrapper()
+        _patch_chat_openai_event_loop()
         key = _PROVIDER_ALIASES.get(selected)
         if key is None:
             raise ValueError(

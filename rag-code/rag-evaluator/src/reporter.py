@@ -21,6 +21,8 @@ from src.metrics import (
     compute_latency_percentiles,
     compute_qpd,
     compute_qps,
+    is_refusal_answer,
+    is_sample_unanswerable,
 )
 from src.stats import WilcoxonComparison
 
@@ -96,6 +98,42 @@ def _extract_metric_values(records: Sequence[Mapping[str, Any]], key: str) -> li
     return vals
 
 
+def _extract_valid_metric_values(records: Sequence[Mapping[str, Any]], key: str) -> list[float]:
+    """Extracts non-None, valid float values for a given metric key from a sequence of records."""
+    vals: list[float] = []
+    for r in records:
+        v = None
+        if key in r:
+            v = r[key]
+        elif "metrics" in r and isinstance(r["metrics"], dict) and key in r["metrics"]:
+            v = r["metrics"][key]
+
+        if v is None:
+            alias_map = {
+                "faithfulness": ["faith"],
+                "answer_relevancy": ["ar", "answer_relevance"],
+                "context_precision": ["cp"],
+                "context_recall": ["cr"],
+                "composite_quality": ["composite_q", "quality", "Q"],
+            }
+            for alias in alias_map.get(key, []):
+                if alias in r:
+                    v = r[alias]
+                    break
+                if "metrics" in r and isinstance(r["metrics"], dict) and alias in r["metrics"]:
+                    v = r["metrics"][alias]
+                    break
+
+        if v is not None:
+            try:
+                f = float(v)
+                if not math.isnan(f):
+                    vals.append(f)
+            except (ValueError, TypeError):
+                pass
+    return vals
+
+
 def summarize_run_records(records: Sequence[Mapping[str, Any]]) -> dict[str, float]:
     """Computes aggregate summary metrics for a collection of query records."""
     if not records:
@@ -107,27 +145,59 @@ def summarize_run_records(records: Sequence[Mapping[str, Any]]) -> dict[str, flo
     costs = _extract_metric_values(records, "cost_usd")
     ems = _extract_metric_values(records, "exact_match")
     f1s = _extract_metric_values(records, "token_f1")
-    faiths = _extract_metric_values(records, "faithfulness")
-    ars = _extract_metric_values(records, "answer_relevancy")
-    cps = _extract_metric_values(records, "context_precision")
-    crs = _extract_metric_values(records, "context_recall")
     tokens = _extract_metric_values(records, "total_tokens")
 
     mean_cost = float(np.mean(costs)) if costs else 0.0
     mean_em = float(np.mean(ems)) if ems else 0.0
     mean_f1 = float(np.mean(f1s)) if f1s else 0.0
+    mean_tokens = float(np.mean(tokens)) if tokens else 0.0
+
+    # Partition records into answerable vs unanswerable (harhautuskysymykset)
+    ans_records = [r for r in records if not is_sample_unanswerable(r)]
+    unans_records = [r for r in records if is_sample_unanswerable(r)]
+
+    # Refusal Accuracy / Abstention Rate: evaluated over unanswerable queries
+    if unans_records:
+        corr_refusals = 0
+        for r in unans_records:
+            pred = str(r.get("generatedAnswer") or r.get("response") or r.get("answer") or "")
+            if is_refusal_answer(pred):
+                corr_refusals += 1
+        refusal_acc = float(corr_refusals / len(unans_records))
+    else:
+        refusal_acc = 1.0
+
+    # False Refusal Rate (FRR): evaluated over answerable queries
+    if ans_records:
+        false_refusals = 0
+        for r in ans_records:
+            pred = str(r.get("generatedAnswer") or r.get("response") or r.get("answer") or "")
+            if is_refusal_answer(pred):
+                false_refusals += 1
+        frr = float(false_refusals / len(ans_records))
+    else:
+        frr = 0.0
+
+    # RAGAS metrics evaluated STRICTLY on answerable records
+    faiths = _extract_valid_metric_values(ans_records, "faithfulness")
+    ars = _extract_valid_metric_values(ans_records, "answer_relevancy")
+    cps = _extract_valid_metric_values(ans_records, "context_precision")
+    crs = _extract_valid_metric_values(ans_records, "context_recall")
+
     mean_faith = float(np.mean(faiths)) if faiths else 0.0
     mean_ar = float(np.mean(ars)) if ars else 0.0
     mean_cp = float(np.mean(cps)) if cps else 0.0
     mean_cr = float(np.mean(crs)) if crs else 0.0
-    mean_tokens = float(np.mean(tokens)) if tokens else 0.0
 
-    # Composite Q from aggregate means or average of individual composite Q
-    comp_qs = _extract_metric_values(records, "composite_quality")
-    if comp_qs and any(q > 0 for q in comp_qs):
-        mean_comp_q = float(np.mean(comp_qs))
-    else:
+    # Composite Q from answerable records (filtering out any legacy poisoned 0.0003 values)
+    comp_qs = _extract_valid_metric_values(ans_records, "composite_quality")
+    valid_comp_qs = [q for q in comp_qs if q > 0.001]
+    if valid_comp_qs:
+        mean_comp_q = float(np.mean(valid_comp_qs))
+    elif ans_records and (mean_cp > 0 or mean_cr > 0 or mean_faith > 0 or mean_ar > 0):
         mean_comp_q = compute_composite_quality(mean_cp, mean_cr, mean_faith, mean_ar)
+    else:
+        mean_comp_q = 0.0
 
     mean_lat = lat_stats["mean"]
     qpd = compute_qpd(mean_comp_q, mean_cost)
@@ -135,6 +205,8 @@ def summarize_run_records(records: Sequence[Mapping[str, Any]]) -> dict[str, flo
 
     return {
         "count": float(len(records)),
+        "answerable_count": float(len(ans_records)),
+        "unanswerable_count": float(len(unans_records)),
         "latency_mean": lat_stats["mean"],
         "latency_p50": lat_stats["p50"],
         "latency_p95": lat_stats["p95"],
@@ -147,6 +219,8 @@ def summarize_run_records(records: Sequence[Mapping[str, Any]]) -> dict[str, flo
         "context_precision_mean": mean_cp,
         "context_recall_mean": mean_cr,
         "composite_q_mean": mean_comp_q,
+        "refusal_accuracy": refusal_acc,
+        "false_refusal_rate": frr,
         "qpd": qpd,
         "qps": qps,
     }
@@ -180,6 +254,7 @@ def display_summary_table(
     table.add_column("CP", justify="right")
     table.add_column("CR", justify="right")
     table.add_column("Comp Q", justify="right", style="bold yellow")
+    table.add_column("Refusal / FRR", justify="right", style="magenta")
     table.add_column("QPD", justify="right")
     table.add_column("QPS", justify="right")
 
@@ -197,6 +272,7 @@ def display_summary_table(
 
         qpd_str = "∞" if math.isinf(s["qpd"]) else f"{s['qpd']:.1f}"
         qps_str = "∞" if math.isinf(s["qps"]) else f"{s['qps']:.3f}"
+        ref_frr_str = f"{s['refusal_accuracy'] * 100:.1f}% / {s['false_refusal_rate'] * 100:.1f}%"
 
         table.add_row(
             name,
@@ -212,6 +288,7 @@ def display_summary_table(
             f"{s['context_precision_mean']:.3f}",
             f"{s['context_recall_mean']:.3f}",
             f"{s['composite_q_mean']:.4f}",
+            ref_frr_str,
             qpd_str,
             qps_str,
         )
@@ -248,6 +325,7 @@ def display_hop_breakdown_table(
     table.add_column("CP", justify="right")
     table.add_column("CR", justify="right")
     table.add_column("Comp Q", justify="right", style="bold yellow")
+    table.add_column("Refusal / FRR", justify="right", style="magenta")
 
     # Partition by hopCount
     hop_groups: dict[int, list[Mapping[str, Any]]] = {}
@@ -267,6 +345,21 @@ def display_hop_breakdown_table(
         s = summarize_run_records(h_records)
         label = f"{h}-Hop Questions" if h > 0 else "Unknown / Out-of-Domain"
 
+        if s.get("answerable_count", 0) == 0:
+            faith_s = "--"
+            ar_s = "--"
+            cp_s = "--"
+            cr_s = "--"
+            q_s = "--"
+            ref_s = f"{s['refusal_accuracy'] * 100:.1f}% / --"
+        else:
+            faith_s = f"{s['faithfulness_mean']:.3f}"
+            ar_s = f"{s['answer_relevancy_mean']:.3f}"
+            cp_s = f"{s['context_precision_mean']:.3f}"
+            cr_s = f"{s['context_recall_mean']:.3f}"
+            q_s = f"{s['composite_q_mean']:.4f}"
+            ref_s = f"-- / {s['false_refusal_rate'] * 100:.1f}%"
+
         table.add_row(
             label,
             str(int(s["count"])),
@@ -276,11 +369,12 @@ def display_hop_breakdown_table(
             f"${s['cost_mean'] * 1000.0:.3f}",
             f"{s['em_mean'] * 100:.1f}%",
             f"{s['f1_mean'] * 100:.1f}%",
-            f"{s['faithfulness_mean']:.3f}",
-            f"{s['answer_relevancy_mean']:.3f}",
-            f"{s['context_precision_mean']:.3f}",
-            f"{s['context_recall_mean']:.3f}",
-            f"{s['composite_q_mean']:.4f}",
+            faith_s,
+            ar_s,
+            cp_s,
+            cr_s,
+            q_s,
+            ref_s,
         )
 
     # Overall Row
@@ -301,6 +395,7 @@ def display_hop_breakdown_table(
             f"{overall_s['context_precision_mean']:.3f}",
             f"{overall_s['context_recall_mean']:.3f}",
             f"{overall_s['composite_q_mean']:.4f}",
+            f"{overall_s['refusal_accuracy'] * 100:.1f}% / {overall_s['false_refusal_rate'] * 100:.1f}%",
         )
 
     c.print(table)

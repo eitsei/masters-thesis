@@ -44,7 +44,9 @@ def get_judge_components(
         embedding_model=embedding_model,
     )
 
-    llm_wrapper = LangchainLLMWrapper(raw_llm) if raw_llm is not None else None
+    llm_wrapper = LangchainLLMWrapper(raw_llm, bypass_n=True) if raw_llm is not None else None
+    if llm_wrapper is not None:
+        llm_wrapper.bypass_n = True
     emb_wrapper = LangchainEmbeddingsWrapper(raw_embeddings) if raw_embeddings is not None else None
     return llm_wrapper, emb_wrapper
 

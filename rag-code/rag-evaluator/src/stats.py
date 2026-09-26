@@ -210,7 +210,21 @@ def _extract_metric_series(
     aliases = METRIC_ALIASES.get(metric_key, [metric_key])
     keys_to_try = [metric_key] + [a for a in aliases if a != metric_key]
 
+    from src.metrics import is_sample_unanswerable
+
+    is_ragas_metric = metric_key in (
+        "faithfulness",
+        "answer_relevancy",
+        "context_precision",
+        "context_recall",
+        "composite_quality",
+    )
+
     for r in records:
+        if is_ragas_metric and is_sample_unanswerable(r):
+            series.append(float("nan"))
+            continue
+
         val = None
 
         # 1. Direct top-level check

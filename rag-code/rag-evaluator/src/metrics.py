@@ -463,6 +463,8 @@ class RagasEvaluatorWrapper:
         delay_seconds: float = 0.0,
     ) -> None:
         self.llm = llm
+        if self.llm is not None and hasattr(self.llm, "bypass_n"):
+            self.llm.bypass_n = True
         self.embeddings = embeddings
         self.delay_seconds = delay_seconds
 
@@ -552,3 +554,136 @@ class RagasEvaluatorWrapper:
             }
 
         return scores
+
+
+# =====================================================================
+# Refusal & Abstention Metrics (Out-of-Domain / Unanswerable Handling)
+# =====================================================================
+
+CANONICAL_REFUSAL_PHRASES_FI: tuple[str, ...] = (
+    "annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi",
+    "ei sisällä riittävästi tietoa kysymykseen vastaamiseksi",
+    "ei sisällä riittävästi tietoa",
+    "aineisto ei sisällä riittävästi tietoa kysymykseen vastaamiseksi",
+    "aineisto ei sisällä riittävästi tietoa",
+)
+
+CANONICAL_REFUSAL_PHRASES_EN: tuple[str, ...] = (
+    "the provided context does not contain sufficient information to answer this query",
+    "does not contain sufficient information to answer this query",
+    "does not contain sufficient information",
+    "the context does not contain sufficient information",
+)
+
+
+def is_refusal_answer(text: str | None) -> bool:
+    """Checks whether the response contains a canonical refusal to answer."""
+    if not text:
+        return False
+    norm = normalize_answer(text)
+    for phrase in CANONICAL_REFUSAL_PHRASES_FI:
+        if normalize_answer(phrase) in norm:
+            return True
+    for phrase in CANONICAL_REFUSAL_PHRASES_EN:
+        if normalize_answer(phrase) in norm:
+            return True
+    return False
+
+
+def is_refusal_ground_truth(text: str | None) -> bool:
+    """Checks whether the reference ground truth specifies a refusal."""
+    return is_refusal_answer(text)
+
+
+def is_sample_unanswerable(
+    record_or_item: Mapping[str, Any] | None = None,
+    ground_truth: str = "",
+    sample_id: str = "",
+) -> bool:
+    """Determines whether a benchmark item is unanswerable / out-of-domain true negative."""
+    if record_or_item is not None:
+        # Explicit boolean flag in MuSiQue / benchmark schema
+        if "answerable" in record_or_item and record_or_item["answerable"] is False:
+            return True
+        gt = (
+            record_or_item.get("groundTruthAnswer")
+            or record_or_item.get("reference")
+            or record_or_item.get("answer")
+            or ground_truth
+        )
+        sid = (
+            str(record_or_item.get("id", ""))
+            or str(record_or_item.get("sample_id", ""))
+            or sample_id
+        )
+    else:
+        gt = ground_truth
+        sid = sample_id
+
+    if is_refusal_ground_truth(gt):
+        return True
+    if sid.startswith("ood__") or sid.startswith("ood_"):
+        return True
+
+    return False
+
+
+def compute_refusal_accuracy(
+    predictions: Sequence[str],
+    ground_truths: Sequence[str],
+    answerable_flags: Sequence[bool] | None = None,
+) -> float:
+    """Computes Refusal Accuracy / Abstention Rate for unanswerable queries.
+
+    Refusal Accuracy = N_correct_refusal / N_unanswerable
+    Returns 1.0 (100%) if there are no unanswerable queries in the sample.
+    """
+    total_unanswerable = 0
+    correct_refusals = 0
+    for i, gt in enumerate(ground_truths):
+        is_unans = (
+            not answerable_flags[i]
+            if answerable_flags is not None and i < len(answerable_flags)
+            else is_refusal_ground_truth(gt)
+        )
+        if is_unans:
+            total_unanswerable += 1
+            pred = predictions[i] if i < len(predictions) else ""
+            if is_refusal_answer(pred):
+                correct_refusals += 1
+
+    if total_unanswerable == 0:
+        return 1.0
+    return float(correct_refusals / total_unanswerable)
+
+
+def compute_false_refusal_rate(
+    predictions: Sequence[str],
+    ground_truths: Sequence[str],
+    answerable_flags: Sequence[bool] | None = None,
+) -> float:
+    """Computes False Refusal Rate (FRR) for answerable queries.
+
+    FRR = N_false_refusals / N_answerable
+    where a false refusal occurs when the model refuses to answer despite the answer
+    being present in the reference context.
+    Returns 0.0 (0%) if there are no answerable queries in the sample.
+    """
+    total_answerable = 0
+    false_refusals = 0
+    for i, gt in enumerate(ground_truths):
+        is_ans = (
+            answerable_flags[i]
+            if answerable_flags is not None and i < len(answerable_flags)
+            else not is_refusal_ground_truth(gt)
+        )
+        if is_ans:
+            total_answerable += 1
+            pred = predictions[i] if i < len(predictions) else ""
+            if is_refusal_answer(pred):
+                false_refusals += 1
+
+    if total_answerable == 0:
+        return 0.0
+    return float(false_refusals / total_answerable)
+
