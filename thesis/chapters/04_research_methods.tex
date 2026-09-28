@@ -220,7 +220,7 @@ where $K$ is the total number of retrieved context chunks, $v_k \in \{0, 1\}$ re
 \text{Context Recall} = \frac{|\text{Ground Truth Sentences Attributed to Context}|}{|\text{Total Sentences in Ground Truth}|}
 \end{equation}
 
-In edge cases where the reference ground truth contains no factual statements (e.g., in valid out-of-domain queries), Context Recall defaults to $1.0$ to prevent division by zero.
+Because Context Recall requires verifiable reference statements, unanswerable and out-of-domain queries containing no factual claims are excluded from recall calculations and instead evaluated under the abstention framework detailed below (Equations~\ref{eq:refusal_accuracy} and~\ref{eq:false_refusal_rate}).
 
 \paragraph{Faithfulness.} Faithfulness measures the factual consistency of the generated response against retrieved context $R_q$, penalizing ungrounded hallucinations~\citep{es2024ragas}:
 
@@ -229,7 +229,7 @@ In edge cases where the reference ground truth contains no factual statements (e
 \text{Faithfulness} = \frac{|\text{Claims in Answer Inferred from Context}|}{|\text{Total Claims in Generated Answer}|}
 \end{equation}
 
-For valid refusals where the generated answer contains no affirmative factual claims, Faithfulness defaults to $1.0$.
+Similarly, valid refusals contain no factual claims to evaluate and score 0 in standard Faithfulness. Therefore, unanswerable queries are excluded and evaluated separately via Refusal Accuracy (Equation~\ref{eq:refusal_accuracy}).
 
 \paragraph{Answer Relevancy.} Answer Relevancy quantifies how directly the generated response addresses the user's initial prompt, penalizing incomplete answers or extraneous verbosity~\citep{es2024ragas}:
 
@@ -249,19 +249,25 @@ Q(q) = \frac{4}{\frac{1}{\text{CP}(q) + \epsilon} + \frac{1}{\text{CR}(q) + \eps
 
 where $\text{CP}(q)$, $\text{CR}(q)$, $\text{Faith}(q)$, and $\text{AR}(q)$ denote Context Precision, Context Recall, Faithfulness, and Answer Relevancy for query $q$, respectively, and $\epsilon = 10^{-4}$ is a minimal smoothing parameter introduced to guarantee numerical stability and penalize catastrophic failures in any single quality dimension.
 
-In addition to RAGAS\cite{es2024ragas} metrics, Refusal accuracy and False Refusal Rates is calculated to test the pipelines capability to capture non-answerable and out-of-domain questions. These metrics have been chosen as the RAGAS falsely scores true refusals with 0, even though the behavior is expected. In these questions, RAGAS metrics has NaN value and are not included in the calculations.
+In addition to the standard RAGAS dimensions, Refusal Accuracy and False Refusal Rate (FRR) are evaluated to quantify the capability of each pipeline to handle non-answerable and out-of-domain queries. This dual-metric formulation addresses an inherent limitation of reference-free RAG evaluation suites~\citep{es2024ragas}: when a pipeline correctly abstains from answering an unanswerable query by emitting the standardized refusal string, generation-level RAGAS metrics (particularly Faithfulness and Answer Relevancy) falsely score zero due to the absence of affirmative factual claims. To preserve evaluation integrity, RAGAS quality metrics ($CP$, $CR$, $\text{Faith}$, and $AR$) as well as the Composite Quality score $Q(q)$ (Equation~\ref{eq:composite_quality}) are computed exclusively over the answerable query partition $Q_{\text{ans}}$, while abstention behavior is evaluated using Equations~\ref{eq:refusal_accuracy} and~\ref{eq:false_refusal_rate}.
 
-\paragraph{Refusal accuracy}
-
-\begin{equation}
-\label{eq:rafusal_accuracy}    
-\end{equation}
-
-\paragraph{False Refusal Rates}
+\paragraph{Refusal Accuracy.} Refusal Accuracy measures the proportion of unanswerable or out-of-domain queries ($Q_{\text{unans}}$) for which the pipeline correctly abstains by returning the predefined refusal response:
 
 \begin{equation}
-\label{eq:false_refusal_rate}    
+\label{eq:refusal_accuracy}
+\text{Refusal Accuracy} = \frac{1}{|Q_{\text{unans}}|} \sum_{q \in Q_{\text{unans}}} \mathbb{I}_{\text{refusal}}(q)
 \end{equation}
+
+where $\mathbb{I}_{\text{refusal}}(q) \in \{0, 1\}$ denotes an indicator function evaluating to 1 if the generated response matches canonical refusal semantics, and 0 otherwise.
+
+\paragraph{False Refusal Rate (FRR).} Conversely, an overly conservative pipeline may reject legitimate questions for which sufficient context is available. The False Refusal Rate measures the frequency of erroneous abstentions over the answerable query partition ($Q_{\text{ans}}$):
+
+\begin{equation}
+\label{eq:false_refusal_rate}
+\text{FRR} = \frac{1}{|Q_{\text{ans}}|} \sum_{q \in Q_{\text{ans}}} \mathbb{I}_{\text{refusal}}(q)
+\end{equation}
+
+Minimizing FRR while maximizing Refusal Accuracy ensures that hallucination mitigation does not compromise system availability for valid enterprise customer requests.
 
 \subsubsection{Pareto Frontier and Trade-off Equilibrium}
 \label{sec:pareto}
