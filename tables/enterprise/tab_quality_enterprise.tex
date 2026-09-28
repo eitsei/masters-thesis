@@ -6,34 +6,34 @@
 \label{tab:quality_enterprise}
 \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c c c @{}}
 \toprule
-\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Rejection Acc. /}\\\textbf{Refusal $F_1$ (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\
+\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Refusal Acc. /}\\\textbf{FRR (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\
 \midrule
 \multicolumn{8}{l}{\textbf{Baseline ($k=0$)}} \\
-$C_{0}$ & Naive RAG Baseline & 0.693 & 0.917 & 0.750 & 0.631 & 100.0\% / 100.0\% & 0.6831 \\
+$C_{0}$ & Naive RAG Baseline & 0.866 & 0.896 & 0.938 & 0.788 & 100.0\% / 0.0\% & 0.8538 \\
 \midrule
 \multicolumn{8}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-$C_{1}$ & S2B & 0.745 & 1.000 & 0.794 & 0.650 & 100.0\% / 100.0\% & \textbf{0.7355}\textsuperscript{ns} \\
-$C_{2}$ & SR & 0.659 & 0.917 & 0.800 & 0.632 & 100.0\% / 100.0\% & 0.6599\textsuperscript{ns} \\
-$C_{3}$ & PC & 0.641 & 0.917 & 0.149 & 0.820 & \phantom{00}0.0\% / \phantom{00}1.1\% & 0.2251\textsuperscript{ns} \\
-$C_{4}$ & MC & 0.682 & 0.917 & 0.694 & 0.536 & 100.0\% / 100.0\% & 0.6001\textsuperscript{ns} \\
+$C_{1}$ & S2B & 0.931 & 1.000 & 0.993 & 0.812 & 100.0\% / 0.0\% & \textbf{0.9193}\textsuperscript{ns} \\
+$C_{2}$ & SR & 0.793 & 0.896 & 1.000 & 0.790 & 100.0\% / 0.0\% & 0.8249\textsuperscript{ns} \\
+$C_{3}$ & PC & 0.801 & 0.896 & 0.187 & 0.824 & 0.0\% / 0.0\% & 0.3750\textsuperscript{ns} \\
+$C_{4}$ & MC & 0.853 & 0.896 & 0.868 & 0.670 & 100.0\% / 12.5\% & 0.8573\textsuperscript{ns} \\
 \midrule
 \multicolumn{8}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\
-$C_{5}$ & S2B + SR & 0.783 & 0.933 & 0.790 & 0.653 & 100.0\% / 100.0\% & 0.7311\textsuperscript{ns} \\
-$C_{6}$ & S2B + PC & 0.750 & 1.000 & 0.141 & 0.824 & \phantom{00}0.0\% / \phantom{00}1.0\% & 0.2649\textsuperscript{ns} \\
-$C_{7}$ & S2B + MC & 0.750 & 1.000 & 0.788 & 0.638 & 100.0\% / 100.0\% & 0.7315\textsuperscript{ns} \\
-$C_{8}$ & SR + PC & 0.649 & 0.917 & 0.065 & 0.818 & \phantom{00}0.0\% / \phantom{00}1.2\% & 0.1404\textsuperscript{ns} \\
-$C_{9}$ & SR + MC & 0.690 & 0.917 & 0.800 & 0.646 & 100.0\% / 100.0\% & 0.6943\textsuperscript{ns} \\
-$C_{10}$ & PC + MC & 0.651 & 0.917 & 0.166 & 0.829 & \phantom{00}0.0\% / \phantom{00}1.1\% & 0.2456\textsuperscript{ns} \\
+$C_{5}$ & S2B + SR & 0.979 & 0.917 & 0.988 & 0.817 & 100.0\% / 0.0\% & 0.9139\textsuperscript{ns} \\
+$C_{6}$ & S2B + PC & 0.937 & 1.000 & 0.176 & 0.827 & 0.0\% / 0.0\% & 0.4413\textsuperscript{ns} \\
+$C_{7}$ & S2B + MC & 0.937 & 1.000 & 0.984 & 0.797 & 100.0\% / 0.0\% & 0.9143\textsuperscript{ns} \\
+$C_{8}$ & SR + PC & 0.811 & 0.896 & 0.082 & 0.811 & 0.0\% / 0.0\% & 0.4674\textsuperscript{ns} \\
+$C_{9}$ & SR + MC & 0.862 & 0.896 & 1.000 & 0.808 & 100.0\% / 0.0\% & 0.8679\textsuperscript{ns} \\
+$C_{10}$ & PC + MC & 0.814 & 0.896 & 0.208 & 0.823 & 0.0\% / 0.0\% & 0.6135\textsuperscript{ns} \\
 \midrule
 \multicolumn{8}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\
-$C_{11}$ & S2B + SR + PC & 0.783 & 0.933 & 0.149 & 0.832 & \phantom{00}0.0\% / \phantom{00}1.1\% & 0.3096\textsuperscript{ns} \\
-$C_{12}$ & S2B + SR + MC & 0.758 & 0.933 & 0.788 & 0.637 & 100.0\% / 100.0\% & 0.7191\textsuperscript{ns} \\
-$C_{13}$ & S2B + PC + MC & 0.745 & 1.000 & 0.237 & 0.821 & \phantom{00}0.0\% / \phantom{00}1.0\% & 0.3203\textsuperscript{ns} \\
-$C_{14}$ & SR + PC + MC & 0.651 & 0.917 & 0.080 & 0.816 & \phantom{00}0.0\% / \phantom{00}1.2\% & 0.1545\textsuperscript{ns} \\
-$C_{15}$ & S2B + SR + PC + MC (Full-Stack) & 0.843 & 0.926 & 0.327 & 0.817 & \phantom{00}0.0\% / \phantom{00}1.5\% & 0.4253\textsuperscript{ns} \\
+$C_{11}$ & S2B + SR + PC & 0.979 & 0.917 & 0.187 & 0.835 & 0.0\% / 0.0\% & 0.4422\textsuperscript{ns} \\
+$C_{12}$ & S2B + SR + MC & 0.948 & 0.917 & 0.984 & 0.796 & 100.0\% / 0.0\% & 0.8989\textsuperscript{ns} \\
+$C_{13}$ & S2B + PC + MC & 0.931 & 1.000 & 0.296 & 0.814 & 0.0\% / 0.0\% & 0.6403\textsuperscript{ns} \\
+$C_{14}$ & SR + PC + MC & 0.814 & 0.896 & 0.100 & 0.817 & 0.0\% / 0.0\% & 0.3858\textsuperscript{ns} \\
+$C_{15}$ & S2B + SR + PC + MC (Full-Stack) & 0.948 & 0.917 & 0.368 & 0.823 & 0.0\% / 0.0\% & 0.6378\textsuperscript{ns} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
 \parbox{\linewidth}{\footnotesize
-\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas}. Rejection Accuracy evaluates adherence in refusing unanswerable out-of-domain (OOD) queries, with Refusal $F_1$ assessing lexical precision against reference refusal templates. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
+\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Refusal Accuracy evaluates correct abstention on unanswerable out-of-domain (OOD) queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
 \end{table}
