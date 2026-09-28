@@ -95,24 +95,28 @@ class MusiqueBenchmarkControllerTest {
     @Test
     void getStats_returnsSummaryMap() throws Exception {
         when(datasetService.getDatasetStats()).thenReturn(Map.of(
-                "totalQuestions", 2417,
-                "twoHopCount", 1252L,
-                "threeHopCount", 760L,
-                "fourHopCount", 405L,
+                "totalQuestions", 4834,
+                "twoHopCount", 2504L,
+                "threeHopCount", 1520L,
+                "fourHopCount", 810L,
+                "answerableCount", 2417L,
+                "unanswerableCount", 2417L,
                 "canonicalSampleSize", 100,
-                "datasetPath", "data/musique/musique_ans_v1.0_dev.jsonl"
+                "datasetPath", "data/musique/musique_full_v1.0_dev.jsonl"
         ));
 
         mockMvc.perform(get("/api/benchmark/musique/stats"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalQuestions").value(2417))
-                .andExpect(jsonPath("$.twoHopCount").value(1252))
+                .andExpect(jsonPath("$.totalQuestions").value(4834))
+                .andExpect(jsonPath("$.twoHopCount").value(2504))
+                .andExpect(jsonPath("$.answerableCount").value(2417))
+                .andExpect(jsonPath("$.unanswerableCount").value(2417))
                 .andExpect(jsonPath("$.canonicalSampleSize").value(100));
     }
 
     @Test
     void ingest_triggersIngestionAndReturnsSummary() throws Exception {
-        when(datasetService.ingest(eq(true), eq(100)))
+        when(datasetService.ingest(eq(true), eq(100), eq("original"), eq(false)))
                 .thenReturn(new MusiqueIngestionSummary(100, 1619, 17, 350L));
 
         mockMvc.perform(post("/api/benchmark/musique/ingest")
@@ -123,7 +127,25 @@ class MusiqueBenchmarkControllerTest {
                 .andExpect(jsonPath("$.questionsProcessed").value(100))
                 .andExpect(jsonPath("$.uniqueParagraphsIngested").value(1619))
                 .andExpect(jsonPath("$.batches").value(17))
-                .andExpect(jsonPath("$.durationMs").value(350));
+                .andExpect(jsonPath("$.durationMs").value(350))
+                .andExpect(jsonPath("$.databaseCleared").value(false));
+    }
+
+    @Test
+    void ingest_withQueryParamsAndClearDatabase() throws Exception {
+        when(datasetService.ingest(eq(true), eq(50), eq("original"), eq(true)))
+                .thenReturn(new MusiqueIngestionSummary(50, 800, 800, 750, 1200, 45, 1200L, "original", true));
+
+        mockMvc.perform(post("/api/benchmark/musique/ingest?mode=original&clearDatabase=true&sampleOnly=true&sampleSize=50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.mode").value("original"))
+                .andExpect(jsonPath("$.databaseCleared").value(true))
+                .andExpect(jsonPath("$.questionsProcessed").value(50))
+                .andExpect(jsonPath("$.uniqueParagraphsIngested").value(800))
+                .andExpect(jsonPath("$.baselineChunksWritten").value(800))
+                .andExpect(jsonPath("$.parentChunksWritten").value(750))
+                .andExpect(jsonPath("$.childChunksWritten").value(1200));
     }
 
     @Test

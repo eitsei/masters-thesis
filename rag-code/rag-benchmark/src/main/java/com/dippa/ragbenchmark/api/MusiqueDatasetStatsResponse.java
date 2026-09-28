@@ -7,6 +7,8 @@ public record MusiqueDatasetStatsResponse(
         long twoHopCount,
         long threeHopCount,
         long fourHopCount,
+        long answerableCount,
+        long unanswerableCount,
         int canonicalSampleSize,
         String datasetPath
 ) {
@@ -16,6 +18,8 @@ public record MusiqueDatasetStatsResponse(
                 (Long) map.getOrDefault("twoHopCount", 0L),
                 (Long) map.getOrDefault("threeHopCount", 0L),
                 (Long) map.getOrDefault("fourHopCount", 0L),
+                (Long) map.getOrDefault("answerableCount", 0L),
+                (Long) map.getOrDefault("unanswerableCount", 0L),
                 (Integer) map.getOrDefault("canonicalSampleSize", 100),
                 (String) map.getOrDefault("datasetPath", "")
         );

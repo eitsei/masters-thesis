@@ -79,15 +79,37 @@ public class MusiqueBenchmarkController {
 
     /**
      * Ingests paragraphs from MuSiQue questions into the pgvector store.
+     * Supports clearing tables prior to ingestion and composite modes (e.g. "original" running both baseline and S2B).
      */
     @PostMapping("/ingest")
-    public ResponseEntity<MusiqueIngestResponse> ingest(@RequestBody(required = false) MusiqueIngestRequest request) {
-        boolean sampleOnly = request == null || request.isSampleOnly();
-        int sampleSize = request != null && request.sampleSize() != null ? request.sampleSize() : 0;
+    public ResponseEntity<MusiqueIngestResponse> ingest(
+            @RequestBody(required = false) MusiqueIngestRequest request,
+            @RequestParam(required = false) String mode,
+            @RequestParam(required = false, defaultValue = "false") boolean clearDatabase,
+            @RequestParam(required = false) Boolean sampleOnly,
+            @RequestParam(required = false) Integer sampleSize) {
+        String effectiveMode = (request != null && request.mode() != null && !request.mode().isBlank())
+                ? request.mode().toLowerCase(java.util.Locale.ROOT)
+                : (mode != null && !mode.isBlank() ? mode.toLowerCase(java.util.Locale.ROOT) : "original");
 
-        MusiqueIngestionSummary summary = (request != null && request.mode() != null)
-                ? datasetService.ingest(sampleOnly, sampleSize, request.mode())
-                : datasetService.ingest(sampleOnly, sampleSize);
+        boolean effectiveClearDb = (request != null && request.clearDatabase() != null)
+                ? request.shouldClearDatabase()
+                : clearDatabase;
+
+        boolean effectiveSampleOnly = (request != null && request.sampleOnly() != null)
+                ? request.isSampleOnly()
+                : (sampleOnly == null || sampleOnly);
+
+        int effectiveSampleSize = (request != null && request.sampleSize() != null)
+                ? request.sampleSize()
+                : (sampleSize != null && sampleSize > 0 ? sampleSize : 0);
+
+        MusiqueIngestionSummary summary = datasetService.ingest(
+                effectiveSampleOnly,
+                effectiveSampleSize,
+                effectiveMode,
+                effectiveClearDb
+        );
         return ResponseEntity.ok(MusiqueIngestResponse.fromSummary(summary));
     }
 

@@ -21,11 +21,12 @@ class MusiqueDatasetReaderTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         properties = new MusiqueDatasetProperties(
-                "data/musique/musique_ans_v1.0_dev.jsonl",
+                "data/musique/musique_full_v1.0_dev.jsonl",
                 100,
                 0.40,
-                0.30,
-                0.30,
+                0.20,
+                0.20,
+                0.20,
                 42L,
                 100,
                 true
@@ -68,6 +69,31 @@ class MusiqueDatasetReaderTest {
     }
 
     @Test
+    void parseLine_standardizesUnanswerableQuestion() {
+        String json = """
+                {
+                  "id": "2hop__153573_109006",
+                  "paragraphs": [
+                    {"idx": 0, "title": "History of the Internet", "paragraph_text": "Precursors...", "is_supporting": false}
+                  ],
+                  "question": "Who developed the character?",
+                  "question_decomposition": [],
+                  "answer": "Walt Disney",
+                  "answer_aliases": [],
+                  "answerable": false
+                }
+                """;
+
+        MusiqueQuestion question = reader.parseLine(json);
+
+        assertThat(question).isNotNull();
+        assertThat(question.id()).isEqualTo("2hop__153573_109006");
+        assertThat(question.answerable()).isFalse();
+        assertThat(question.answer()).isEqualTo(MusiqueDatasetReader.CANONICAL_REFUSAL_EN);
+        assertThat(question.answerAliases()).contains("does not contain sufficient information to answer this query");
+    }
+
+    @Test
     void extractHopCount_handles3hopAnd4hopPrefixes() {
         MusiqueQuestion q3 = reader.parseLine("{\"id\": \"3hop1__1234_5678\", \"question\": \"q\", \"answer\": \"a\", \"paragraphs\": []}");
         MusiqueQuestion q4 = reader.parseLine("{\"id\": \"4hop2__9999_8888\", \"question\": \"q\", \"answer\": \"a\", \"paragraphs\": []}");
@@ -81,7 +107,7 @@ class MusiqueDatasetReaderTest {
         List<MusiqueQuestion> all = reader.loadAll();
 
         assertThat(all).isNotEmpty();
-        assertThat(all.size()).isGreaterThanOrEqualTo(2000);
+        assertThat(all.size()).isGreaterThanOrEqualTo(4000);
 
         // Second call should return same cached reference
         List<MusiqueQuestion> secondCall = reader.loadAll();
@@ -89,18 +115,39 @@ class MusiqueDatasetReaderTest {
     }
 
     @Test
-    void getStratifiedSample_returnsExactDistributionAndIsDeterministic() {
-        List<MusiqueQuestion> sample1 = reader.getStratifiedSample(100, 0.40, 0.30, 0.30, 42L);
-        List<MusiqueQuestion> sample2 = reader.getStratifiedSample(100, 0.40, 0.30, 0.30, 42L);
+    void getCanonicalBenchmarkSample_returnsTargetDistribution() {
+        List<MusiqueQuestion> sample = reader.getCanonicalBenchmarkSample();
 
-        assertThat(sample1).hasSize(100);
+        assertThat(sample).hasSize(100);
 
-        Map<Integer, Long> hopCounts = sample1.stream()
+        long answerableCount = sample.stream().filter(MusiqueQuestion::answerable).count();
+        long unanswerableCount = sample.stream().filter(q -> !q.answerable()).count();
+
+        assertThat(answerableCount).isEqualTo(80L);
+        assertThat(unanswerableCount).isEqualTo(20L);
+
+        Map<Integer, Long> ansHopCounts = sample.stream()
+                .filter(MusiqueQuestion::answerable)
                 .collect(Collectors.groupingBy(MusiqueQuestion::hopCount, Collectors.counting()));
 
-        assertThat(hopCounts.get(2)).isEqualTo(40L);
-        assertThat(hopCounts.get(3)).isEqualTo(30L);
-        assertThat(hopCounts.get(4)).isEqualTo(30L);
+        assertThat(ansHopCounts.get(2)).isEqualTo(40L);
+        assertThat(ansHopCounts.get(3)).isEqualTo(20L);
+        assertThat(ansHopCounts.get(4)).isEqualTo(20L);
+
+        // Verify unanswerable questions have canonical refusal ground truth
+        List<MusiqueQuestion> unanswerable = sample.stream().filter(q -> !q.answerable()).toList();
+        for (MusiqueQuestion q : unanswerable) {
+            assertThat(q.answer()).isEqualTo(MusiqueDatasetReader.CANONICAL_REFUSAL_EN);
+            assertThat(q.answerAliases()).contains("does not contain sufficient information to answer this query");
+        }
+    }
+
+    @Test
+    void getStratifiedSample_returnsExactDistributionAndIsDeterministic() {
+        List<MusiqueQuestion> sample1 = reader.getStratifiedSample(100, 0.40, 0.20, 0.20, 0.20, 42L);
+        List<MusiqueQuestion> sample2 = reader.getStratifiedSample(100, 0.40, 0.20, 0.20, 0.20, 42L);
+
+        assertThat(sample1).hasSize(100);
 
         // Deterministic reproduction
         List<String> ids1 = sample1.stream().map(MusiqueQuestion::id).toList();
@@ -115,5 +162,23 @@ class MusiqueDatasetReaderTest {
 
         MusiqueQuestion found = reader.findById(expectedId).orElseThrow();
         assertThat(found.id()).isEqualTo(expectedId);
+    }
+
+    @Test
+    void exportCanonicalBenchmarkSampleToFile() throws Exception {
+        List<MusiqueQuestion> sample = reader.getCanonicalBenchmarkSample();
+        assertThat(sample).hasSize(100);
+
+        java.nio.file.Path outPath = java.nio.file.Path.of("..", "rag-evaluator", "data", "musique", "musique_100_final.jsonl");
+        if (java.nio.file.Files.exists(outPath.getParent())) {
+            try (var writer = java.nio.file.Files.newBufferedWriter(outPath, java.nio.charset.StandardCharsets.UTF_8)) {
+                for (MusiqueQuestion q : sample) {
+                    com.dippa.ragbenchmark.api.MusiqueQuestionResponse resp =
+                            com.dippa.ragbenchmark.api.MusiqueQuestionResponse.fromDomain(q);
+                    writer.write(objectMapper.writeValueAsString(resp));
+                    writer.newLine();
+                }
+            }
+        }
     }
 }

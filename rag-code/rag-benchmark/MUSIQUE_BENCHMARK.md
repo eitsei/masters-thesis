@@ -37,21 +37,37 @@ curl -s http://localhost:8080/api/benchmark/musique/stats | jq .
 
 ### 2. Ingest Dataset Paragraphs into pgvector
 
-Before running queries, populate the vector store (`vector_store_test`) with paragraphs:
+Before running queries, populate the vector store tables with paragraphs. The ingestion pipeline supports composite ingestion (`mode: original` runs both standard baseline and Small-to-Big hierarchical chunking) as well as table clearing (`clearDatabase=true`):
 
-#### Option A: Canonical Benchmark Sample (Recommended, 100 Questions / ~1,700 Paragraphs)
+#### Method A: Using the CLI Helper Script (Recommended)
 ```bash
-curl -X POST http://localhost:8080/api/benchmark/musique/ingest \
-  -H "Content-Type: application/json" \
-  -d '{"sampleOnly": true, "sampleSize": 100}'
+# Ingest canonical 100 questions into both baseline and S2B tables with database reset:
+./scripts/ingest_musique.sh original true
+
+# Ingest without resetting tables:
+./scripts/ingest_musique.sh original false
+
+# Ingest only baseline table or only S2B tables:
+./scripts/ingest_musique.sh baseline true
+./scripts/ingest_musique.sh s2b true
 ```
 
-#### Option B: Full Dataset Ingestion (~2,400 Questions / ~48,000 Paragraphs)
+#### Method B: Triggering via REST API (`POST /api/ingest/musique` or `/api/benchmark/musique/ingest`)
 ```bash
-curl -X POST http://localhost:8080/api/benchmark/musique/ingest \
+# Reset database and ingest both baseline and S2B (canonical 100 questions):
+curl -X POST "http://localhost:8080/api/ingest/musique?mode=original&clearDatabase=true" \
+  -H "Content-Type: application/json"
+
+# Ingest full dataset (~2,400 questions) into both baseline and S2B tables:
+curl -X POST http://localhost:8080/api/ingest/musique \
   -H "Content-Type: application/json" \
-  -d '{"sampleOnly": false}'
+  -d '{"mode": "original", "clearDatabase": true, "sampleOnly": false}'
 ```
+
+**Target Tables Populated:**
+- `vector_store_musique`: Standard baseline paragraphs (~1,600 deduplicated Wikipedia passages).
+- `vector_store_musique_large`: Small-to-Big parent context chunks (1024 tokens).
+- `vector_store_musique_small`: Small-to-Big child search chunks (128 tokens, linked to parent).
 
 ---
 
@@ -139,10 +155,11 @@ curl -X POST http://localhost:8080/api/query \
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/benchmark/musique/stats` | Dataset hop breakdown, sample sizes, and file paths. |
-| `GET` | `/api/benchmark/musique/sample` | 100-question canonical evaluation sample (stratified 40% 2-hop, 30% 3-hop, 30% 4-hop). |
+| `GET` | `/api/benchmark/musique/sample` | 100-question canonical evaluation sample (stratified 40% 2-hop, 20% 3-hop, 20% 4-hop, 20% unanswerable). |
 | `GET` | `/api/benchmark/musique/questions` | List questions with query parameters (`offset`, `limit`, `hops`, `sample`). |
 | `GET` | `/api/benchmark/musique/questions/{id}` | Full detail for a single question including decomposition steps and paragraphs. |
-| `POST` | `/api/benchmark/musique/ingest` | Ingest paragraph corpus into pgvector (`{"sampleOnly": true, "sampleSize": 100}`). |
+| `POST` | `/api/benchmark/musique/ingest` | Ingest corpus into pgvector (`mode`: `original`/`baseline`/`s2b`, `clearDatabase`: `true`/`false`). |
+| `POST` | `/api/ingest/musique` | Alias endpoint matching `/api/ingest/nordea-closed` convention. |
 | `POST` | `/api/benchmark/musique/questions/{id}/query` | Evaluate pipeline on question `{id}`, comparing generated answer to ground truth. |
 | `POST` | `/api/query` | Standard RAG pipeline execution for arbitrary text queries. |
 

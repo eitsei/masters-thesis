@@ -35,6 +35,15 @@ public class MusiqueDatasetReader {
 
     private static final Logger logger = LoggerFactory.getLogger(MusiqueDatasetReader.class);
 
+    public static final String CANONICAL_REFUSAL_EN =
+            "The provided context does not contain sufficient information to answer this query.";
+
+    public static final List<String> CANONICAL_REFUSAL_ALIASES_EN = List.of(
+            "does not contain sufficient information to answer this query",
+            "the context does not contain sufficient information",
+            "does not contain sufficient information"
+    );
+
     private final MusiqueDatasetProperties properties;
     private final ObjectMapper objectMapper;
     private final ResourceLoader resourceLoader;
@@ -94,36 +103,91 @@ public class MusiqueDatasetReader {
     }
 
     /**
-     * Produces a reproducible stratified sample matching the specified hop ratios and random seed.
+     * Produces a reproducible stratified sample matching the specified hop ratios, unanswerable ratio, and random seed.
      */
-    public List<MusiqueQuestion> getStratifiedSample(int sampleSize, double twoHopRatio, double threeHopRatio, double fourHopRatio, long seed) {
+    public List<MusiqueQuestion> getStratifiedSample(
+            int sampleSize,
+            double twoHopRatio,
+            double threeHopRatio,
+            double fourHopRatio,
+            double unanswerableRatio,
+            long seed) {
         List<MusiqueQuestion> all = loadAll();
         if (all.isEmpty()) {
             return List.of();
         }
 
-        Map<Integer, List<MusiqueQuestion>> byHop = all.stream()
-                .collect(Collectors.groupingBy(MusiqueQuestion::hopCount));
-
-        List<MusiqueQuestion> twoHopPool = new ArrayList<>(byHop.getOrDefault(2, List.of()));
-        List<MusiqueQuestion> threeHopPool = new ArrayList<>(byHop.getOrDefault(3, List.of()));
-        List<MusiqueQuestion> fourHopPool = new ArrayList<>(byHop.getOrDefault(4, List.of()));
+        List<MusiqueQuestion> answerableQuestions = all.stream().filter(MusiqueQuestion::answerable).toList();
+        List<MusiqueQuestion> unanswerableQuestions = all.stream().filter(q -> !q.answerable()).toList();
 
         Random random = new Random(seed);
-        Collections.shuffle(twoHopPool, random);
-        Collections.shuffle(threeHopPool, random);
-        Collections.shuffle(fourHopPool, random);
 
-        int count2 = (int) Math.round(sampleSize * twoHopRatio);
-        int count3 = (int) Math.round(sampleSize * threeHopRatio);
-        int count4 = sampleSize - count2 - count3;
+        int countUnanswerable = (int) Math.round(sampleSize * unanswerableRatio);
+        if (unanswerableQuestions.isEmpty()) {
+            countUnanswerable = 0;
+        }
+
+        int targetAnswerable = sampleSize - countUnanswerable;
+        double totalAnswerableRatio = twoHopRatio + threeHopRatio + fourHopRatio;
+        if (totalAnswerableRatio <= 0.0) {
+            totalAnswerableRatio = 1.0;
+        }
+
+        int count2 = (int) Math.round(targetAnswerable * (twoHopRatio / totalAnswerableRatio));
+        int count3 = (int) Math.round(targetAnswerable * (threeHopRatio / totalAnswerableRatio));
+        int count4 = targetAnswerable - count2 - count3;
+
+        Map<Integer, List<MusiqueQuestion>> ansByHop = answerableQuestions.stream()
+                .collect(Collectors.groupingBy(MusiqueQuestion::hopCount));
+
+        List<MusiqueQuestion> ans2Pool = new ArrayList<>(ansByHop.getOrDefault(2, List.of()));
+        List<MusiqueQuestion> ans3Pool = new ArrayList<>(ansByHop.getOrDefault(3, List.of()));
+        List<MusiqueQuestion> ans4Pool = new ArrayList<>(ansByHop.getOrDefault(4, List.of()));
+
+        Collections.shuffle(ans2Pool, random);
+        Collections.shuffle(ans3Pool, random);
+        Collections.shuffle(ans4Pool, random);
 
         List<MusiqueQuestion> sample = new ArrayList<>(sampleSize);
-        sample.addAll(twoHopPool.stream().limit(count2).toList());
-        sample.addAll(threeHopPool.stream().limit(count3).toList());
-        sample.addAll(fourHopPool.stream().limit(count4).toList());
+        sample.addAll(ans2Pool.stream().limit(count2).toList());
+        sample.addAll(ans3Pool.stream().limit(count3).toList());
+        sample.addAll(ans4Pool.stream().limit(count4).toList());
+
+        if (countUnanswerable > 0 && !unanswerableQuestions.isEmpty()) {
+            Map<Integer, List<MusiqueQuestion>> unansByHop = unanswerableQuestions.stream()
+                    .collect(Collectors.groupingBy(MusiqueQuestion::hopCount));
+
+            List<MusiqueQuestion> unans2Pool = new ArrayList<>(unansByHop.getOrDefault(2, List.of()));
+            List<MusiqueQuestion> unans3Pool = new ArrayList<>(unansByHop.getOrDefault(3, List.of()));
+            List<MusiqueQuestion> unans4Pool = new ArrayList<>(unansByHop.getOrDefault(4, List.of()));
+
+            Collections.shuffle(unans2Pool, random);
+            Collections.shuffle(unans3Pool, random);
+            Collections.shuffle(unans4Pool, random);
+
+            // Stratify unanswerable queries across hop depths (40% 2-hop, 30% 3-hop, 30% 4-hop)
+            int unans2 = (int) Math.round(countUnanswerable * 0.40);
+            int unans3 = (int) Math.round(countUnanswerable * 0.30);
+            int unans4 = countUnanswerable - unans2 - unans3;
+
+            sample.addAll(unans2Pool.stream().limit(unans2).toList());
+            sample.addAll(unans3Pool.stream().limit(unans3).toList());
+            sample.addAll(unans4Pool.stream().limit(unans4).toList());
+        }
 
         return Collections.unmodifiableList(sample);
+    }
+
+    /**
+     * Backward-compatible overload for pure answerable hop stratification.
+     */
+    public List<MusiqueQuestion> getStratifiedSample(
+            int sampleSize,
+            double twoHopRatio,
+            double threeHopRatio,
+            double fourHopRatio,
+            long seed) {
+        return getStratifiedSample(sampleSize, twoHopRatio, threeHopRatio, fourHopRatio, 0.0, seed);
     }
 
     /**
@@ -135,6 +199,7 @@ public class MusiqueDatasetReader {
                 properties.twoHopRatio(),
                 properties.threeHopRatio(),
                 properties.fourHopRatio(),
+                properties.unanswerableRatio(),
                 properties.randomSeed()
         );
     }
@@ -200,6 +265,11 @@ public class MusiqueDatasetReader {
                 for (JsonNode alias : aliasesNode) {
                     aliases.add(alias.asText());
                 }
+            }
+
+            if (!answerable) {
+                answer = CANONICAL_REFUSAL_EN;
+                aliases = new ArrayList<>(CANONICAL_REFUSAL_ALIASES_EN);
             }
 
             List<MusiqueParagraph> paragraphs = new ArrayList<>();

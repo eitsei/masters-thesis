@@ -111,11 +111,12 @@ rag:
         - jina-reranker-v2
   dataset:
     musique:
-      file-path: ${MUSIQUE_DATASET_PATH:data/musique/musique_ans_v1.0_dev.jsonl}
+      file-path: ${MUSIQUE_DATASET_PATH:data/musique/musique_full_v1.0_dev.jsonl}
       sample-size: 100
       two-hop-ratio: 0.40
-      three-hop-ratio: 0.30
-      four-hop-ratio: 0.30
+      three-hop-ratio: 0.20
+      four-hop-ratio: 0.20
+      unanswerable-ratio: 0.20
       random-seed: 42
       batch-size: 100
       include-title-in-chunk-text: true

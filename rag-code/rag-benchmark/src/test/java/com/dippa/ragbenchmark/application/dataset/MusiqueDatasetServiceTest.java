@@ -31,10 +31,11 @@ class MusiqueDatasetServiceTest {
     void setUp() {
         reader = mock(MusiqueDatasetReader.class);
         properties = new MusiqueDatasetProperties(
-                "data/musique/musique_ans_v1.0_dev.jsonl",
+                "data/musique/musique_full_v1.0_dev.jsonl",
                 2,
                 0.50,
                 0.50,
+                0.00,
                 0.00,
                 42L,
                 2,
@@ -74,7 +75,7 @@ class MusiqueDatasetServiceTest {
     }
 
     @Test
-    void ingest_deduplicatesParagraphsAndBatchesVectorStoreAdd() {
+    void ingestBaseline_deduplicatesParagraphsAndBatchesVectorStoreAdd() {
         MusiqueParagraph p1 = new MusiqueParagraph(0, "Title A", "Paragraph text 1", true);
         MusiqueParagraph p2 = new MusiqueParagraph(1, "Title B", "Paragraph text 2", false);
         // Duplicate paragraph with same title and text:
@@ -84,13 +85,18 @@ class MusiqueDatasetServiceTest {
         MusiqueQuestion q1 = new MusiqueQuestion("2hop_1", "q1", "a1", List.of(), 2, true, List.of(p1, p2), List.of());
         MusiqueQuestion q2 = new MusiqueQuestion("3hop_2", "q2", "a2", List.of(), 3, true, List.of(pDuplicate, p3), List.of());
 
-        when(reader.getStratifiedSample(2, 0.50, 0.50, 0.00, 42L)).thenReturn(List.of(q1, q2));
+        when(reader.getStratifiedSample(2, 0.50, 0.50, 0.00, 0.00, 42L)).thenReturn(List.of(q1, q2));
 
-        MusiqueIngestionSummary summary = datasetService.ingest(true, 2);
+        MusiqueIngestionSummary summary = datasetService.ingest(true, 2, "baseline");
 
         assertThat(summary.questionsProcessed()).isEqualTo(2);
         assertThat(summary.uniqueParagraphsIngested()).isEqualTo(3); // p1, p2, p3 (duplicate ignored)
+        assertThat(summary.baselineChunksWritten()).isEqualTo(3);
+        assertThat(summary.parentChunksWritten()).isEqualTo(0);
+        assertThat(summary.childChunksWritten()).isEqualTo(0);
         assertThat(summary.batchCount()).isEqualTo(2); // 3 items with batchSize 2 -> 2 batches (2 + 1)
+        assertThat(summary.mode()).isEqualTo("baseline");
+        assertThat(summary.databaseCleared()).isFalse();
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Document>> captor = ArgumentCaptor.forClass(List.class);
@@ -105,5 +111,31 @@ class MusiqueDatasetServiceTest {
         assertThat(firstDoc.getText()).contains("Title A").contains("Paragraph text 1");
         assertThat(firstDoc.getMetadata().get("dataset")).isEqualTo("musique");
         assertThat(firstDoc.getMetadata().get("title")).isEqualTo("Title A");
+    }
+
+    @Test
+    void ingestOriginal_runsBaselineAndSmallToBigWithTableClearing() {
+        org.springframework.jdbc.core.JdbcTemplate mockJdbc = mock(org.springframework.jdbc.core.JdbcTemplate.class);
+        datasetService = new MusiqueDatasetService(reader, properties, vectorStore, null, mockJdbc);
+
+        MusiqueParagraph p1 = new MusiqueParagraph(0, "Title A", "Paragraph text 1", true);
+        MusiqueParagraph p2 = new MusiqueParagraph(1, "Title B", "Paragraph text 2", false);
+        MusiqueQuestion q1 = new MusiqueQuestion("2hop_1", "q1", "a1", List.of(), 2, true, List.of(p1, p2), List.of());
+
+        when(reader.getStratifiedSample(1, 0.50, 0.50, 0.00, 0.00, 42L)).thenReturn(List.of(q1));
+
+        MusiqueIngestionSummary summary = datasetService.ingest(true, 1, "original", true);
+
+        assertThat(summary.questionsProcessed()).isEqualTo(1);
+        assertThat(summary.uniqueParagraphsIngested()).isEqualTo(2);
+        assertThat(summary.baselineChunksWritten()).isEqualTo(2);
+        assertThat(summary.parentChunksWritten()).isGreaterThan(0);
+        assertThat(summary.childChunksWritten()).isGreaterThan(0);
+        assertThat(summary.mode()).isEqualTo("original");
+        assertThat(summary.databaseCleared()).isTrue();
+
+        verify(mockJdbc).execute("TRUNCATE TABLE vector_store_musique");
+        verify(mockJdbc).execute("TRUNCATE TABLE vector_store_musique_large");
+        verify(mockJdbc).execute("TRUNCATE TABLE vector_store_musique_small");
     }
 }
