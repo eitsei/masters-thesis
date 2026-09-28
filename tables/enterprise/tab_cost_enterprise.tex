@@ -1,0 +1,39 @@
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{2.5pt}
+\caption{Operational expenditure and token consumption profiles across all 16 pipeline configurations on the enterprise production corpus (Nordea).}
+\label{tab:cost_enterprise}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l l r r r r r @{}}
+\toprule
+\textbf{Config} & \textbf{Pipeline Composition} & \makecell[r]{\textbf{Uncached}\\\textbf{Prompt}\\\textbf{Tokens}} & \makecell[r]{\textbf{Cached}\\\textbf{Prompt}\\\textbf{Tokens}} & \makecell[r]{\textbf{Output}\\\textbf{Tokens}} & \makecell[r]{\textbf{$\text{Cost}_{1\text{k}}$}\\\textbf{(\$)}} & \makecell[r]{\textbf{$\Delta \text{Cost}$}\\\textbf{(\%)}} \\
+\midrule
+\multicolumn{7}{l}{\textbf{Baseline ($k=0$)}} \\
+$C_{0}$ & Naive RAG Baseline & 5{,}167.2 & 0.0 & 131.1 & 4.3674 & \multicolumn{1}{c}{---} \\
+\midrule
+\multicolumn{7}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\
+$C_{1}$ & S2B & 7{,}115.1 & 407.6 & 229.6 & 6.5034 & $+48.91\%^{*}$ \\
+$C_{2}$ & SR & 5{,}783.2 & 0.0 & 183.6 & 10.0263 & $+129.57\%^{*}$ \\
+$C_{3}$ & PC & 42.7 & 0.0 & 791.2 & 7.0843 & $+62.21\%^{*}$ \\
+$C_{4}$ & MC & 4{,}966.9 & 813.4 & 149.1 & 4.1167 & $-5.74\%^{\text{ns}}$ \\
+\midrule
+\multicolumn{7}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\
+$C_{5}$ & S2B + SR & 7{,}228.9 & 0.0 & 228.3 & 11.2782 & $+158.24\%^{*}$ \\
+$C_{6}$ & S2B + PC & 30.7 & 0.0 & 622.2 & 7.7484 & $+77.41\%^{*}$ \\
+$C_{7}$ & S2B + MC & 7{,}522.7 & 0.0 & 189.0 & 4.1743 & $-4.42\%^{\text{ns}}$ \\
+$C_{8}$ & SR + PC & 33.7 & 0.0 & 642.8 & 11.5233 & $+163.85\%^{*}$ \\
+$C_{9}$ & SR + MC & 5{,}783.2 & 0.0 & 171.3 & 8.2353 & $+88.56\%^{*}$ \\
+$C_{10}$ & PC + MC & 42.7 & 0.0 & 674.5 & 5.0312 & $+15.20\%^{\text{ns}}$ \\
+\midrule
+\multicolumn{7}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\
+$C_{11}$ & S2B + SR + PC & 33.0 & 0.0 & 569.6 & 12.3325 & $+182.38\%^{*}$ \\
+$C_{12}$ & S2B + SR + MC & 6{,}525.3 & 0.0 & 151.5 & 7.6033 & $+74.09\%^{*}$ \\
+$C_{13}$ & S2B + PC + MC & 42.7 & 0.0 & 663.7 & 5.7865 & $+32.49\%^{\text{ns}}$ \\
+$C_{14}$ & SR + PC + MC & 33.4 & 0.0 & 526.6 & 9.1467 & $+109.43\%^{*}$ \\
+$C_{15}$ & S2B + SR + PC + MC (Full-Stack) & 42.3 & 0.0 & 669.6 & 8.7467 & $+100.27\%^{*}$ \\
+\bottomrule
+\end{tabular*}
+\vspace{0.5em}
+\parbox{\textwidth}{\footnotesize
+\textbf{Notes:} $\text{Cost}_{1\text{k}}$ reflects operational expenditure normalized per 1,000 queries in USD (Equation~\ref{eq:cost_1k}). $\Delta \text{Cost}$ denotes relative cost variation against baseline ($C_{0}$). Statistical significance is evaluated using two-tailed paired Wilcoxon signed-rank tests with Holm-Bonferroni correction: $^{*}\,p < 0.05$, $^{**}\,p < 0.01$, $^{***}\,p < 0.001$, $\text{ns}\,p \ge 0.05$.}
+\end{table}

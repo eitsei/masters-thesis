@@ -137,9 +137,9 @@ To replicate real-world enterprise deployments where query complexity is unknown
 \subsection{Benchmark Datasets}
 \label{subsec:bench_datasets}
 
-The primary academic benchmark dataset is MuSiQue~\citep{trivedi2022musique}, from which a sample of 100 question--answer pairs is selected following established benchmarking methodologies in recent RAG literature~\citep{lumer2025rethinking, demourajunior2026adaptive}. Specifically, the sample comprises 40\% 2-hop questions and 60\% 3- and 4-hop questions to ensure balanced coverage across varying reasoning difficulty tiers. Multi-hop queries eliminate the reasoning shortcuts and surface-level lexical matching common in single-hop datasets~\citep{trivedi2022musique}, making them well-suited for evaluating Small-to-Big retrieval ($M_1$), Semantic Re-ranking ($M_2$), and Prompt Caching ($M_3$). Furthermore, stratifying the evaluation set by reasoning depth provides a realistic testbed for assessing hybrid Model Cascading ($M_4$) across distinct query complexity tiers. 
+The primary academic benchmark dataset is MuSiQue~\citep{trivedi2022musique}, from which a sample of 100 question--answer pairs is selected following established benchmarking methodologies in recent RAG literature~\citep{lumer2025rethinking, demourajunior2026adaptive}. Specifically, the sample comprises 40\% 2-hop questions, 40\% 3- and 4-hop, as well as 20\% of non-answerable questions to ensure balanced coverage across varying reasoning difficulty tiers. For non-answerable queries, the expected reference response is a standardized refusal string (\textit{``The provided context does not contain sufficient information to answer this query.''}), allowing rejection accuracy and hallucination resistance to be quantitatively evaluated. Multi-hop queries eliminate the reasoning shortcuts and surface-level lexical matching common in single-hop datasets~\citep{trivedi2022musique}, making them well-suited for evaluating Small-to-Big retrieval ($M_1$), Semantic Re-ranking ($M_2$), and Prompt Caching ($M_3$). Furthermore, stratifying the evaluation set by reasoning depth provides a realistic testbed for assessing hybrid Model Cascading ($M_4$) across distinct query complexity tiers. 
 
-To complement the academic benchmark with domain-specific enterprise workloads, a secondary evaluation dataset comprising 100 synthetically generated question--answer pairs is constructed to reflect real-world customer inquiries regarding the products and services of the partner enterprise. The underlying knowledge corpus is compiled by scraping the public-facing documentation and web portal of the partner organization, with the comprehensive extraction methodology detailed in Appendix~\ref{sec:appendix}. To evaluate pipeline robustness across varied interaction patterns, the dataset is partitioned into 40\% single-hop factual queries, 40\% multi-hop relational questions, and 20\% out-of-domain queries. For out-of-domain queries, the expected reference response is a standardized refusal string (\textit{``The provided context does not contain sufficient information to answer this query.''}), allowing rejection accuracy and hallucination resistance to be quantitatively evaluated.
+To complement the academic benchmark with domain-specific enterprise workloads, a secondary evaluation dataset comprising 100 synthetically generated question--answer pairs is constructed to reflect real-world customer inquiries regarding the products and services of the partner enterprise. The underlying knowledge corpus is compiled by scraping the public-facing documentation and web portal of the partner organization, with the comprehensive extraction methodology detailed in Appendix~\ref{sec:appendix}. To evaluate pipeline robustness across varied interaction patterns, the dataset is partitioned into 40\% single-hop factual queries, 40\% multi-hop relational questions, and 20\% out-of-domain queries. Out-of-domain questions are handled in the same way as in MuSiQue dataset described earlier.
 
 \subsection{Evaluation Setup and Metrics}
 \label{subsec:eval_metrics}
@@ -249,6 +249,20 @@ Q(q) = \frac{4}{\frac{1}{\text{CP}(q) + \epsilon} + \frac{1}{\text{CR}(q) + \eps
 
 where $\text{CP}(q)$, $\text{CR}(q)$, $\text{Faith}(q)$, and $\text{AR}(q)$ denote Context Precision, Context Recall, Faithfulness, and Answer Relevancy for query $q$, respectively, and $\epsilon = 10^{-4}$ is a minimal smoothing parameter introduced to guarantee numerical stability and penalize catastrophic failures in any single quality dimension.
 
+In addition to RAGAS\cite{es2024ragas} metrics, Refusal accuracy and False Refusal Rates is calculated to test the pipelines capability to capture non-answerable and out-of-domain questions. These metrics have been chosen as the RAGAS falsely scores true refusals with 0, even though the behavior is expected. In these questions, RAGAS metrics has NaN value and are not included in the calculations.
+
+\paragraph{Refusal accuracy}
+
+\begin{equation}
+\label{eq:rafusal_accuracy}    
+\end{equation}
+
+\paragraph{False Refusal Rates}
+
+\begin{equation}
+\label{eq:false_refusal_rate}    
+\end{equation}
+
 \subsubsection{Pareto Frontier and Trade-off Equilibrium}
 \label{sec:pareto}
 
@@ -281,3 +295,12 @@ Distributed computer systems and network environments introduce numerous sources
 Practically all of the systems introduced in Section~\ref{sec:literature-review} are implemented using a very homogeneous set of programming languages, relying mostly on Python. A primary motivation of this study is to examine how these optimization concepts generalize into enterprise-standard languages and frameworks, specifically Java and Spring AI. There is also a risk that the pre-training corpus of the underlying LLMs might include academic benchmarks used in this study, potentially enabling the model to answer queries based on memorized parametric knowledge rather than retrieved context. To mitigate this issue, the standardized MuSiQue dataset~\citep{trivedi2022musique} is paired with a domain-specific synthetic customer support dataset to assess model generalizability.
 
 Furthermore, evaluating hierarchical retrieval strategies such as Small-to-Big ($M_1$) on MuSiQue poses an external validity concern due to the dataset's native structure. MuSiQue passages are inherently short, pre-segmented Wikipedia paragraphs (typically 100--150 tokens). Reconstructing 1024-token parent context windows by aggregating passages sharing the same article title introduces a synthetic document hierarchy that may not fully reflect native document continuity.
+
+% TODO: Päivitä lukuun 4 (erityisesti alilukuihin 4.4 ja 4.5.3) kuvaus Refusal Accuracysta ja False Refusal Ratesta (FRR) sekä perustelut, miksi näihin päädyttiin:
+% 1. RAGAS-metriikat (Context Precision, Context Recall, Faithfulness, Answer Relevancy) arvioivat vastauksen laatua annettujen kontekstien pohjalta.
+%    Harhautuskysymyksille (unanswerable / out-of-domain true negative), joissa järjestelmän kuuluu kieltäytyä, RAGAS laskee virheellisesti nollatulokset (0.0),
+%    mikä romahduttaa harmonisen keskiarvon (Composite Quality Q) ja vääristää laatumittauksen, vaikka järjestelmä toimi täysin oikeaoppisesti kieltäytyessään.
+% 2. Siksi RAGAS-evaluointi rajataan vain vastattavissa oleviin kysymyksiin (in-domain / answerable).
+% 3. Harhautuskysymysten ja kieltäytymiskäyttäytymisen arviointiin käytetään erillisiä turvallisuus-/pidättäytymismetriikoita:
+%    - Refusal Accuracy / Abstention Rate: Osuus harhautuskysymyksistä, joissa järjestelmä kieltäytyi oikeaoppisesti vastaamasta.
+%    - False Refusal Rate (FRR): Osuus vastattavissa olevista kysymyksistä (Ryhmä 1), joissa järjestelmä kieltäytyi virheellisesti vastaamasta, vaikka vastaus oli kontekstissa.
