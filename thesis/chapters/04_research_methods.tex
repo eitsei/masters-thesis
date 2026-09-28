@@ -141,6 +141,10 @@ The primary academic benchmark dataset is MuSiQue~\citep{trivedi2022musique}, fr
 
 To complement the academic benchmark with domain-specific enterprise workloads, a secondary evaluation dataset comprising 100 synthetically generated question--answer pairs is constructed to reflect real-world customer inquiries regarding the products and services of the partner enterprise. The underlying knowledge corpus is compiled by scraping the public-facing documentation and web portal of the partner organization, with the comprehensive extraction methodology detailed in Appendix~\ref{sec:appendix}. To evaluate pipeline robustness across varied interaction patterns, the dataset is partitioned into 40\% single-hop factual queries, 40\% multi-hop relational questions, and 20\% out-of-domain queries. Out-of-domain questions are handled in the same way as in MuSiQue dataset described earlier.
 
+% TODO (Kirjoita tähän): Mainitse lyhyesti aineiston kaksi eri roolia:
+% 1. Suljettu korpus (Enterprise Closed, 1:1 MuSiQue-pariteetti, 1 333 kappaletta): Käytetään luvun 5 päätuloksissa poistamaan hakuavaruuden kokoeron aiheuttama sekoittava muuttuja.
+% 2. Avoin raaka-aineisto (Enterprise Raw, 300 lähdedokumenttia / 2 535 chunkkia): Käytetään liitteessä C (Appendix C) testaamaan putken kestävyyttä rajaamattomassa ja kohinaisessa hakuympäristössä.
+
 \subsection{Evaluation Setup and Metrics}
 \label{subsec:eval_metrics}
 
@@ -294,6 +298,14 @@ According to \citet{wohlin2012experimentation}, empirical research in software e
 \paragraph{Construct Validity.}
 The RAGAS evaluation framework relies heavily on an LLM-as-a-judge. This dependency and the stochastic nature of LLMs introduce potential threats to validity, as the judge's evaluations may exhibit non-deterministic behavior. In addition, if the evaluation judge and the generative pipeline shared the same model family, the results would be susceptible to vendor self-preference bias. To mitigate these risks, an independent model from a different family, Claude Sonnet 5, is selected as the judge, configured with a temperature of $T=0.0$ to ensure deterministic evaluation scoring. Furthermore, to complement the model-based evaluation, deterministic token-level lexical overlap metrics ($F_1$ and Exact Match) are computed against gold standard reference answers.
 
+% TODO (Construct Validity - Tekoälyn rooli aineiston luonnissa):
+% Lisää maininta siitä, että Gemini 3.8 Flash loi ja verifioi synteettiset kysymykset ja referenssivastaukset,
+% ja samaa Gemini-malliperhettä käytetään tutkittavassa RAG-putkessa (M4 ja baseline).
+% Mahdollisen arviointiharhan (generator-evaluator alignment / circularity) lievennyskeinot:
+% 1. RAGAS-tuomarina toimii täysin riippumaton Claude Sonnet 5 (ei toimittajan itsesuosintaharhaa).
+% 2. Rinnalla ajetaan ihmisen luomaa akateemista MuSiQue-benchmarkkia kontrollina.
+% 3. Vastaukset ja tukikappaleet on sidottu suoraan todellisiin lähdedokumentteihin ilman mallin omia oletuksia.
+
 \paragraph{Internal Validity.}
 Distributed computer systems and network environments introduce numerous sources of latency variance, ranging from cold-start overheads to transient network jitter. To mitigate cold-start distortions (such as JVM Just-In-Time compilation, database connection pool initialization, and TLS handshakes), multiple unmeasured warm-up runs are executed prior to recording steady-state measurements. Additionally, the software stack and database are deployed within a dedicated VPC in the \texttt{europe-north1} region to minimize network hops and isolate the testbed from public internet routing fluctuations. Finally, application and database caches are explicitly reset between distinct experimental configurations to prevent cross-run state leakage.
 
@@ -302,11 +314,7 @@ Practically all of the systems introduced in Section~\ref{sec:literature-review}
 
 Furthermore, evaluating hierarchical retrieval strategies such as Small-to-Big ($M_1$) on MuSiQue poses an external validity concern due to the dataset's native structure. MuSiQue passages are inherently short, pre-segmented Wikipedia paragraphs (typically 100--150 tokens). Reconstructing 1024-token parent context windows by aggregating passages sharing the same article title introduces a synthetic document hierarchy that may not fully reflect native document continuity.
 
-% TODO: Päivitä lukuun 4 (erityisesti alilukuihin 4.4 ja 4.5.3) kuvaus Refusal Accuracysta ja False Refusal Ratesta (FRR) sekä perustelut, miksi näihin päädyttiin:
-% 1. RAGAS-metriikat (Context Precision, Context Recall, Faithfulness, Answer Relevancy) arvioivat vastauksen laatua annettujen kontekstien pohjalta.
-%    Harhautuskysymyksille (unanswerable / out-of-domain true negative), joissa järjestelmän kuuluu kieltäytyä, RAGAS laskee virheellisesti nollatulokset (0.0),
-%    mikä romahduttaa harmonisen keskiarvon (Composite Quality Q) ja vääristää laatumittauksen, vaikka järjestelmä toimi täysin oikeaoppisesti kieltäytyessään.
-% 2. Siksi RAGAS-evaluointi rajataan vain vastattavissa oleviin kysymyksiin (in-domain / answerable).
-% 3. Harhautuskysymysten ja kieltäytymiskäyttäytymisen arviointiin käytetään erillisiä turvallisuus-/pidättäytymismetriikoita:
-%    - Refusal Accuracy / Abstention Rate: Osuus harhautuskysymyksistä, joissa järjestelmä kieltäytyi oikeaoppisesti vastaamasta.
-%    - False Refusal Rate (FRR): Osuus vastattavissa olevista kysymyksistä (Ryhmä 1), joissa järjestelmä kieltäytyi virheellisesti vastaamasta, vaikka vastaus oli kontekstissa.
+% TODO (External Validity - Synteettisen datan luonne):
+% Lisää maininta siitä, että synteettiset kysymykset edustavat kieliopillisesti siistiä ja standardoitua
+% asiatyyliä. Aitojen kuluttaja-asiakkaiden kysymykset sisältävät usein kirjoitusvirheitä, puhekieltä, slangia
+% tai epätäsmällisyyksiä, joita synteettinen aineisto ei täysimääräisesti mallinna.

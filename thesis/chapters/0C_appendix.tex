@@ -1,0 +1,37 @@
+This appendix presents the comprehensive benchmark evaluation statistics across all 16 evaluated architectural configurations ($C_0$--$C_{15}$) on the original, unconstrained raw enterprise knowledge corpus.
+
+\input{tables/enterprise/tab_latency_enterprise}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/enterprise/latency_breakdown_enterprise.pdf}
+\caption{Component-wise latency breakdown across all 16 pipeline configurations on the unconstrained raw enterprise corpus, detailing execution duration across retrieval, semantic re-ranking, cache management, and model tier generation phases.}
+\label{fig:latency_breakdown_enterprise_raw}
+\end{figure}
+
+\input{tables/enterprise/tab_cost_enterprise}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/enterprise/cost_breakdown_enterprise.pdf}
+\caption{Component-wise operational expenditure breakdown per 1,000 queries across all 16 pipeline configurations on the unconstrained raw enterprise corpus, detailing monetary expenditure across uncached context prefill, context cache lookups, generative completion, and auxiliary neural re-ranking services.}
+\label{fig:cost_breakdown_enterprise_raw}
+\end{figure}
+
+\input{tables/enterprise/tab_quality_enterprise}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/enterprise/quality_radar_enterprise.pdf}
+\caption{Multi-dimensional response quality profiles across architectural tiers on the unconstrained raw enterprise corpus, comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy.}
+\label{fig:quality_radar_enterprise_raw}
+\end{figure}
+
+\input{tables/enterprise/tab_pareto_enterprise}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/enterprise/pareto_frontier_enterprise.pdf}
+\caption{Empirical Pareto frontier of Composite Quality ($Q$) versus median end-to-end execution latency ($T_{\text{total}}\ P_{50}$) and operational expenditure ($\text{Cost}_{1\text{k}}$) on the unconstrained raw enterprise corpus. Solid lines delineate the non-dominated empirical Pareto frontier across configurations.}
+\label{fig:pareto_frontier_enterprise_raw}
+\end{figure}
