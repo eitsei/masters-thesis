@@ -213,7 +213,7 @@ public class MusiqueDatasetService {
      * and {@code vector_store_musique_small}.</p>
      */
     public MusiqueIngestionSummary ingest(boolean sampleOnly, int sampleSize, String mode, boolean clearDatabase) {
-        String effectiveMode = (mode != null && !mode.isBlank()) ? mode.toLowerCase(Locale.ROOT) : "original";
+        String effectiveMode = (mode != null && !mode.isBlank()) ? mode.trim().toLowerCase(Locale.ROOT) : "original";
         java.util.Set<String> validModes = java.util.Set.of("original", "both", "all", "baseline", "baseline-only", "s2b", "small-to-big");
         if (!validModes.contains(effectiveMode)) {
             throw new IllegalArgumentException("Unsupported MuSiQue ingestion mode: " + mode);
@@ -295,7 +295,8 @@ public class MusiqueDatasetService {
             if (q == null || q.paragraphs() == null) continue;
             for (MusiqueParagraph p : q.paragraphs()) {
                 if (p == null || p.paragraphText() == null || p.paragraphText().isBlank()) continue;
-                String key = p.title() + "\n" + p.paragraphText();
+                String title = p.title() != null ? p.title() : "";
+                String key = title + "\n" + p.paragraphText();
                 unique.putIfAbsent(key, p);
             }
         }
@@ -305,17 +306,18 @@ public class MusiqueDatasetService {
     private BaselineIngestResult ingestOriginalChunks(Map<String, MusiqueParagraph> uniqueParagraphs) {
         List<Document> documents = new ArrayList<>(uniqueParagraphs.size());
         for (MusiqueParagraph p : uniqueParagraphs.values()) {
+            String title = p.title() != null ? p.title() : "";
             String text = properties.includeTitleInChunkText()
-                    ? p.title() + "\n\n" + p.paragraphText()
+                    ? title + "\n\n" + p.paragraphText()
                     : p.paragraphText();
 
             String deterministicId = UUID.nameUUIDFromBytes(
-                    ("musique:" + p.title() + "\n" + p.paragraphText()).getBytes(StandardCharsets.UTF_8)
+                    ("musique:" + title + "\n" + p.paragraphText()).getBytes(StandardCharsets.UTF_8)
             ).toString();
 
             Map<String, Object> metadata = new HashMap<>();
             metadata.put("dataset", "musique");
-            metadata.put("title", p.title());
+            metadata.put("title", title);
             metadata.put("source", "musique_full_v1.0_dev");
 
             documents.add(new Document(deterministicId, text, metadata));
@@ -333,7 +335,8 @@ public class MusiqueDatasetService {
     private S2bIngestResult ingestSmallToBigChunks(Map<String, MusiqueParagraph> uniqueParagraphs) {
         Map<String, List<MusiqueParagraph>> paragraphsByTitle = new LinkedHashMap<>();
         for (MusiqueParagraph p : uniqueParagraphs.values()) {
-            paragraphsByTitle.computeIfAbsent(p.title(), k -> new ArrayList<>()).add(p);
+            String title = p.title() != null ? p.title() : "";
+            paragraphsByTitle.computeIfAbsent(title, k -> new ArrayList<>()).add(p);
         }
 
         TokenTextSplitter parentSplitter = TokenTextSplitter.builder().withChunkSize(1024).build();

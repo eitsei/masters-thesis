@@ -33,7 +33,13 @@ with warnings.catch_warnings():
     )
 
 from .judge_factory import JudgeFactory
-from .metrics import compute_composite_quality
+from .metrics import (
+    compute_composite_quality,
+    compute_false_refusal_rate,
+    compute_refusal_accuracy,
+    is_refusal_answer,
+    is_sample_unanswerable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -141,25 +147,46 @@ class RagEvaluator:
         if not records:
             raise ValueError("Cannot evaluate empty records list.")
 
-        dataset = jsonl_to_ragas_dataset(records)
+        # Partition records into answerable and unanswerable subsets (Thesis §4.5.3)
+        # Unanswerable queries (true negatives) are excluded from RAGAS evaluation
+        ans_records: list[dict[str, Any]] = []
+        ans_indices: list[int] = []
+        unans_records: list[dict[str, Any]] = []
+        unans_indices: list[int] = []
 
-        # Run RAGAS evaluation
-        ragas_result = evaluate(
-            dataset=dataset,
-            metrics=self.metrics,
-            llm=self.llm,
-            embeddings=self.embeddings,
-            raise_exceptions=False,
-            show_progress=False,
-        )
+        for idx, rec in enumerate(records):
+            if is_sample_unanswerable(rec):
+                unans_records.append(rec)
+                unans_indices.append(idx)
+            else:
+                ans_records.append(rec)
+                ans_indices.append(idx)
 
-        df = ragas_result.to_pandas()
+        # Run RAGAS evaluation strictly on answerable records
+        if ans_records:
+            dataset = jsonl_to_ragas_dataset(ans_records)
+            ragas_result = evaluate(
+                dataset=dataset,
+                metrics=self.metrics,
+                llm=self.llm,
+                embeddings=self.embeddings,
+                raise_exceptions=False,
+                show_progress=False,
+            )
+            df = ragas_result.to_pandas()
+        else:
+            df = pd.DataFrame()
+
         return self._compute_summary(
             records=records,
             df=df,
             run_name=run_name,
             output_dir=output_dir,
             save_output=save_output,
+            ans_records=ans_records,
+            ans_indices=ans_indices,
+            unans_records=unans_records,
+            unans_indices=unans_indices,
         )
 
     def evaluate_file(
@@ -202,7 +229,26 @@ class RagEvaluator:
         run_name: str,
         output_dir: str | Path,
         save_output: bool,
+        ans_records: list[dict[str, Any]] | None = None,
+        ans_indices: list[int] | None = None,
+        unans_records: list[dict[str, Any]] | None = None,
+        unans_indices: list[int] | None = None,
     ) -> dict[str, Any]:
+        if ans_records is None or ans_indices is None or unans_records is None or unans_indices is None:
+            ans_records = []
+            ans_indices = []
+            unans_records = []
+            unans_indices = []
+            for idx, rec in enumerate(records):
+                if is_sample_unanswerable(rec):
+                    unans_records.append(rec)
+                    unans_indices.append(idx)
+                else:
+                    ans_records.append(rec)
+                    ans_indices.append(idx)
+
+        ans_idx_to_df_row = {orig_idx: df_row_idx for df_row_idx, orig_idx in enumerate(ans_indices)}
+
         # Identify metric score columns present in the DataFrame
         non_metric_inputs = {
             "user_input",
@@ -224,40 +270,66 @@ class RagEvaluator:
         per_sample: list[dict[str, Any]] = []
         sample_composites: list[float] = []
 
-        for idx, row in df.iterrows():
-            rec = records[idx] if idx < len(records) else {}
-            sample_scores: dict[str, float] = {}
-            for col in metric_cols:
-                val = row[col]
-                if pd.notna(val) and isinstance(val, (int, float)):
-                    sample_scores[col] = float(val)
+        for idx, rec in enumerate(records):
+            pred_ans = str(
+                rec.get("generatedAnswer")
+                or rec.get("response")
+                or rec.get("answer")
+                or ""
+            )
+            is_unans = idx in unans_indices
 
-            # Composite quality: regularized harmonic mean (Thesis Eq. 238) if core RAGAS metrics available
-            has_core = any(k in sample_scores for k in ("context_precision", "context_recall", "faithfulness", "answer_relevance", "answer_relevancy"))
-            if has_core:
-                cp = sample_scores.get("context_precision", 0.0)
-                cr = sample_scores.get("context_recall", 0.0)
-                faith = sample_scores.get("faithfulness", 0.0)
-                ar = sample_scores.get("answer_relevance", sample_scores.get("answer_relevancy", 0.0))
-                composite = compute_composite_quality(cp, cr, faith, ar)
-            elif sample_scores:
-                composite = float(np.mean(list(sample_scores.values())))
+            if not is_unans and idx in ans_idx_to_df_row:
+                df_row_idx = ans_idx_to_df_row[idx]
+                row = df.iloc[df_row_idx] if df_row_idx < len(df) else pd.Series()
+                sample_scores: dict[str, float] = {}
+                for col in metric_cols:
+                    val = row[col] if col in row else None
+                    if pd.notna(val) and isinstance(val, (int, float)):
+                        sample_scores[col] = float(val)
+
+                # Composite quality: regularized harmonic mean (Thesis Eq. 248) if core RAGAS metrics available
+                has_core = any(k in sample_scores for k in ("context_precision", "context_recall", "faithfulness", "answer_relevance", "answer_relevancy"))
+                if has_core:
+                    cp = sample_scores.get("context_precision", 0.0)
+                    cr = sample_scores.get("context_recall", 0.0)
+                    faith = sample_scores.get("faithfulness", 0.0)
+                    ar = sample_scores.get("answer_relevance", sample_scores.get("answer_relevancy", 0.0))
+                    composite = compute_composite_quality(cp, cr, faith, ar)
+                elif sample_scores:
+                    composite = float(np.mean(list(sample_scores.values())))
+                else:
+                    composite = 0.0
+
+                sample_composites.append(composite)
+
+                per_sample.append({
+                    "sampleIndex": int(idx),
+                    "questionId": rec.get("questionId") or rec.get("id"),
+                    "question": rec.get("question"),
+                    "generatedAnswer": rec.get("generatedAnswer"),
+                    "groundTruthAnswer": rec.get("groundTruthAnswer"),
+                    "isUnanswerable": False,
+                    "isRefusal": is_refusal_answer(pred_ans),
+                    "scores": sample_scores,
+                    "compositeQuality": round(composite, 4),
+                })
             else:
-                composite = 0.0
+                # Unanswerable / out-of-domain sample: excluded from affirmative RAGAS scoring (Thesis §4.5.3)
+                refused = is_refusal_answer(pred_ans)
+                per_sample.append({
+                    "sampleIndex": int(idx),
+                    "questionId": rec.get("questionId") or rec.get("id"),
+                    "question": rec.get("question"),
+                    "generatedAnswer": rec.get("generatedAnswer"),
+                    "groundTruthAnswer": rec.get("groundTruthAnswer"),
+                    "isUnanswerable": True,
+                    "isRefusal": refused,
+                    "scores": {},
+                    "compositeQuality": None,
+                })
 
-            sample_composites.append(composite)
-
-            per_sample.append({
-                "sampleIndex": int(idx),
-                "questionId": rec.get("questionId") or rec.get("id"),
-                "question": rec.get("question"),
-                "generatedAnswer": rec.get("generatedAnswer"),
-                "groundTruthAnswer": rec.get("groundTruthAnswer"),
-                "scores": sample_scores,
-                "compositeQuality": round(composite, 4),
-            })
-
-        # Quality aggregates
+        # Quality aggregates (computed over answerable partition df)
         quality_aggregates: dict[str, dict[str, float]] = {}
         quality_means: dict[str, float] = {}
 
@@ -286,13 +358,54 @@ class RagEvaluator:
         )
         quality_means["composite_quality"] = round(composite_quality_mean, 4)
 
+        # Abstention metrics across unanswerable and answerable partitions (Thesis Eq. 260 & 269)
+        unans_predictions = [
+            str(r.get("generatedAnswer") or r.get("response") or r.get("answer") or "")
+            for r in unans_records
+        ]
+        unans_gts = [
+            str(r.get("groundTruthAnswer") or r.get("reference") or r.get("ground_truth") or "")
+            for r in unans_records
+        ]
+        refusal_acc = compute_refusal_accuracy(
+            unans_predictions,
+            unans_gts,
+            answerable_flags=[False] * len(unans_records),
+        )
+
+        ans_predictions = [
+            str(r.get("generatedAnswer") or r.get("response") or r.get("answer") or "")
+            for r in ans_records
+        ]
+        ans_gts = [
+            str(r.get("groundTruthAnswer") or r.get("reference") or r.get("ground_truth") or "")
+            for r in ans_records
+        ]
+        frr = compute_false_refusal_rate(
+            ans_predictions,
+            ans_gts,
+            answerable_flags=[True] * len(ans_records),
+        )
+
+        if unans_records:
+            quality_means["refusal_accuracy"] = round(refusal_acc, 4)
+            quality_means["false_refusal_rate"] = round(frr, 4)
+
         # Operational metrics aggregation (RQ1 & RQ2)
-        operational_metrics = self._aggregate_operational_metrics(records)
+        operational_metrics = self._aggregate_operational_metrics(
+            records=records,
+            ans_records=ans_records,
+            unans_records=unans_records,
+            refusal_acc=refusal_acc,
+            frr=frr,
+        )
 
         summary: dict[str, Any] = {
             "runName": run_name,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "totalSamples": len(records),
+            "answerableSamples": len(ans_records),
+            "unanswerableSamples": len(unans_records),
             "qualityScores": quality_means,
             "qualityAggregates": quality_aggregates,
             "operationalMetrics": operational_metrics,
@@ -309,7 +422,12 @@ class RagEvaluator:
         return summary
 
     def _aggregate_operational_metrics(
-        self, records: list[dict[str, Any]]
+        self,
+        records: list[dict[str, Any]],
+        ans_records: list[dict[str, Any]] | None = None,
+        unans_records: list[dict[str, Any]] | None = None,
+        refusal_acc: float = 1.0,
+        frr: float = 0.0,
     ) -> dict[str, Any]:
         """Aggregate latency (RQ1) and token usage / cost metrics (RQ2)."""
         latencies = [
@@ -351,13 +469,18 @@ class RagEvaluator:
         )
 
         mean_latency = float(np.mean(latencies)) if latencies else 0.0
+        p50_latency = float(np.percentile(latencies, 50)) if latencies else 0.0
         p95_latency = float(np.percentile(latencies, 95)) if latencies else 0.0
         mean_retrieval = float(np.mean(retrieval_times)) if retrieval_times else 0.0
         mean_generation = float(np.mean(gen_times)) if gen_times else 0.0
 
+        num_ans = len(ans_records) if ans_records is not None else len(records)
+        num_unans = len(unans_records) if unans_records is not None else 0
+
         return {
             "latency": {
                 "meanTotalLatencyMs": round(mean_latency, 2),
+                "p50TotalLatencyMs": round(p50_latency, 2),
                 "p95TotalLatencyMs": round(p95_latency, 2),
                 "meanRetrievalMs": round(mean_retrieval, 2),
                 "meanGenerationMs": round(mean_generation, 2),
@@ -374,6 +497,12 @@ class RagEvaluator:
                 "evidenceFoundRate": round(
                     evidence_found_count / len(records) if records else 0.0, 4
                 ),
+            },
+            "abstention": {
+                "answerableCount": num_ans,
+                "unanswerableCount": num_unans,
+                "refusalAccuracy": round(refusal_acc, 4),
+                "falseRefusalRate": round(frr, 4),
             },
         }
 

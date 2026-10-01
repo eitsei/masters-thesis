@@ -612,7 +612,8 @@ def is_sample_unanswerable(
             or ground_truth
         )
         sid = (
-            str(record_or_item.get("id", ""))
+            str(record_or_item.get("questionId", ""))
+            or str(record_or_item.get("id", ""))
             or str(record_or_item.get("sample_id", ""))
             or sample_id
         )

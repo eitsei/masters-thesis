@@ -46,6 +46,11 @@ Your primary objective is to process academic papers to extract technical data r
 7. **Thesis Compilation & Artifact Cleanup (CRITICAL):**
     - Whenever you compile the LaTeX thesis (e.g., `thesis/_main.tex` using `pdflatex`, `latexmk`, or any LaTeX toolchain), you **must always** immediately delete all intermediate auxiliary compilation files (`.aux`, `.bbl`, `.blg`, `.fdb_latexmk`, `.fls`, `.log`, `.lot`, `.lof`, `.out`, `.toc`, `.xmpdata`, `*.xmpi`, `pdfa.xmpi`, `.synctex.gz`, etc.).
     - **Only the resulting `.pdf` file (e.g., `_main.pdf`) may be left behind.** Never leave auxiliary compilation files in the workspace or git tree.
+8. **No Unprompted File Modifications (CRITICAL):**
+    - **Never modify or create any files unless the user explicitly and specifically asks you to do so.**
+    - When the user wants to discuss, brainstorm, analyze, ask for advice, or evaluate options, stay in the conversation. Do not make unprompted file modifications prematurely.
+9. **No Ad-Hoc / Throwaway Scripts (CRITICAL):**
+    - **Never create separate ad-hoc or throwaway helper scripts** (such as ad-hoc scratch or helper scripts to bypass problems). Always directly locate and inspect the actual project files concerned, unless the user explicitly requests otherwise.
 
 ---
 
