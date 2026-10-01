@@ -1,0 +1,39 @@
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{2.5pt}
+\caption{Latency profiles and computational overhead across all 16 pipeline configurations on the enterprise closed benchmark corpus.}
+\label{tab:latency_enterprise}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l l r r r r r @{}}
+\toprule
+\textbf{Config} & \textbf{Pipeline Composition} & \makecell[r]{\textbf{TTFT $P_{50}$}\\\textbf{(ms)}} & \makecell[r]{\textbf{TTFT $P_{95}$}\\\textbf{(ms)}} & \makecell[r]{\textbf{$T_{\text{total}}$ $P_{50}$}\\\textbf{(ms)}} & \makecell[r]{\textbf{$T_{\text{total}}$ $P_{95}$}\\\textbf{(ms)}} & \makecell[r]{\textbf{$\Delta T_{\text{total}}$}\\\textbf{(\%)}} \\
+\midrule
+\multicolumn{7}{l}{\textbf{Baseline ($k=0$)}} \\
+$C_{0}$ & Naive RAG Baseline & 1{,}746.5 & 3{,}044.8 & 2{,}564.5 & 4{,}162.1 & \multicolumn{1}{c}{---} \\
+\midrule
+\multicolumn{7}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\
+$C_{1}$ & S2B & 1{,}626.5 & 5{,}745.3 & 2{,}489.5 & 7{,}429.9 & $-2.9\%^{\text{ns}}$ \\
+$C_{2}$ & SR & 1{,}605.5 & 13{,}460.1 & 2{,}428.5 & 14{,}787.4 & $-5.3\%^{\text{ns}}$ \\
+$C_{3}$ & PC & 3{,}057.5 & 8{,}400.0 & 6{,}126.0 & 18{,}009.2 & $+138.9\%^{*}$ \\
+$C_{4}$ & MC & 1{,}803.5 & 4{,}149.4 & 2{,}288.0 & 4{,}849.2 & $-10.8\%^{\text{ns}}$ \\
+\midrule
+\multicolumn{7}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\
+$C_{5}$ & S2B + SR & 1{,}626.5 & 7{,}223.0 & 3{,}029.0 & 9{,}425.1 & $+18.1\%^{\text{ns}}$ \\
+$C_{6}$ & S2B + PC & 2{,}940.5 & 4{,}799.3 & 7{,}491.0 & 9{,}439.7 & $+192.1\%^{*}$ \\
+$C_{7}$ & S2B + MC & 1{,}811.0 & 4{,}040.4 & 2{,}337.0 & 4{,}985.4 & $-8.9\%^{\text{ns}}$ \\
+$C_{8}$ & SR + PC & 3{,}010.0 & 4{,}016.8 & 6{,}753.0 & 8{,}860.0 & $+163.3\%^{*}$ \\
+$C_{9}$ & SR + MC & 1{,}934.0 & 2{,}225.6 & 2{,}434.5 & 3{,}433.0 & $-5.1\%^{\text{ns}}$ \\
+$C_{10}$ & PC + MC & 3{,}014.5 & 8{,}964.3 & 6{,}296.5 & 13{,}319.0 & $+145.5\%^{*}$ \\
+\midrule
+\multicolumn{7}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\
+$C_{11}$ & S2B + SR + PC & 2{,}946.5 & 3{,}676.6 & 6{,}290.5 & 9{,}394.4 & $+145.3\%^{*}$ \\
+$C_{12}$ & S2B + SR + MC & 2{,}173.5 & 3{,}099.8 & 2{,}663.5 & 4{,}322.6 & $+3.9\%^{\text{ns}}$ \\
+$C_{13}$ & S2B + PC + MC & 3{,}672.5 & 5{,}115.4 & 6{,}883.0 & 10{,}032.2 & $+168.4\%^{*}$ \\
+$C_{14}$ & SR + PC + MC & 3{,}481.5 & 5{,}370.8 & 8{,}194.5 & 11{,}791.5 & $+219.5\%^{*}$ \\
+$C_{15}$ & S2B + SR + PC + MC (Full-Stack) & 3{,}308.0 & 20{,}513.6 & 7{,}035.0 & 24{,}955.5 & $+174.3\%^{*}$ \\
+\bottomrule
+\end{tabular*}
+\vspace{0.5em}
+\parbox{\textwidth}{\footnotesize
+\textbf{Notes:} TTFT: Time to First Token; $T_{\text{total}}$: end-to-end execution latency; $P_{50}$ and $P_{95}$ denote median and 95th percentile distributions, respectively. $\Delta T_{\text{total}}$ reflects relative percentage shift in median total latency against naive baseline ($C_0$). Statistical significance evaluated via paired two-tailed Wilcoxon signed-rank tests with Holm-Bonferroni correction ($^{*}p < 0.05$, $^{**}p < 0.01$, $^{***}p < 0.001$, $^{\text{ns}}p \ge 0.05$).}
+\end{table}

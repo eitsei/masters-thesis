@@ -16,12 +16,12 @@
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:latency_enterprise}
 
-\input{tables/enterprise/tab_latency_enterprise}
+\input{tables/enterprise_closed/tab_latency_enterprise}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\linewidth]{figures/enterprise/latency_breakdown_enterprise.pdf}
-\caption{Component-wise latency breakdown across all 16 pipeline configurations on the enterprise production corpus, detailing execution duration across retrieval, semantic re-ranking, cache management, and model tier generation phases.}
+\includegraphics[width=\linewidth]{figures/enterprise_closed/latency_breakdown_enterprise_closed.pdf}
+\caption{Component-wise latency breakdown across all 16 pipeline configurations on the enterprise closed benchmark corpus, detailing execution duration across retrieval, semantic re-ranking, cache management, and model tier generation phases.}
 \label{fig:latency_breakdown_enterprise}
 \end{figure}
 
@@ -43,12 +43,12 @@
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:cost_enterprise}
 
-\input{tables/enterprise/tab_cost_enterprise}
+\input{tables/enterprise_closed/tab_cost_enterprise}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\linewidth]{figures/enterprise/cost_breakdown_enterprise.pdf}
-\caption{Component-wise operational expenditure breakdown per 1,000 queries across all 16 pipeline configurations on the enterprise production corpus, detailing monetary expenditure across uncached context prefill, context cache lookups, generative completion, and auxiliary neural re-ranking services.}
+\includegraphics[width=\linewidth]{figures/enterprise_closed/cost_breakdown_enterprise_closed.pdf}
+\caption{Component-wise operational expenditure breakdown per 1,000 queries across all 16 pipeline configurations on the enterprise closed benchmark corpus, detailing monetary expenditure across uncached context prefill, context cache lookups, generative completion, and auxiliary neural re-ranking services.}
 \label{fig:cost_breakdown_enterprise}
 \end{figure}
 
@@ -70,12 +70,12 @@
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:quality_enterprise}
 
-\input{tables/enterprise/tab_quality_enterprise}
+\input{tables/enterprise_closed/tab_quality_enterprise}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\linewidth]{figures/enterprise/quality_radar_enterprise.pdf}
-\caption{Multi-dimensional response quality profiles across architectural tiers on the enterprise production corpus, comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy.}
+\includegraphics[width=\linewidth]{figures/enterprise_closed/quality_radar_enterprise_closed.pdf}
+\caption{Multi-dimensional response quality profiles across architectural tiers on the enterprise closed benchmark corpus, comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy.}
 \label{fig:quality_radar_enterprise}
 \end{figure}
 
@@ -97,11 +97,11 @@
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:pareto_enterprise}
 
-\input{tables/enterprise/tab_pareto_enterprise}
+\input{tables/enterprise_closed/tab_pareto_enterprise}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\linewidth]{figures/enterprise/pareto_frontier_enterprise.pdf}
-\caption{Empirical Pareto frontier of Composite Quality ($Q$) versus median end-to-end execution latency ($T_{\text{total}}\ P_{50}$) and operational expenditure ($\text{Cost}_{1\text{k}}$) on the enterprise production corpus. Solid lines delineate the non-dominated empirical Pareto frontier across configurations.}
+\includegraphics[width=\linewidth]{figures/enterprise_closed/pareto_frontier_enterprise_closed.pdf}
+\caption{Empirical Pareto frontier of Composite Quality ($Q$) versus median end-to-end execution latency ($T_{\text{total}}\ P_{50}$) and operational expenditure ($\text{Cost}_{1\text{k}}$) on the enterprise closed benchmark corpus. Solid lines delineate the non-dominated empirical Pareto frontier across configurations.}
 \label{fig:pareto_frontier_enterprise}
 \end{figure}
