@@ -452,6 +452,7 @@ class NordeaMusiqueDatasetBuilder:
         decomposition: list[dict[str, Any]],
         answerable: bool = True,
         target_pool_size: int = 20,
+        hop_count: int = 1,
     ) -> dict[str, Any]:
         """Assembles a single MuSiQue-schema record with 20 shuffled paragraphs."""
         pool: list[dict[str, Any]] = []
@@ -543,6 +544,7 @@ class NordeaMusiqueDatasetBuilder:
             "question": question,
             "answer": answer,
             "answer_aliases": aliases,
+            "hopCount": hop_count,
             "paragraphs": final_paragraphs,
             "question_decomposition": final_decomp,
             "answerable": answerable,
@@ -704,6 +706,7 @@ class NordeaMusiqueDatasetBuilder:
                     candidate_paras=candidates,
                     decomposition=[],
                     answerable=True,
+                    hop_count=hops,
                 )
                 single_hop_samples.append(sample)
                 new_single.append(sample)
@@ -786,6 +789,7 @@ class NordeaMusiqueDatasetBuilder:
                     candidate_paras=candidates,
                     decomposition=decomp,
                     answerable=True,
+                    hop_count=hops,
                 )
                 multi_hop_samples.append(sample)
                 new_multi.append(sample)
@@ -820,6 +824,7 @@ class NordeaMusiqueDatasetBuilder:
                     candidate_paras=[],
                     decomposition=[],
                     answerable=False,
+                    hop_count=0,
                 )
                 ood_samples.append(sample)
                 new_ood.append(sample)

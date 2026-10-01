@@ -174,7 +174,8 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
                 logger.info("Local cache entry for key '{}' expired at {}; evicting", key, existingEntry.expiresAt());
                 localEntries.remove(key, existingEntry);
             } else {
-                logger.debug("Explicit cache hit for key '{}' -> cacheId={}", key, existingEntry.cacheId());
+                logger.info("Explicit cache hit for key '{}' -> cacheId={}, tokens={}, expiresAt={}",
+                        key, existingEntry.cacheId(), existingEntry.tokenCount(), existingEntry.expiresAt());
                 return CacheLookupResult.hit(existingEntry.cacheId(), existingEntry.tokenCount(), existingEntry.expiresAt());
             }
         }
@@ -227,8 +228,10 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
             }
 
             promise.complete(createdEntry);
-            logger.info("Created explicit Google GenAI cache for key '{}' -> cacheId={}, tokens={}, expiresAt={}",
-                    key, createdEntry.cacheId(), createdEntry.tokenCount(), createdEntry.expiresAt());
+            logger.info("Created explicit Google GenAI cache for key '{}': cacheId={}, tokens={}, expiresAt={}, systemInstructionChars={}, contentsChars={}",
+                    key, createdEntry.cacheId(), createdEntry.tokenCount(), createdEntry.expiresAt(),
+                    request.systemInstruction() != null ? request.systemInstruction().length() : 0,
+                    request.contextContent() != null ? request.contextContent().length() : 0);
             return CacheLookupResult.miss(createdEntry.cacheId(), createdEntry.tokenCount(), createdEntry.expiresAt());
         } catch (Throwable t) {
             promise.completeExceptionally(t);
@@ -251,21 +254,20 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
                     .displayName(displayName)
                     .ttl(properties.ttl());
 
+            if (request.systemInstruction() != null && !request.systemInstruction().isBlank()) {
+                Content systemInstructionContent = Content.fromParts(Part.fromText(request.systemInstruction()));
+                requestBuilder.systemInstruction(systemInstructionContent);
+            }
+
             if (request.contextContent() != null && !request.contextContent().isBlank()) {
                 Content contextContent = Content.fromParts(Part.fromText(request.contextContent()));
                 requestBuilder.contents(List.of(contextContent));
-                if (request.systemInstruction() != null && !request.systemInstruction().isBlank()) {
-                    Content systemInstructionContent = Content.fromParts(Part.fromText(request.systemInstruction()));
-                    requestBuilder.systemInstruction(systemInstructionContent);
-                }
             } else {
-                // When contextContent is blank (Strategy 1: Shared Static Prefix Caching),
-                // the static instruction/few-shot prefix constitutes the cached content payload.
                 // Spring AI's CachedContentRequest enforces that contents must not be empty.
-                String textToCache = (request.systemInstruction() != null && !request.systemInstruction().isBlank())
-                        ? request.systemInstruction()
-                        : "";
-                Content prefixContent = Content.fromParts(Part.fromText(textToCache));
+                // If no separate context or demonstrations are provided, use a structural
+                // user turn marking the cached prompt prefix, avoiding duplicating the system instruction
+                // or injecting synthetic assistant turns ("Understood.").
+                Content prefixContent = Content.fromParts(Part.fromText("Static prompt prefix."));
                 requestBuilder.contents(List.of(prefixContent));
             }
 

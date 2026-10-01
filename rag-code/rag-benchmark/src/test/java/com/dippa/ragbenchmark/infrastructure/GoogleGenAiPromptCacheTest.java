@@ -290,7 +290,7 @@ class GoogleGenAiPromptCacheTest {
     }
 
     @Test
-    void qualifyingRequest_coldMiss_withBlankContextContent_cachesSystemInstructionInContents() {
+    void qualifyingRequest_coldMiss_withBlankContextContent_setsSystemInstructionAndDoesNotDuplicateInContents() {
         Instant expiry = Instant.now().plusSeconds(300);
         GoogleGenAiCachedContent mockContent = mockCachedContent("cachedContents/created-blank-ctx", 5120, expiry);
         when(cachedContentService.create(any(CachedContentRequest.class))).thenReturn(mockContent);
@@ -306,7 +306,34 @@ class GoogleGenAiPromptCacheTest {
         ArgumentCaptor<CachedContentRequest> captor = ArgumentCaptor.forClass(CachedContentRequest.class);
         verify(cachedContentService).create(captor.capture());
         CachedContentRequest capturedReq = captor.getValue();
+        assertThat(capturedReq.getSystemInstruction()).isNotNull();
+        assertThat(capturedReq.getSystemInstruction().text()).isEqualTo("static system instruction and few-shot demonstrations");
         assertThat(capturedReq.getContents()).isNotEmpty();
-        assertThat(capturedReq.getContents().get(0).text()).isEqualTo("static system instruction and few-shot demonstrations");
+        assertThat(capturedReq.getContents().get(0).text()).isNotEqualTo("static system instruction and few-shot demonstrations");
+        assertThat(capturedReq.getContents().get(0).role().orElse("user")).isNotEqualTo("model");
+    }
+
+    @Test
+    void qualifyingRequest_coldMiss_withDemonstrationsContextContent_setsDirectivesInSystemInstructionAndDemonstrationsInContents() {
+        Instant expiry = Instant.now().plusSeconds(300);
+        GoogleGenAiCachedContent mockContent = mockCachedContent("cachedContents/created-with-demos", 5120, expiry);
+        when(cachedContentService.create(any(CachedContentRequest.class))).thenReturn(mockContent);
+
+        CacheRequest request = new CacheRequest(
+                "key-demo-prefix", "gemini-3.8-flash", "Directives 1-5", "Demonstrations 1-8", 5120L);
+
+        CacheLookupResult result = promptCache.getOrCreate(request);
+
+        assertThat(result.status()).isEqualTo(CacheStatus.EXPLICIT_MISS);
+        assertThat(result.cacheId()).isEqualTo("cachedContents/created-with-demos");
+
+        ArgumentCaptor<CachedContentRequest> captor = ArgumentCaptor.forClass(CachedContentRequest.class);
+        verify(cachedContentService).create(captor.capture());
+        CachedContentRequest capturedReq = captor.getValue();
+        assertThat(capturedReq.getSystemInstruction()).isNotNull();
+        assertThat(capturedReq.getSystemInstruction().text()).isEqualTo("Directives 1-5");
+        assertThat(capturedReq.getContents()).hasSize(1);
+        assertThat(capturedReq.getContents().get(0).text()).isEqualTo("Demonstrations 1-8");
+        assertThat(capturedReq.getContents().get(0).role().orElse("user")).isNotEqualTo("model");
     }
 }

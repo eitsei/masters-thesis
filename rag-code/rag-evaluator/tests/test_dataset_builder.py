@@ -120,7 +120,7 @@ def test_build_musique_sample_schema(temp_corpus: Path) -> None:
     )
 
     # Validate exact MuSiQue keys
-    expected_keys = {"id", "question", "answer", "answer_aliases", "paragraphs", "question_decomposition", "answerable"}
+    expected_keys = {"id", "question", "answer", "answer_aliases", "paragraphs", "question_decomposition", "answerable", "hopCount"}
     assert set(sample.keys()) == expected_keys
     assert sample["id"] == "2hop__nordea_0001"
     assert sample["answerable"] is True

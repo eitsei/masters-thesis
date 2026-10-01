@@ -63,4 +63,14 @@ public record TokenUsageDto(
     public TokenUsageDto(long promptTokens, long completionTokens, long totalTokens, long cachedTokens) {
         this(promptTokens, completionTokens, totalTokens, cachedTokens, 0L, 0, 0, 0, 0, 0);
     }
+
+    /**
+     * Non-cached (dynamic) prompt tokens processed fresh for this query.
+     */
+    public long dynamicPromptTokens() {
+        if (cachedTokens > 0L) {
+            return promptTokens >= cachedTokens ? (promptTokens - cachedTokens) : promptTokens;
+        }
+        return promptTokens;
+    }
 }

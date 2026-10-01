@@ -314,10 +314,10 @@ class RagQueryServiceTest {
         assertThat(result.cacheMetadata().tokenCount()).isEqualTo(5120L);
         assertThat(result.cacheMs()).isGreaterThanOrEqualTo(0L);
 
-        // Verify static prefix caching invariant: cacheRequest has empty contextContent
+        // Verify static prefix caching invariant: cacheRequest has demonstrations in contextContent
         ArgumentCaptor<CacheRequest> cacheCaptor = ArgumentCaptor.forClass(CacheRequest.class);
         verify(promptCache).getOrCreate(cacheCaptor.capture());
-        assertThat(cacheCaptor.getValue().contextContent()).isEmpty();
+        assertThat(cacheCaptor.getValue().contextContent()).isEqualTo(promptRenderer.getStaticDemonstrations());
         assertThat(cacheCaptor.getValue().systemInstruction()).isEqualTo(promptRenderer.getSystemInstruction());
 
         ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
@@ -332,6 +332,7 @@ class RagQueryServiceTest {
         assertThat(promptSent.getOptions()).isInstanceOf(GoogleGenAiChatOptions.class);
         GoogleGenAiChatOptions options = (GoogleGenAiChatOptions) promptSent.getOptions();
         assertThat(options.getCachedContentName()).isEqualTo("cachedContents/hit-123");
+        assertThat(options.getUseCachedContent()).isTrue();
         assertThat(options.getThinkingBudget()).isEqualTo(0);
         assertThat(options.getIncludeExtendedUsageMetadata()).isTrue();
     }
@@ -360,6 +361,7 @@ class RagQueryServiceTest {
                 .contains("Question: Cold question?\nAnswer:");
         GoogleGenAiChatOptions options = (GoogleGenAiChatOptions) promptSent.getOptions();
         assertThat(options.getCachedContentName()).isEqualTo("cachedContents/miss-456");
+        assertThat(options.getUseCachedContent()).isTrue();
         assertThat(options.getThinkingBudget()).isEqualTo(0);
         assertThat(options.getIncludeExtendedUsageMetadata()).isTrue();
     }

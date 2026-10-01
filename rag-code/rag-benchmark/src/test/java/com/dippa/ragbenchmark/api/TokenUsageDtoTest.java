@@ -70,4 +70,19 @@ class TokenUsageDtoTest {
         assertThat(deserialized.routingCompletionTokens()).isEqualTo(2);
         assertThat(deserialized.routingTokens()).isEqualTo(27);
     }
+
+    @Test
+    void dynamicPromptTokens_calculatesNonCachedDifference() {
+        // Total prompt 5720, cached 5120 -> dynamic 600
+        TokenUsageDto withCache = new TokenUsageDto(5720, 50, 5770, 5120);
+        assertThat(withCache.dynamicPromptTokens()).isEqualTo(600L);
+
+        // No cache: prompt 800, cached 0 -> dynamic 800
+        TokenUsageDto withoutCache = new TokenUsageDto(800, 50, 850, 0);
+        assertThat(withoutCache.dynamicPromptTokens()).isEqualTo(800L);
+
+        // Edge case: promptTokens < cachedTokens (e.g. mock where promptTokens only recorded dynamic)
+        TokenUsageDto mockEdge = new TokenUsageDto(600, 50, 5770, 5120);
+        assertThat(mockEdge.dynamicPromptTokens()).isEqualTo(600L);
+    }
 }

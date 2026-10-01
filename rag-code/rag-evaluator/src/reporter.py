@@ -332,18 +332,38 @@ def display_hop_breakdown_table(
     for r in records:
         hops = r.get("hopCount")
         if hops is None:
-            hops = r.get("hop_count", 0)
+            hops = r.get("hop_count")
+        if hops is None and "id" in r:
+            rid = str(r["id"]).lower()
+            if rid.startswith("1hop"):
+                hops = 1
+            elif rid.startswith("2hop"):
+                hops = 2
+            elif rid.startswith("3hop"):
+                hops = 3
+            elif rid.startswith("4hop"):
+                hops = 4
+            elif rid.startswith("ood"):
+                hops = 0
         try:
-            h_int = int(hops)
+            h_int = int(hops) if hops is not None else 0
         except (ValueError, TypeError):
             h_int = 0
         hop_groups.setdefault(h_int, []).append(r)
 
-    # Sort keys (e.g. 2, 3, 4)
+    # Adapt title dynamically if default
+    if title == "Query Complexity Breakdown (2-Hop vs 3-Hop vs 4-Hop)":
+        non_zero_hops = [f"{h}-Hop" for h in sorted(hop_groups.keys()) if h > 0]
+        if 0 in hop_groups:
+            non_zero_hops.append("OOD")
+        if non_zero_hops:
+            table.title = f"📊 [bold green]Query Complexity Breakdown ({' vs '.join(non_zero_hops)})[/bold green]"
+
+    # Sort keys (e.g. 1, 2, 3, 4)
     for h in sorted(hop_groups.keys()):
         h_records = hop_groups[h]
         s = summarize_run_records(h_records)
-        label = f"{h}-Hop Questions" if h > 0 else "Unknown / Out-of-Domain"
+        label = f"{h}-Hop Questions" if h > 0 else "Out-of-Domain / Refusal"
 
         if s.get("answerable_count", 0) == 0:
             faith_s = "--"

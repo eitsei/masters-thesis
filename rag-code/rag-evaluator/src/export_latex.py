@@ -126,9 +126,23 @@ def export_hop_breakdown_latex(
     # Group by hopCount
     hop_groups: dict[int, list[Mapping[str, Any]]] = {}
     for r in records:
-        hops = r.get("hopCount", r.get("hop_count", 0))
+        hops = r.get("hopCount")
+        if hops is None:
+            hops = r.get("hop_count")
+        if hops is None and "id" in r:
+            rid = str(r["id"]).lower()
+            if rid.startswith("1hop"):
+                hops = 1
+            elif rid.startswith("2hop"):
+                hops = 2
+            elif rid.startswith("3hop"):
+                hops = 3
+            elif rid.startswith("4hop"):
+                hops = 4
+            elif rid.startswith("ood"):
+                hops = 0
         try:
-            h_int = int(hops)
+            h_int = int(hops) if hops is not None else 0
         except (ValueError, TypeError):
             h_int = 0
         hop_groups.setdefault(h_int, []).append(r)

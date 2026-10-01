@@ -54,7 +54,7 @@ if [ "$WARMUP" -gt 0 ]; then
     curl -s -o /dev/null -w "  Warm-up $i: HTTP %{http_code} (%{time_total}s)\n" \
       "${URL}/api/query" \
       -H "Content-Type: application/json" \
-      -d "{\"query\": \"lämmittelykysely $i\", \"tableName\": \"$TABLE_NAME\"}"
+      -d "{\"query\": \"Warmup question: $i\", \"tableName\": \"$TABLE_NAME\"}"
   done
   clear_cache
 fi

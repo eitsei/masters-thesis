@@ -34,6 +34,7 @@ public class RagPromptRenderer {
     private final PromptTemplate suffixTemplate;
     private final PromptTemplate dynamicPayloadTemplate;
     private final String systemInstruction;
+    private final String staticDemonstrations;
 
     @Autowired
     public RagPromptRenderer(@Value("classpath:prompts/answer-generation.st") Resource promptResource) {
@@ -51,7 +52,7 @@ public class RagPromptRenderer {
 
         this.fullPromptTemplate = new PromptTemplate(content);
 
-        // Derive system instruction, dynamic payload, and dynamic query suffix from prompt template
+        // Derive system instruction, demonstrations, dynamic payload, and dynamic query suffix from prompt template
         int contextIndex = content.indexOf("Context:\n{context}");
         if (contextIndex < 0) {
             contextIndex = content.indexOf("Context:\r\n{context}");
@@ -60,12 +61,26 @@ public class RagPromptRenderer {
             contextIndex = content.lastIndexOf("Context:");
         }
 
-        if (contextIndex >= 0) {
+        int demoIndex = content.indexOf("=== IN-CONTEXT REASONING DEMONSTRATIONS");
+        if (demoIndex >= 0 && (contextIndex < 0 || demoIndex < contextIndex)) {
+            this.systemInstruction = content.substring(0, demoIndex).trim();
+            if (contextIndex >= 0) {
+                this.staticDemonstrations = content.substring(demoIndex, contextIndex).trim();
+            } else {
+                this.staticDemonstrations = content.substring(demoIndex).trim();
+            }
+        } else if (contextIndex >= 0) {
             this.systemInstruction = content.substring(0, contextIndex).trim();
+            this.staticDemonstrations = "";
+        } else {
+            this.systemInstruction = content.trim();
+            this.staticDemonstrations = "";
+        }
+
+        if (contextIndex >= 0) {
             String dynamicPayloadTemplateString = content.substring(contextIndex).trim();
             this.dynamicPayloadTemplate = new PromptTemplate(dynamicPayloadTemplateString);
         } else {
-            this.systemInstruction = content.trim();
             this.dynamicPayloadTemplate = null;
         }
 
@@ -86,6 +101,17 @@ public class RagPromptRenderer {
     }
 
     public String getSystemInstruction() {
+        return systemInstruction;
+    }
+
+    public String getStaticDemonstrations() {
+        return staticDemonstrations;
+    }
+
+    public String getFullStaticPrefix() {
+        if (staticDemonstrations != null && !staticDemonstrations.isBlank()) {
+            return systemInstruction + "\n\n" + staticDemonstrations;
+        }
         return systemInstruction;
     }
 
@@ -142,10 +168,10 @@ public class RagPromptRenderer {
     public String computeCanonicalCacheKey(
             String provider,
             String model,
-            String systemInstructionText) {
+            String staticPrefixText) {
         String effectiveProvider = provider != null ? provider.trim() : "default";
         String effectiveModel = model != null ? model.trim() : "default";
-        String effectiveInstruction = systemInstructionText != null ? systemInstructionText.trim() : this.systemInstruction;
+        String effectiveInstruction = staticPrefixText != null ? staticPrefixText.trim() : getFullStaticPrefix();
 
         String keyMaterial = String.join("::",
                 PROMPT_SCHEMA_VERSION,
@@ -154,6 +180,20 @@ public class RagPromptRenderer {
                 effectiveInstruction);
 
         return sha256Hex(keyMaterial);
+    }
+
+    /**
+     * Computes canonical cache key from separate system instruction and demonstrations parts.
+     */
+    public String computeCanonicalCacheKey(
+            String provider,
+            String model,
+            String systemInstructionText,
+            String staticDemonstrationsText) {
+        String combined = (staticDemonstrationsText != null && !staticDemonstrationsText.isBlank())
+                ? (systemInstructionText != null ? systemInstructionText.trim() : "") + "\n\n" + staticDemonstrationsText.trim()
+                : (systemInstructionText != null ? systemInstructionText.trim() : "");
+        return computeCanonicalCacheKey(provider, model, combined);
     }
 
     /**

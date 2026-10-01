@@ -1103,8 +1103,24 @@ def run_questions(
             item["answerable"] = rec["answerable"]
         if "question_decomposition" in rec:
             item["question_decomposition"] = rec["question_decomposition"]
-        if "hopCount" in rec or "hop_count" in rec:
-            item["hopCount"] = rec.get("hopCount") or rec.get("hop_count")
+        if "hopCount" in rec and rec["hopCount"] is not None:
+            item["hopCount"] = rec["hopCount"]
+        elif "hop_count" in rec and rec["hop_count"] is not None:
+            item["hopCount"] = rec["hop_count"]
+        elif "id" in rec:
+            rec_id = str(rec["id"]).lower()
+            if rec_id.startswith("1hop"):
+                item["hopCount"] = 1
+            elif rec_id.startswith("2hop"):
+                item["hopCount"] = 2
+            elif rec_id.startswith("3hop"):
+                item["hopCount"] = 3
+            elif rec_id.startswith("4hop"):
+                item["hopCount"] = 4
+            elif rec_id.startswith("ood"):
+                item["hopCount"] = 0
+            elif "question_decomposition" in rec and rec["question_decomposition"]:
+                item["hopCount"] = len(rec["question_decomposition"])
         elif "question_decomposition" in rec and rec["question_decomposition"]:
             item["hopCount"] = len(rec["question_decomposition"])
 

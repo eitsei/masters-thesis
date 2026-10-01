@@ -105,7 +105,32 @@ class RagPromptRendererTest {
     void constructor_templateStartingWithContext_handlesEmptySystemInstruction() {
         RagPromptRenderer edgeRenderer = new RagPromptRenderer("Context:\n{context}\n\nQuestion: {question}\nAnswer:");
         assertThat(edgeRenderer.getSystemInstruction()).isEmpty();
+        assertThat(edgeRenderer.getStaticDemonstrations()).isEmpty();
+        assertThat(edgeRenderer.getFullStaticPrefix()).isEmpty();
         String payload = edgeRenderer.renderDynamicPayload("Test question?", List.of(Document.builder().id("1").text("Text").build()));
         assertThat(payload).contains("Context:\nText").contains("Question: Test question?\nAnswer:");
+    }
+
+    @Test
+    void templateParsing_separatesSystemInstructionAndStaticDemonstrations() {
+        assertThat(renderer.getSystemInstruction())
+                .contains("=== CORE OPERATIONAL MANDATE & GROUNDING DIRECTIVES ===")
+                .doesNotContain("=== IN-CONTEXT REASONING DEMONSTRATIONS");
+
+        assertThat(renderer.getStaticDemonstrations())
+                .contains("=== IN-CONTEXT REASONING DEMONSTRATIONS (FEW-SHOT LIBRARY) ===")
+                .doesNotContain("=== CORE OPERATIONAL MANDATE & GROUNDING DIRECTIVES ===")
+                .doesNotContain("Context:\n{context}");
+
+        assertThat(renderer.getFullStaticPrefix())
+                .isEqualTo(renderer.getSystemInstruction() + "\n\n" + renderer.getStaticDemonstrations());
+    }
+
+    @Test
+    void computeCanonicalCacheKey_staticDemonstrationsOverload_matchesCombined() {
+        String keyOverload = renderer.computeCanonicalCacheKey("google-genai", "gemini-3.8-flash", "inst", "demos");
+        String keyCombined = renderer.computeCanonicalCacheKey("google-genai", "gemini-3.8-flash", "inst\n\ndemos");
+
+        assertThat(keyOverload).isEqualTo(keyCombined);
     }
 }

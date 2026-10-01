@@ -323,6 +323,11 @@ class BenchmarkCollector:
         prompt_tokens = tokens.get("promptTokens", 0)
         completion_tokens = tokens.get("completionTokens", 0)
         cached_tokens = tokens.get("cachedTokens", 0)
+        dynamic_tokens = (
+            prompt_tokens - cached_tokens
+            if prompt_tokens >= cached_tokens and cached_tokens > 0
+            else prompt_tokens
+        )
         total_tokens = tokens.get("totalTokens", 0)
         chunks = record.get("retrievedChunks") or []
         chunk_ids = [
@@ -343,9 +348,9 @@ class BenchmarkCollector:
             f"Client Roundtrip: [yellow]{roundtrip_ms:.1f}ms[/yellow]"
         )
         self.console.print(
-            f"  [bold]Tokens:[/bold] Prompt: [blue]{prompt_tokens}[/blue] | "
+            f"  [bold]Tokens:[/bold] Prompt: [blue]{prompt_tokens}[/blue] "
+            f"([magenta]Cached: {cached_tokens}[/magenta] | [cyan]Dynamic: {dynamic_tokens}[/cyan]) | "
             f"Completion: [blue]{completion_tokens}[/blue] | "
-            f"Cached: [magenta]{cached_tokens}[/magenta] | "
             f"Total: [bold blue]{total_tokens}[/bold blue]"
         )
         self.console.print(
