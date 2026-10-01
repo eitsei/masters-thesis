@@ -10,3 +10,4 @@ build/
 htmlcov/
 .env
 data/nordea/
+figure_testing/

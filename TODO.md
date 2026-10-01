@@ -1,6 +1,9 @@
 #TODO
 
+TUTKI TUO ROUNTING JUTTU NYT KUNNOLLA!
+
 Tsekkaa promptit
+- TODO: Päivitä src/main/resources/prompts/answer-generation.st staattinen prefiksi Strategian 1 mukaisilla kuratoiduilla Few-Shot ICL -demonstraatioilla (ks. STRATEGY_SHARED_PREFIX_FEWSHOT.md), jotka ylittävät luonnollisesti Geminin 4096 tokenin kynnyksen ilman keinotekoista täytetekstiä.
 Tsekkaa koko koodi läpi muutenkin
 Tsekkaa, että kaikki metodit on oikeasti toteutettu oikein!
 Vastaako koodi kirjoitettua tekstiä ja jos ei, niin korjaa

@@ -40,7 +40,17 @@ class RagPromptRendererTest {
     }
 
     @Test
-    void computeCanonicalCacheKey_preservesPipelineOrder_andDifferentiatesOrderChanges() {
+    void renderDynamicPayload_formatsContextAndQuestion() {
+        Document doc = Document.builder().id("1").text("Dynamic context text.").build();
+        String payload = renderer.renderDynamicPayload("Dynamic question?", List.of(doc));
+
+        assertThat(payload)
+                .contains("Context:\nDynamic context text.")
+                .contains("Question: Dynamic question?\nAnswer:");
+    }
+
+    @Test
+    void computeCanonicalCacheKey_staticPrefix_sharesKeyAcrossDifferentChunks() {
         Document docA = Document.builder().id("chunk-a").text("Context Alpha").build();
         Document docB = Document.builder().id("chunk-b").text("Context Beta").build();
 
@@ -56,9 +66,18 @@ class RagPromptRendererTest {
         String key2 = renderer.computeCanonicalCacheKey(
                 "google-genai", "gemini-3.8-flash", "table_1", "system instruction", List.of(docB, docA));
 
+        // In Strategy 1, static prefix caching ensures the cache key is shared across different query chunks
         assertThat(key1).isEqualTo(key1Duplicate);
-        assertThat(key1).isNotEqualTo(key2);
+        assertThat(key1).isEqualTo(key2);
         assertThat(key1).hasSize(64); // Valid 64-char SHA-256 hex string
+    }
+
+    @Test
+    void computeCanonicalCacheKey_differentiatesDifferentInstructions() {
+        String key1 = renderer.computeCanonicalCacheKey("google-genai", "gemini-3.8-flash", "instruction A");
+        String key2 = renderer.computeCanonicalCacheKey("google-genai", "gemini-3.8-flash", "instruction B");
+
+        assertThat(key1).isNotEqualTo(key2);
     }
 
     @Test
@@ -80,5 +99,13 @@ class RagPromptRendererTest {
         long tokens = renderer.estimateTokens(text, 3.5);
 
         assertThat(tokens).isEqualTo(10L);
+    }
+
+    @Test
+    void constructor_templateStartingWithContext_handlesEmptySystemInstruction() {
+        RagPromptRenderer edgeRenderer = new RagPromptRenderer("Context:\n{context}\n\nQuestion: {question}\nAnswer:");
+        assertThat(edgeRenderer.getSystemInstruction()).isEmpty();
+        String payload = edgeRenderer.renderDynamicPayload("Test question?", List.of(Document.builder().id("1").text("Text").build()));
+        assertThat(payload).contains("Context:\nText").contains("Question: Test question?\nAnswer:");
     }
 }

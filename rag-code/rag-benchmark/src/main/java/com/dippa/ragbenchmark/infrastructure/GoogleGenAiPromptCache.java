@@ -243,19 +243,33 @@ public class GoogleGenAiPromptCache implements PromptCache, DisposableBean {
 
     private CacheEntry doCreate(CacheRequest request) {
         try {
-            Content systemInstructionContent = Content.fromParts(Part.fromText(request.systemInstruction()));
-            Content contextContent = Content.fromParts(Part.fromText(request.contextContent()));
-
             String shortKey = request.cacheKey().length() > 8 ? request.cacheKey().substring(0, 8) : request.cacheKey();
             String displayName = properties.displayNamePrefix() + instanceId + "-" + shortKey;
 
-            CachedContentRequest createRequest = CachedContentRequest.builder()
+            CachedContentRequest.Builder requestBuilder = CachedContentRequest.builder()
                     .model(request.model())
                     .displayName(displayName)
-                    .systemInstruction(systemInstructionContent)
-                    .contents(List.of(contextContent))
-                    .ttl(properties.ttl())
-                    .build();
+                    .ttl(properties.ttl());
+
+            if (request.contextContent() != null && !request.contextContent().isBlank()) {
+                Content contextContent = Content.fromParts(Part.fromText(request.contextContent()));
+                requestBuilder.contents(List.of(contextContent));
+                if (request.systemInstruction() != null && !request.systemInstruction().isBlank()) {
+                    Content systemInstructionContent = Content.fromParts(Part.fromText(request.systemInstruction()));
+                    requestBuilder.systemInstruction(systemInstructionContent);
+                }
+            } else {
+                // When contextContent is blank (Strategy 1: Shared Static Prefix Caching),
+                // the static instruction/few-shot prefix constitutes the cached content payload.
+                // Spring AI's CachedContentRequest enforces that contents must not be empty.
+                String textToCache = (request.systemInstruction() != null && !request.systemInstruction().isBlank())
+                        ? request.systemInstruction()
+                        : "";
+                Content prefixContent = Content.fromParts(Part.fromText(textToCache));
+                requestBuilder.contents(List.of(prefixContent));
+            }
+
+            CachedContentRequest createRequest = requestBuilder.build();
 
             GoogleGenAiCachedContentService service = getCachedContentService();
             if (service == null) {

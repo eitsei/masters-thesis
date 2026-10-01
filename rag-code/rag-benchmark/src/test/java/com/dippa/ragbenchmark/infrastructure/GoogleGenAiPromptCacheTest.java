@@ -288,4 +288,25 @@ class GoogleGenAiPromptCacheTest {
         creatorExecutor.shutdownNow();
         clearExecutor.shutdownNow();
     }
+
+    @Test
+    void qualifyingRequest_coldMiss_withBlankContextContent_cachesSystemInstructionInContents() {
+        Instant expiry = Instant.now().plusSeconds(300);
+        GoogleGenAiCachedContent mockContent = mockCachedContent("cachedContents/created-blank-ctx", 5120, expiry);
+        when(cachedContentService.create(any(CachedContentRequest.class))).thenReturn(mockContent);
+
+        CacheRequest request = new CacheRequest(
+                "key-static-prefix", "gemini-3.8-flash", "static system instruction and few-shot demonstrations", "", 5120L);
+
+        CacheLookupResult result = promptCache.getOrCreate(request);
+
+        assertThat(result.status()).isEqualTo(CacheStatus.EXPLICIT_MISS);
+        assertThat(result.cacheId()).isEqualTo("cachedContents/created-blank-ctx");
+
+        ArgumentCaptor<CachedContentRequest> captor = ArgumentCaptor.forClass(CachedContentRequest.class);
+        verify(cachedContentService).create(captor.capture());
+        CachedContentRequest capturedReq = captor.getValue();
+        assertThat(capturedReq.getContents()).isNotEmpty();
+        assertThat(capturedReq.getContents().get(0).text()).isEqualTo("static system instruction and few-shot demonstrations");
+    }
 }

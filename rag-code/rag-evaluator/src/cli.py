@@ -58,6 +58,8 @@ from src.plot_results import (
     plot_latency_breakdown,
     plot_pareto_frontier,
     plot_pareto_frontier_3d,
+    plot_quality_delta_matrix,
+    plot_quality_lollipop,
     plot_ragas_metrics_radar,
 )
 from src.reporter import (
@@ -864,7 +866,13 @@ def export_thesis(
     console.print(f"  [green]✓[/green] Figure: [cyan]{p4}[/cyan]")
 
     p5 = plot_ragas_metrics_radar(run_dict, figures_dir / f"quality_radar{slug_suffix}.pdf", dataset_name=dataset_name)
-    console.print(f"  [green]✓[/green] Figure: [cyan]{p5}[/cyan]")
+    console.print(f"  [green]✓[/green] Figure (legacy radar): [cyan]{p5}[/cyan]")
+
+    p6 = plot_quality_lollipop(run_dict, figures_dir / f"quality_lollipop{slug_suffix}.pdf", dataset_name=dataset_name)
+    console.print(f"  [green]✓[/green] Figure [bold](PRIMARY quality)[/bold]: [cyan]{p6}[/cyan]")
+
+    p7 = plot_quality_delta_matrix(run_dict, figures_dir / f"quality_delta_matrix{slug_suffix}.pdf", dataset_name=dataset_name)
+    console.print(f"  [green]✓[/green] Figure (executive heatmap): [cyan]{p7}[/cyan]")
 
     # For un-slugged root export, provide backwards compatibility alias for legacy ragas_metrics_radar.pdf
     if not slug:
@@ -872,6 +880,7 @@ def export_thesis(
             shutil.copy2(p5, figures_dir / "ragas_metrics_radar.pdf")
 
     console.print("\n[bold green]All thesis tables and figures exported successfully![/bold green]")
+    console.print("[dim]Quality figure standard: quality_lollipop (primary) + quality_radar (legacy).[/dim]")
 
 
 @app.command("query")

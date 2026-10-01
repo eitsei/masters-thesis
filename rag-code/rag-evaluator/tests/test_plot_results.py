@@ -3,6 +3,7 @@
 Tests:
 - plot_latency_breakdown: verifying stream_ms derivation (generationMs - prefillMs) and other=0
 - plot_cost_breakdown: verifying per-record modelUsed pricing tier resolution (Pro vs Flash)
+- plot_quality_lollipop: verifying 2x2 multi-panel layout + output file created
 """
 
 from pathlib import Path
@@ -14,7 +15,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from src.plot_results import plot_cost_breakdown, plot_latency_breakdown
+from src.plot_results import (
+    plot_cost_breakdown,
+    plot_latency_breakdown,
+    plot_quality_delta_matrix,
+    plot_quality_lollipop,
+)
 
 
 def test_plot_latency_breakdown(tmp_path: Path):
@@ -170,3 +176,93 @@ def test_plot_ragas_metrics_radar_four_panel(tmp_path: Path):
     result = plot_ragas_metrics_radar(data, output_path=out_pdf, dataset_name="Enterprise")
     assert result.exists()
     assert result.stat().st_size > 1000
+
+
+def test_plot_quality_lollipop_full_scale(tmp_path: Path):
+    """plot_quality_lollipop with wide metric spreads — should use full [0,1] scale on all panels."""
+    out_pdf = tmp_path / "quality_lollipop.pdf"
+    configs = [
+        "run_C0_baseline",
+        "run_C1_M1", "run_C2_M2", "run_C3_M3", "run_C4_M4",
+        "run_C5_M1_M2",
+    ]
+    # Faithfulness spans 0.30–0.95 (> 0.45 span) → full-scale; all others wide too
+    data = {
+        cfg: [
+            {
+                "context_precision":  0.50 + i * 0.07,
+                "context_recall":     0.30 + i * 0.08,
+                "faithfulness":       0.30 + i * 0.13,
+                "answer_relevancy":   0.40 + i * 0.06,
+            }
+        ]
+        for i, cfg in enumerate(configs)
+    }
+
+    result = plot_quality_lollipop(data, out_pdf, dataset_name="Test-Full")
+    assert result.exists(), "Output PDF was not created"
+    assert result.stat().st_size > 1000, "Output PDF seems empty"
+
+
+def test_plot_quality_lollipop_clustered(tmp_path: Path):
+    """plot_quality_lollipop with clustered high metrics — renders continuous 2x2 multi-panel layout."""
+    out_pdf = tmp_path / "quality_lollipop_broken.pdf"
+    configs = [
+        "run_C0_baseline",
+        "run_C1_M1", "run_C2_M2", "run_C3_M3", "run_C4_M4",
+        "run_C5_M1_M2", "run_C6_M1_M3", "run_C7_M1_M4", "run_C8_M2_M3", "run_C9_M2_M4",
+        "run_C10_M3_M4", "run_C11_M1_M2_M3", "run_C12_M1_M2_M4", "run_C13_M1_M3_M4",
+        "run_C14_M2_M3_M4", "run_C15_M1_M2_M3_M4",
+    ]
+    # Context Precision clustered in [0.72, 0.86] → broken axis should trigger (min ≥ 0.40, span ≤ 0.45)
+    import random
+    random.seed(42)
+    data = {
+        cfg: [
+            {
+                "context_precision":  0.72 + random.random() * 0.14,   # clustered [0.72, 0.86]
+                "context_recall":     0.81 + random.random() * 0.19,   # clustered [0.81, 1.00]
+                "faithfulness":       0.30 + random.random() * 0.65,   # wide → no break
+                "answer_relevancy":   0.58 + random.random() * 0.20,   # borderline broken
+            }
+        ]
+        for cfg in configs
+    }
+
+    result = plot_quality_lollipop(data, out_pdf, dataset_name="Enterprise-Closed")
+    assert result.exists(), "Output PDF was not created"
+    assert result.stat().st_size > 1000, "Output PDF seems empty"
+
+
+def test_plot_quality_lollipop_empty_data(tmp_path: Path):
+    """plot_quality_lollipop should handle empty data gracefully and still write a file."""
+    out_pdf = tmp_path / "quality_lollipop_empty.pdf"
+    result = plot_quality_lollipop({}, out_pdf, dataset_name="Empty")
+    assert result.exists(), "Output PDF should be created even for empty data"
+
+
+def test_plot_quality_delta_matrix(tmp_path: Path):
+    """plot_quality_delta_matrix generates executive diverging heatmap against C0 baseline."""
+    out_pdf = tmp_path / "quality_delta_matrix.pdf"
+    configs = [
+        "run_C0_baseline",
+        "run_C1_M1", "run_C2_M2", "run_C3_M3", "run_C4_M4",
+    ]
+    data = {
+        cfg: [
+            {
+                "context_precision": 0.80 + i * 0.02,
+                "context_recall": 0.85 + i * 0.01,
+                "faithfulness": 0.90 - i * 0.05,
+                "answer_relevancy": 0.75 + i * 0.03,
+                "totalLatencyMs": 2000.0 + i * 200.0,
+                "tokenUsage": {"promptTokens": 500, "completionTokens": 100},
+            }
+        ]
+        for i, cfg in enumerate(configs)
+    }
+
+    result = plot_quality_delta_matrix(data, out_pdf, dataset_name="Test-Delta")
+    assert result.exists(), "Output PDF was not created"
+    assert result.stat().st_size > 1000, "Output PDF seems empty"
+

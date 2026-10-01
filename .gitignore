@@ -9,6 +9,10 @@ rag-benchmark/data/
 rag-code/rag-benchmark/data/
 rag-code/rag-evaluator/data/nordea/
 
+# Figure testing sandbox (not tracked in git; only thesis/figures/ is canonical)
+figure_testing/
+rag-code/rag-evaluator/figure_testing/
+
 # LaTeX compilation auxiliary files
 thesis/*.aux
 thesis/*.bbl

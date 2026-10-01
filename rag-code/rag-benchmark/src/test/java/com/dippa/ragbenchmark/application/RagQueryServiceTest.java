@@ -298,7 +298,7 @@ class RagQueryServiceTest {
     }
 
     @Test
-    void m3ExplicitHit_setsCachedContentOptionAndPassesDynamicSuffixOnly() {
+    void m3ExplicitHit_setsCachedContentOptionAndPassesDynamicPayload() {
         Document chunk = Document.builder().id("c1").text("Large chunk content that meets the threshold.").build();
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(chunk));
         when(promptCache.isConfigured()).thenReturn(true);
@@ -314,12 +314,20 @@ class RagQueryServiceTest {
         assertThat(result.cacheMetadata().tokenCount()).isEqualTo(5120L);
         assertThat(result.cacheMs()).isGreaterThanOrEqualTo(0L);
 
+        // Verify static prefix caching invariant: cacheRequest has empty contextContent
+        ArgumentCaptor<CacheRequest> cacheCaptor = ArgumentCaptor.forClass(CacheRequest.class);
+        verify(promptCache).getOrCreate(cacheCaptor.capture());
+        assertThat(cacheCaptor.getValue().contextContent()).isEmpty();
+        assertThat(cacheCaptor.getValue().systemInstruction()).isEqualTo(promptRenderer.getSystemInstruction());
+
         ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
         verify(chatModel).call(promptCaptor.capture());
 
         Prompt promptSent = promptCaptor.getValue();
-        // The prompt body should only contain the dynamic suffix
-        assertThat(promptSent.getContents()).isEqualTo("Question: Cached question?\nAnswer:");
+        // Strategy 1: The dynamic prompt body contains retrieved chunks and question suffix
+        assertThat(promptSent.getContents())
+                .contains("Context:\nLarge chunk content that meets the threshold.")
+                .contains("Question: Cached question?\nAnswer:");
         // The options should contain cachedContentName
         assertThat(promptSent.getOptions()).isInstanceOf(GoogleGenAiChatOptions.class);
         GoogleGenAiChatOptions options = (GoogleGenAiChatOptions) promptSent.getOptions();
@@ -329,7 +337,7 @@ class RagQueryServiceTest {
     }
 
     @Test
-    void m3ExplicitMiss_setsCachedContentOptionAndReportsExplicitMiss() {
+    void m3ExplicitMiss_setsCachedContentOptionAndPassesDynamicPayload() {
         Document chunk = Document.builder().id("c1").text("Large chunk content on cold creation.").build();
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(chunk));
         when(promptCache.isConfigured()).thenReturn(true);
@@ -347,7 +355,9 @@ class RagQueryServiceTest {
         verify(chatModel).call(promptCaptor.capture());
 
         Prompt promptSent = promptCaptor.getValue();
-        assertThat(promptSent.getContents()).isEqualTo("Question: Cold question?\nAnswer:");
+        assertThat(promptSent.getContents())
+                .contains("Context:\nLarge chunk content on cold creation.")
+                .contains("Question: Cold question?\nAnswer:");
         GoogleGenAiChatOptions options = (GoogleGenAiChatOptions) promptSent.getOptions();
         assertThat(options.getCachedContentName()).isEqualTo("cachedContents/miss-456");
         assertThat(options.getThinkingBudget()).isEqualTo(0);

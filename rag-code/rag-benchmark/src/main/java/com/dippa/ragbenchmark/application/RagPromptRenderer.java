@@ -32,6 +32,7 @@ public class RagPromptRenderer {
 
     private final PromptTemplate fullPromptTemplate;
     private final PromptTemplate suffixTemplate;
+    private final PromptTemplate dynamicPayloadTemplate;
     private final String systemInstruction;
 
     @Autowired
@@ -50,15 +51,32 @@ public class RagPromptRenderer {
 
         this.fullPromptTemplate = new PromptTemplate(content);
 
-        // Derive system instruction and dynamic query suffix from the single prompt template source
-        int contextIndex = content.indexOf("Context:");
-        if (contextIndex > 0) {
-            this.systemInstruction = content.substring(0, contextIndex).trim();
-        } else {
-            this.systemInstruction = content.trim();
+        // Derive system instruction, dynamic payload, and dynamic query suffix from prompt template
+        int contextIndex = content.indexOf("Context:\n{context}");
+        if (contextIndex < 0) {
+            contextIndex = content.indexOf("Context:\r\n{context}");
+        }
+        if (contextIndex < 0) {
+            contextIndex = content.lastIndexOf("Context:");
         }
 
-        int questionIndex = content.indexOf("Question:");
+        if (contextIndex >= 0) {
+            this.systemInstruction = content.substring(0, contextIndex).trim();
+            String dynamicPayloadTemplateString = content.substring(contextIndex).trim();
+            this.dynamicPayloadTemplate = new PromptTemplate(dynamicPayloadTemplateString);
+        } else {
+            this.systemInstruction = content.trim();
+            this.dynamicPayloadTemplate = null;
+        }
+
+        int questionIndex = content.indexOf("Question: {question}");
+        if (questionIndex < 0) {
+            questionIndex = content.indexOf("Question:\n{question}");
+        }
+        if (questionIndex < 0) {
+            questionIndex = content.lastIndexOf("Question:");
+        }
+
         if (questionIndex >= 0) {
             String suffixTemplateString = content.substring(questionIndex).trim();
             this.suffixTemplate = new PromptTemplate(suffixTemplateString);
@@ -93,6 +111,18 @@ public class RagPromptRenderer {
     }
 
     /**
+     * Renders dynamic query payload (context documents + question) sent in explicit cached calls.
+     */
+    public String renderDynamicPayload(String question, List<Document> chunks) {
+        String context = renderContext(chunks);
+        String sanitizedQuestion = question != null ? question.trim() : "";
+        if (dynamicPayloadTemplate != null) {
+            return dynamicPayloadTemplate.render(Map.of("context", context, "question", sanitizedQuestion));
+        }
+        return "Context:\n" + context + "\n\n" + renderDynamicSuffix(sanitizedQuestion);
+    }
+
+    /**
      * Renders full monolithic prompt for baseline queries or sub-threshold/bypassed queries.
      */
     public String renderFullPrompt(String question, List<Document> chunks) {
@@ -102,10 +132,33 @@ public class RagPromptRenderer {
     }
 
     /**
-     * Computes a canonical, length-safe SHA-256 cache key including schema version, provider,
-     * model identifier, table name, system instruction, and ordered context chunks.
+     * Computes a canonical, length-safe SHA-256 cache key for the static cacheable prefix.
      *
-     * <p>Preserves pipeline input order to ensure distinct prefix orderings yield distinct cache keys.</p>
+     * <p>In accordance with Strategy 1 (Shared Static Prefix Caching), the cache key depends
+     * exclusively on schema version, provider, model identifier, and system instruction prefix,
+     * ensuring that queries with distinct retrieved context chunks share the exact same cached prefix
+     * and achieve a 100% cache hit rate.</p>
+     */
+    public String computeCanonicalCacheKey(
+            String provider,
+            String model,
+            String systemInstructionText) {
+        String effectiveProvider = provider != null ? provider.trim() : "default";
+        String effectiveModel = model != null ? model.trim() : "default";
+        String effectiveInstruction = systemInstructionText != null ? systemInstructionText.trim() : this.systemInstruction;
+
+        String keyMaterial = String.join("::",
+                PROMPT_SCHEMA_VERSION,
+                effectiveProvider,
+                effectiveModel,
+                effectiveInstruction);
+
+        return sha256Hex(keyMaterial);
+    }
+
+    /**
+     * Computes canonical cache key for backward compatibility with 5-parameter callers.
+     * Delegates to the static prefix key computation to maintain 100% cache hit rate.
      */
     public String computeCanonicalCacheKey(
             String provider,
@@ -113,40 +166,7 @@ public class RagPromptRenderer {
             String tableName,
             String systemInstructionText,
             List<Document> chunks) {
-        String effectiveProvider = provider != null ? provider.trim() : "default";
-        String effectiveModel = model != null ? model.trim() : "default";
-        String effectiveTable = tableName != null ? tableName.trim() : "default";
-        String effectiveInstruction = systemInstructionText != null ? systemInstructionText.trim() : this.systemInstruction;
-
-        StringBuilder chunksRepresentation = new StringBuilder();
-        if (chunks != null) {
-            for (int i = 0; i < chunks.size(); i++) {
-                Document doc = chunks.get(i);
-                String id = doc.getId() != null ? doc.getId() : "";
-                String text = doc.getText() != null ? doc.getText() : "";
-                chunksRepresentation.append("[")
-                        .append(i)
-                        .append("]id=")
-                        .append(id.length())
-                        .append(":")
-                        .append(id)
-                        .append(":text=")
-                        .append(text.length())
-                        .append(":")
-                        .append(text)
-                        .append("\n");
-            }
-        }
-
-        String keyMaterial = String.join("::",
-                PROMPT_SCHEMA_VERSION,
-                effectiveProvider,
-                effectiveModel,
-                effectiveTable,
-                effectiveInstruction,
-                chunksRepresentation.toString());
-
-        return sha256Hex(keyMaterial);
+        return computeCanonicalCacheKey(provider, model, systemInstructionText);
     }
 
     /**

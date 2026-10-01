@@ -3,9 +3,22 @@
 Generates:
 - thesis/figures/pareto_frontier.pdf (Quality vs Latency, Quality vs Cost with empirical Pareto frontier)
 - thesis/figures/pareto_frontier_3d.pdf (Empirical 3D Pareto frontier across QPS, QPD, Composite Q)
-- thesis/figures/latency_breakdown.pdf (Stacked bar chart of retrieval vs. generation latencies)
-- thesis/figures/cost_breakdown.pdf (Stacked bar chart of micro-phase operational costs per 1,000 queries)
-- thesis/figures/ragas_metrics_radar.pdf (Radar chart comparing 4 core RAGAS metrics)
+- thesis/figures/latency_breakdown.pdf (Full 9-phase stacked micro-breakdown, 45° angled labels)
+- thesis/figures/cost_breakdown.pdf (Full 7-phase stacked cost breakdown per 1,000 queries, 45° angled labels)
+- thesis/figures/quality_lollipop.pdf [PRIMARY] (2x2 horizontal lollipop plot with tier pastel
+    backgrounds, reinforced grid, and dynamic adaptive broken axes per metric)
+- thesis/figures/quality_delta_matrix.pdf (Executive performance delta heatmap vs. C0 baseline)
+- thesis/figures/quality_radar.pdf [LEGACY] (4-panel radar / spider chart, kept for backwards compat)
+
+Visual Standards (adopted permanently from October 2026 evaluation runs):
+- Quality profiles: 4-panel horizontal lollipop with dynamic broken x-axes when metric values cluster
+  above 0.40 (e.g. Context Precision, Context Recall). Each architectural tier (k=0..4) highlighted
+  by a distinct pastel background band and separated by subtle boundary lines.
+- Latency breakdown: All 9 micro-phases stacked (route, embed, ret, rerank, expand, cache, prefill,
+  stream, other), total label rotated 45°, y-limit = 1.35 * max_total.
+- Cost breakdown: All 7 cost components stacked (prompt, cache, comp, rerank, embed, route, other),
+  total label rotated 45°, y-limit = 1.35 * max_total.
+- Pareto frontier: Only Pareto-optimal points annotated, dynamic Y bounds, anti-collision offsets.
 """
 
 from __future__ import annotations
@@ -17,12 +30,101 @@ from typing import Any, Mapping, Optional, Sequence
 
 import matplotlib
 matplotlib.use("Agg")  # Headless backend for Linux environments
+import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 - registers 3d projection
 import numpy as np
 
 from src.metrics import PRICING_CATALOG, get_pricing_tier
 from src.reporter import summarize_run_records
+
+# ── Tier colour palettes ──────────────────────────────────────────────────────
+_TIER_COLORS: dict[int, str] = {
+    0: "#2c3e50",  # Baseline: dark slate
+    1: "#1f77b4",  # k=1 Isolated: blue
+    2: "#2ca02c",  # k=2 Pairwise: green
+    3: "#ff7f0e",  # k=3 Triplets: orange
+    4: "#d62728",  # k=4 Full-Stack: red
+}
+
+_TIER_BG_COLORS: dict[int, str] = {
+    0: "#f1f5f9",  # Baseline: soft slate
+    1: "#eff6ff",  # k=1: soft light blue
+    2: "#f0fdf4",  # k=2: soft light green
+    3: "#fff7ed",  # k=3: soft light orange/peach
+    4: "#fef2f2",  # k=4: soft light red/rose
+}
+
+_CONFIG_FRIENDLY_NAMES: dict[str, str] = {
+    "C0": "$C_0$ (Baseline)",
+    "C1": "$C_1$ (M1)",   "C2": "$C_2$ (M2)",   "C3": "$C_3$ (M3)",   "C4": "$C_4$ (M4)",
+    "C5": "$C_5$ (M1+M2)", "C6": "$C_6$ (M1+M3)", "C7": "$C_7$ (M1+M4)",
+    "C8": "$C_8$ (M2+M3)", "C9": "$C_9$ (M2+M4)", "C10": "$C_{10}$ (M3+M4)",
+    "C11": "$C_{11}$ (M1+M2+M3)", "C12": "$C_{12}$ (M1+M2+M4)",
+    "C13": "$C_{13}$ (M1+M3+M4)", "C14": "$C_{14}$ (M2+M3+M4)",
+    "C15": "$C_{15}$ (Full-Stack)",
+}
+
+
+def _get_config_key(name: str) -> str:
+    m = re.search(r"c_?(\d+)", name.lower())
+    if m:
+        return f"C{m.group(1)}"
+    if "base" in name.lower():
+        return "C0"
+    return name
+
+
+def _get_friendly_name_pr(name: str) -> str:
+    key = _get_config_key(name)
+    return _CONFIG_FRIENDLY_NAMES.get(key, name.replace("run_", "").replace("_", " "))
+
+
+def _get_tier_pr(name: str) -> int:
+    key = _get_config_key(name)
+    m = re.search(r"C(\d+)", key)
+    if not m:
+        return 0
+    c = int(m.group(1))
+    if c == 0:
+        return 0
+    if 1 <= c <= 4:
+        return 1
+    if 5 <= c <= 10:
+        return 2
+    if 11 <= c <= 14:
+        return 3
+    return 4
+
+
+def _draw_tier_bands_pr(ax: plt.Axes, y_pos: "np.ndarray", tiers: list[int], total: int) -> None:
+    """Draws soft tinted horizontal tier bands with boundary divider lines."""
+    for t in range(5):
+        ys = [y for y, tier in zip(y_pos, tiers) if tier == t]
+        if not ys:
+            continue
+        min_y, max_y = min(ys), max(ys)
+        ax.axhspan(min_y - 0.5, max_y + 0.5, facecolor=_TIER_BG_COLORS[t], alpha=0.85, zorder=0)
+        if max_y + 0.5 < total - 0.5:
+            ax.axhline(max_y + 0.5, color="#cbd5e1", linewidth=0.85, linestyle="-", zorder=1)
+        if min_y - 0.5 > -0.5:
+            ax.axhline(min_y - 0.5, color="#cbd5e1", linewidth=0.85, linestyle="-", zorder=1)
+
+
+def _add_axis_break_slashes(ax_l: plt.Axes, ax_r: plt.Axes, d: float = 0.025) -> None:
+    """Adds '//' diagonal break marks on the shared spine between two sub-axes."""
+    ax_l.spines["right"].set_visible(False)
+    ax_r.spines["left"].set_visible(False)
+    ax_r.tick_params(left=False, labelleft=False)
+    kw = dict(color="#475569", clip_on=False, linewidth=1.1)
+    ax_l.plot((1 - d, 1 + d), (-d, +d), transform=ax_l.transAxes, **kw)
+    ax_l.plot((1 - d, 1 + d), (1 - d, 1 + d), transform=ax_l.transAxes, **kw)
+    d_r = d * 0.20
+    ax_r.plot((-d_r, +d_r), (-d, +d), transform=ax_r.transAxes, **kw)
+    ax_r.plot((-d_r, +d_r), (1 - d, 1 + d), transform=ax_r.transAxes, **kw)
+
+
 
 
 def _set_publication_style() -> None:
@@ -85,7 +187,15 @@ def plot_pareto_frontier(
     output_path: Path | str = "thesis/figures/pareto_frontier.pdf",
     dataset_name: Optional[str] = None,
 ) -> Path:
-    """Generates dual-panel Quality vs Latency and Quality vs Cost Pareto trade-off figure."""
+    """Generates dual-panel Quality vs Latency and Quality vs Cost Pareto trade-off figure.
+
+    Visual Standards (Pareto Improved):
+    - Tier colors used for all scatter points.
+    - Only Pareto-optimal points are annotated with friendly names and offset labels to eliminate clutter.
+    - Dynamic Y-limits based on actual data range.
+    - Red dashed curve delineating the empirical Pareto frontier.
+    - Bottom legend identifying tiers and the Pareto frontier.
+    """
     _set_publication_style()
     out_file = Path(output_path)
     out_file.parent.mkdir(parents=True, exist_ok=True)
@@ -103,81 +213,139 @@ def plot_pareto_frontier(
         latency_points.append((lat, q, name))
         cost_points.append((cost, q, name))
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.8), dpi=300)
+    if not latency_points:
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No data available", ha="center", va="center", transform=ax.transAxes)
+        plt.savefig(out_file, bbox_inches="tight", dpi=300)
+        plt.close(fig)
+        return out_file
 
-    palette = [
-        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
-        "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
-    ]
+    frontier_lat = _compute_pareto_frontier(latency_points, minimize_x=True, maximize_y=True)
+    pareto_lat_names = set(p[2] for p in frontier_lat)
 
-    # Panel 1: Quality vs Latency
-    for i, (lat, q, name) in enumerate(latency_points):
-        color = palette[i % len(palette)]
-        ax1.scatter(lat, q, color=color, s=70, zorder=4, edgecolors="k", linewidth=0.6, label=name)
-        ax1.annotate(
-            name,
-            (lat, q),
-            textcoords="offset points",
-            xytext=(5, 5),
-            fontsize=8,
-            alpha=0.85,
+    frontier_cost = _compute_pareto_frontier(cost_points, minimize_x=True, maximize_y=True)
+    pareto_cost_names = set(p[2] for p in frontier_cost)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11.5, 5.0), dpi=300)
+
+    # Dynamic Y limits
+    all_q = [p[1] for p in latency_points]
+    y_min = max(0.0, min(all_q) - 0.08)
+    y_max = min(1.02, max(all_q) + 0.10)
+
+    # ── Panel 1: Quality vs Latency ───────────────────────────────────────────
+    for lat, q, name in latency_points:
+        t = _get_tier_pr(name)
+        color = _TIER_COLORS.get(t, "#444444")
+        is_pareto = name in pareto_lat_names
+
+        ax1.scatter(
+            lat, q,
+            color=color,
+            s=80 if is_pareto else 50,
+            zorder=5 if is_pareto else 3,
+            edgecolors="#d62728" if is_pareto else "k",
+            linewidth=2.0 if is_pareto else 0.5,
+            alpha=0.95 if is_pareto else 0.6,
         )
 
-    # Compute and plot Pareto frontier for Latency
-    frontier_lat = _compute_pareto_frontier(latency_points, minimize_x=True, maximize_y=True)
+        if is_pareto:
+            friendly = _get_friendly_name_pr(name)
+            ax1.annotate(
+                friendly,
+                (lat, q),
+                textcoords="offset points",
+                xytext=(6, 6),
+                fontsize=8.5,
+                fontweight="bold",
+                color="#b30000",
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.85, edgecolor="#b30000", linewidth=0.5),
+                zorder=6,
+            )
+
     if len(frontier_lat) > 1:
         fx = [p[0] for p in frontier_lat]
         fy = [p[1] for p in frontier_lat]
-        ax1.plot(fx, fy, "--", color="#d62728", alpha=0.75, linewidth=1.5, label="Pareto Frontier ($\\mathcal{P}$)")
+        ax1.plot(fx, fy, "--", color="#d62728", linewidth=1.8, label="Pareto Frontier ($\\mathcal{P}$)", zorder=4)
 
     ax1.set_title("(a) Quality vs. End-to-End Latency", fontweight="bold")
-    ax1.set_xlabel("Median Latency $P_{50}$ (ms)")
-    ax1.set_ylabel("Composite Quality $Q(q) \\in [0, 1]$")
-    ax1.set_ylim(-0.05, 1.05)
-    ax1.grid(True)
+    ax1.set_xlabel("Median Latency $P_{50}$ (ms)", fontweight="bold")
+    ax1.set_ylabel("Composite Quality $Q(q) \\in [0, 1]$", fontweight="bold")
+    ax1.set_ylim(y_min, y_max)
+    ax1.grid(True, linestyle="--", alpha=0.5)
 
-    # Panel 2: Quality vs Cost
-    for i, (cost, q, name) in enumerate(cost_points):
-        color = palette[i % len(palette)]
-        ax2.scatter(cost, q, color=color, s=70, zorder=4, edgecolors="k", linewidth=0.6)
-        ax2.annotate(
-            name,
-            (cost, q),
-            textcoords="offset points",
-            xytext=(5, 5),
-            fontsize=8,
-            alpha=0.85,
+    # ── Panel 2: Quality vs Cost ──────────────────────────────────────────────
+    for cost, q, name in cost_points:
+        t = _get_tier_pr(name)
+        color = _TIER_COLORS.get(t, "#444444")
+        is_pareto = name in pareto_cost_names
+
+        ax2.scatter(
+            cost, q,
+            color=color,
+            s=80 if is_pareto else 50,
+            zorder=5 if is_pareto else 3,
+            edgecolors="#d62728" if is_pareto else "k",
+            linewidth=2.0 if is_pareto else 0.5,
+            alpha=0.95 if is_pareto else 0.6,
         )
 
-    # Compute and plot Pareto frontier for Cost
-    frontier_cost = _compute_pareto_frontier(cost_points, minimize_x=True, maximize_y=True)
+        if is_pareto:
+            friendly = _get_friendly_name_pr(name)
+            ox, oy = 6, 6
+            for oc, oq, oname in cost_points:
+                if oname in pareto_cost_names and oname != name and abs(oc - cost) < 0.4 and abs(oq - q) < 0.04:
+                    if name > oname:
+                        ox, oy = 8, 14
+                    else:
+                        ox, oy = -42, -16
+            ax2.annotate(
+                friendly,
+                (cost, q),
+                textcoords="offset points",
+                xytext=(ox, oy),
+                fontsize=8.5,
+                fontweight="bold",
+                color="#b30000",
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.85, edgecolor="#b30000", linewidth=0.5),
+                zorder=6,
+            )
+
     if len(frontier_cost) > 1:
         cx = [p[0] for p in frontier_cost]
         cy = [p[1] for p in frontier_cost]
-        ax2.plot(cx, cy, "--", color="#d62728", alpha=0.75, linewidth=1.5, label="Pareto Frontier ($\\mathcal{P}$)")
+        ax2.plot(cx, cy, "--", color="#d62728", linewidth=1.8, label="Pareto Frontier ($\\mathcal{P}$)", zorder=4)
 
     ax2.set_title("(b) Quality vs. Operational Cost", fontweight="bold")
-    ax2.set_xlabel("Operational Cost per 1,000 Queries (USD)")
-    ax2.set_ylabel("Composite Quality $Q(q) \\in [0, 1]$")
-    ax2.set_ylim(-0.05, 1.05)
-    ax2.grid(True)
+    ax2.set_xlabel("Operational Cost per 1,000 Queries (USD)", fontweight="bold")
+    ax2.set_ylabel("Composite Quality $Q(q) \\in [0, 1]$", fontweight="bold")
+    ax2.set_ylim(y_min, y_max)
+    ax2.grid(True, linestyle="--", alpha=0.5)
 
-    # Place combined legend below subplots
-    handles, labels = ax1.get_legend_handles_labels()
+    # ── Combined legend below subplots ────────────────────────────────────────
+    legend_elements = [
+        plt.Line2D([0], [0], color="#d62728", linestyle="--", linewidth=1.8, label="Pareto Frontier ($\\mathcal{P}$)"),
+        Patch(facecolor=_TIER_COLORS[0], edgecolor="k", label="$C_0$ Baseline"),
+        Patch(facecolor=_TIER_COLORS[1], edgecolor="k", label="Single-opt ($k=1$)"),
+        Patch(facecolor=_TIER_COLORS[2], edgecolor="k", label="Dual-opt ($k=2$)"),
+        Patch(facecolor=_TIER_COLORS[3], edgecolor="k", label="Triple-opt ($k=3$)"),
+        Patch(facecolor=_TIER_COLORS[4], edgecolor="k", label="Full-Stack ($k=4$)"),
+    ]
     fig.legend(
-        handles,
-        labels,
+        handles=legend_elements,
         loc="upper center",
         bbox_to_anchor=(0.5, 0.04),
-        ncol=min(5, len(labels)),
+        ncol=6,
+        fontsize=8.5,
         frameon=True,
     )
 
     if dataset_name:
-        fig.suptitle(f"Multi-Objective Pareto Frontier for {dataset_name}", fontsize=12, fontweight="bold", y=0.98)
-        plt.tight_layout(rect=[0, 0.08, 1, 0.95])
+        fig.suptitle(f"Multi-Objective Pareto Frontier for {dataset_name}", fontsize=12.5, fontweight="bold", y=0.98)
+        plt.tight_layout(rect=[0, 0.08, 1, 0.94])
     else:
-        plt.tight_layout(rect=[0, 0.08, 1, 1])
+        plt.tight_layout(rect=[0, 0.08, 1, 0.94])
+
     plt.savefig(out_file, bbox_inches="tight", dpi=300)
     plt.close(fig)
     return out_file
@@ -361,18 +529,19 @@ def plot_latency_breakdown(
         )
         bottom += vals
 
-    # Label total latency on top of bars
+    # Label total latency on top of bars, rotated 45° for readability
     max_tot = max(totals) if totals else 1.0
     for i, tot in enumerate(totals):
         ax.annotate(
             f"{tot:.0f} ms",
             xy=(x[i], tot),
-            xytext=(0, 4),
+            xytext=(4, 4),
             textcoords="offset points",
-            ha="center",
+            ha="left",
             va="bottom",
-            fontsize=8,
+            fontsize=7.5,
             fontweight="bold",
+            rotation=45,
         )
 
     ax.set_ylabel("Execution Latency (ms)")
@@ -381,9 +550,9 @@ def plot_latency_breakdown(
     ax.set_xticks(x)
 
     display_labels = [c.replace("_", " ") for c in configs]
-    ax.set_xticklabels(display_labels, rotation=20, ha="right", fontsize=9)
+    ax.set_xticklabels(display_labels, rotation=45, ha="right", fontsize=9)
 
-    ax.set_ylim(0, max_tot * 1.22)
+    ax.set_ylim(0, max_tot * 1.35)
     ax.legend(
         loc="upper left",
         framealpha=0.92,
@@ -622,6 +791,300 @@ def plot_ragas_metrics_radar(
     )
     plt.tight_layout()
     plt.subplots_adjust(hspace=0.38, wspace=0.25)
+    plt.savefig(out_file, bbox_inches="tight", dpi=300)
+    plt.close(fig)
+    return out_file
+
+
+def plot_quality_lollipop(
+    data: Mapping[str, Any],
+    out_file: Path,
+    dataset_name: str = "",
+) -> Path:
+    """4-panel horizontal lollipop plot — the primary quality figure standard.
+
+    Replaced the radar chart as the default quality export from October 2026.
+    Each panel shows one RAGAS metric across all 16 configurations, ordered
+    bottom-to-top by tier (C0 baseline → C15 full-stack).
+
+    Features
+    --------
+    - **Tier pastel bands**: Each of the 5 architectural tiers (k=0..4) is
+      highlighted with a distinct pastel horizontal band and labelled on the
+      y-axis (C0 … C15).
+    - **Reinforced grid**: Stronger dashed vertical grid lines (alpha=0.65).
+    - **Dynamic broken x-axis**: When metric values cluster above 0.40 and
+      span ≤ 0.45, the x-axis is split into a short [0.0–0.06] anchor segment
+      and a zoomed [zoom_min, zoom_max] segment, joined by '//' break marks.
+      Otherwise the full [0, 1] scale is used.
+    - **Per-panel tick & spine styling**: Only left spine visible; horizontal
+      lollipop stems with circular markers.
+
+    Parameters
+    ----------
+    data:
+        ``{run_name: [record, ...]}`` mapping as returned by the CLI loader.
+    out_file:
+        Destination path for the PDF/PNG output.
+    dataset_name:
+        Human-readable dataset label used in the figure title.
+
+    Returns
+    -------
+    Path
+        The ``out_file`` path after writing.
+    """
+    _set_publication_style()
+
+    # ── Metrics ────────────────────────────────────────────────────────────────
+    METRICS = [
+        ("context_precision_mean",  "Context Precision"),
+        ("context_recall_mean",     "Context Recall"),
+        ("faithfulness_mean",       "Faithfulness"),
+        ("answer_relevancy_mean",   "Answer Relevancy"),
+    ]
+
+    # ── Build sorted config list ───────────────────────────────────────────────
+    summarised: dict[str, dict[str, float]] = {}
+    for run_name, records in data.items():
+        if not records:
+            continue
+        s = summarize_run_records(records)
+        if s:
+            summarised[run_name] = s
+
+    if not summarised:
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No data available", ha="center", va="center", transform=ax.transAxes)
+        plt.savefig(out_file, bbox_inches="tight", dpi=300)
+        plt.close(fig)
+        return out_file
+
+    def _sort_key(name: str) -> int:
+        m = re.search(r"c_?(\d+)", name.lower())
+        if m:
+            return int(m.group(1))
+        if "base" in name.lower():
+            return 0
+        return 999
+
+    sorted_runs = sorted(summarised.keys(), key=_sort_key, reverse=True)
+    n = len(sorted_runs)
+    labels = [_get_friendly_name_pr(r) for r in sorted_runs]
+    tiers = [_get_tier_pr(r) for r in sorted_runs]
+    y_pos = np.arange(n)
+    colors = [_TIER_COLORS[t] for t in tiers]
+
+    # ── Figure layout (2x2 grid with continuous [0.0, 1.0] scale) ──────────────
+    # Top row: Retrieval metrics (Context Precision, Context Recall)
+    # Bottom row: Synthesis metrics (Faithfulness, Answer Relevancy)
+    fig_w = 8.8
+    fig_h = 10.2
+
+    fig = plt.figure(figsize=(fig_w, fig_h), dpi=300)
+    title_suffix = f" — {dataset_name}" if dataset_name else ""
+    fig.suptitle(
+        f"RAGAS Quality Metrics by Configuration{title_suffix}",
+        fontsize=12.5, fontweight="bold", y=0.985,
+    )
+
+    outer_gs = gridspec.GridSpec(
+        2, 2, figure=fig,
+        hspace=0.28, wspace=0.38,
+        left=0.14, right=0.96, top=0.94, bottom=0.06,
+    )
+
+    panel_prefixes = ["(a)", "(b)", "(c)", "(d)"]
+
+    for idx, (mkey, mtitle) in enumerate(METRICS):
+        row = idx // 2
+        col = idx % 2
+        cell = outer_gs[row, col]
+        ax = fig.add_subplot(cell)
+
+        # Soft tier background bands
+        _draw_tier_bands_pr(ax, y_pos, tiers, n)
+
+        vals = [summarised[r].get(mkey, float("nan")) for r in sorted_runs]
+
+        for i, (v, c) in enumerate(zip(vals, colors)):
+            if math.isnan(v):
+                continue
+            ax.hlines(y_pos[i], 0.0, v, colors=c, linewidth=1.5, alpha=0.85, zorder=3)
+            ax.scatter(v, y_pos[i], color=c, s=45, edgecolors="k", linewidth=0.6, zorder=4)
+            ax.annotate(
+                f"{v:.3f}",
+                (v, y_pos[i]),
+                textcoords="offset points",
+                xytext=(8, 0),
+                va="center",
+                ha="left",
+                fontsize=7.2,
+                fontweight="bold",
+                color=c,
+            )
+
+        ax.set_title(f"{panel_prefixes[idx]} {mtitle}", fontweight="bold", fontsize=10.5, pad=8, loc="left")
+        ax.set_xlim(-0.02, 1.14)
+        ax.set_xticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+        ax.set_xticklabels(["0.0", "0.2", "0.4", "0.6", "0.8", "1.0"], fontsize=8.0)
+        ax.xaxis.set_tick_params(labelsize=8.0)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(labels, fontsize=8.2, fontweight="medium")
+        ax.set_ylim(-0.7, n - 0.3)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(True, axis="x", linestyle="--", linewidth=0.8, color="#94a3b8", alpha=0.65, zorder=1)
+
+    # ── Tier legend below the figure ──────────────────────────────────────────
+    tier_labels = {
+        0: "Baseline ($C_0$)",
+        1: "Single-opt ($C_1$–$C_4$)",
+        2: "Dual-opt ($C_5$–$C_{10}$)",
+        3: "Triple-opt ($C_{11}$–$C_{14}$)",
+        4: "Full-Stack ($C_{15}$)",
+    }
+    handles = [
+        Patch(facecolor=_TIER_COLORS[t], edgecolor="k", label=tier_labels[t])
+        for t in sorted(tier_labels)
+    ]
+    fig.legend(
+        handles=handles,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.01),
+        ncol=5,
+        fontsize=9.0,
+        framealpha=0.9,
+        edgecolor="#cbd5e1",
+    )
+
+    plt.savefig(out_file, bbox_inches="tight", dpi=300)
+    plt.close(fig)
+    return out_file
+
+
+def plot_quality_delta_matrix(
+    data: Mapping[str, Any],
+    out_file: Path,
+    dataset_name: str = "",
+) -> Path:
+    """Executive Performance Delta Heatmap comparing all treatments (C1..C15) to C0 Baseline.
+
+    Displays relative percentage improvements/regressions across all 4 RAGAS metrics,
+    Composite Quality (Q), median latency (P50), and operational cost per 1k queries.
+    """
+    _set_publication_style()
+    out_file = Path(out_file)
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+
+    summaries: dict[str, dict[str, float]] = {}
+    for run_name, records in data.items():
+        if not records:
+            continue
+        s = summarize_run_records(records)
+        if s:
+            summaries[run_name] = s
+
+    if not summaries:
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No data available", ha="center", va="center", transform=ax.transAxes)
+        plt.savefig(out_file, bbox_inches="tight", dpi=300)
+        plt.close(fig)
+        return out_file
+
+    configs = list(summaries.keys())
+    base_name = next((c for c in configs if _get_config_key(c) == "C0"), None)
+    if not base_name or base_name not in summaries:
+        base_name = configs[0]
+    sb = summaries[base_name]
+
+    treatment_configs = [c for c in configs if _get_config_key(c) != "C0"]
+    def _c_sort(c: str) -> int:
+        m = re.search(r"c_?(\d+)", c.lower())
+        return int(m.group(1)) if m else 999
+    treatment_configs.sort(key=_c_sort)
+
+    if not treatment_configs:
+        treatment_configs = configs
+
+    metrics = [
+        ("Context Precision", "context_precision_mean", True),
+        ("Context Recall", "context_recall_mean", True),
+        ("Faithfulness", "faithfulness_mean", True),
+        ("Answer Relevancy", "answer_relevancy_mean", True),
+        ("Composite Quality $Q$", "composite_q_mean", True),
+        ("Latency $P_{50}$", "latency_p50", False),
+        ("Cost / 1k", "cost_mean", False),
+    ]
+
+    delta_matrix = np.zeros((len(treatment_configs), len(metrics)))
+    raw_matrix = np.zeros((len(treatment_configs), len(metrics)))
+
+    for r_idx, c_name in enumerate(treatment_configs):
+        s = summaries[c_name]
+        for c_idx, (m_label, m_key, higher_is_better) in enumerate(metrics):
+            val = s.get(m_key, 0.0)
+            base_v = sb.get(m_key, 1.0)
+            raw_matrix[r_idx, c_idx] = val
+
+            if base_v > 0:
+                pct = ((val - base_v) / base_v) * 100.0
+            else:
+                pct = 0.0
+
+            oriented_delta = pct if higher_is_better else -pct
+            delta_matrix[r_idx, c_idx] = oriented_delta
+
+    fig, ax = plt.subplots(figsize=(10.5, 8.0), dpi=300)
+    cmap = plt.cm.RdYlGn
+    vlim = max(30.0, float(np.percentile(np.abs(delta_matrix), 90)))
+    im = ax.imshow(delta_matrix, cmap=cmap, vmin=-vlim, vmax=vlim, aspect="auto")
+
+    for r in range(len(treatment_configs)):
+        for c in range(len(metrics)):
+            val = raw_matrix[r, c]
+            d = delta_matrix[r, c]
+            higher_is_better = metrics[c][2]
+            actual_pct = d if higher_is_better else -d
+
+            sign = "+" if actual_pct >= 0 else ""
+            if "Cost" in metrics[c][0]:
+                raw_str = f"${val*1000.0:.2f}"
+            elif "Latency" in metrics[c][0]:
+                raw_str = f"{val:.0f}ms"
+            else:
+                raw_str = f"{val:.3f}"
+
+            text_color = "white" if abs(d) > (vlim * 0.60) else "black"
+            ax.text(
+                c, r,
+                f"{raw_str}\n({sign}{actual_pct:.1f}%)",
+                ha="center", va="center",
+                fontsize=7.5,
+                color=text_color,
+                fontweight="bold" if abs(d) > 20 else "normal",
+            )
+
+    y_labels = [_get_friendly_name_pr(c) for c in treatment_configs]
+    ax.set_yticks(np.arange(len(treatment_configs)))
+    ax.set_yticklabels(y_labels, fontsize=8.5)
+
+    x_labels = [m[0] for m in metrics]
+    ax.set_xticks(np.arange(len(metrics)))
+    ax.set_xticklabels(x_labels, fontsize=9.0, fontweight="bold", rotation=20, ha="right")
+
+    cbar = fig.colorbar(im, ax=ax, fraction=0.03, pad=0.04)
+    cbar.set_label("Relative Performance vs. Baseline ($C_0$)\n[Green = Improvement, Red = Regression]", fontsize=8.5)
+    cbar.ax.tick_params(labelsize=8.0)
+
+    title_suffix = f" for {dataset_name}" if dataset_name else ""
+    ax.set_title(
+        f"Executive Performance Delta vs. Baseline ($C_0$){title_suffix}",
+        fontsize=11.5,
+        fontweight="bold",
+        pad=15,
+    )
+    plt.tight_layout()
     plt.savefig(out_file, bbox_inches="tight", dpi=300)
     plt.close(fig)
     return out_file
@@ -1098,12 +1561,13 @@ def plot_cost_breakdown(
         ax.annotate(
             f"${tot:.3f}",
             xy=(x[i], tot),
-            xytext=(0, 4),
+            xytext=(4, 4),
             textcoords="offset points",
-            ha="center",
+            ha="left",
             va="bottom",
-            fontsize=8,
+            fontsize=7.5,
             fontweight="bold",
+            rotation=45,
         )
 
     ax.set_ylabel("Operational Cost per 1,000 Queries (USD)")
@@ -1112,9 +1576,9 @@ def plot_cost_breakdown(
     ax.set_xticks(x)
 
     display_labels = [c.replace("run_", "").replace("_", " ") for c in configs]
-    ax.set_xticklabels(display_labels, rotation=20, ha="right", fontsize=9)
+    ax.set_xticklabels(display_labels, rotation=45, ha="right", fontsize=9)
 
-    ax.set_ylim(0, max(max_tot * 1.25, 0.01))
+    ax.set_ylim(0, max(max_tot * 1.35, 0.01))
     ax.legend(
         loc="upper left",
         framealpha=0.92,

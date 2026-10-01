@@ -131,6 +131,36 @@ The candidate retrieval pool for $M_2$ is generated using dense vector embedding
 \paragraph{Dual-Tier Prompt Caching ($M_3$).}
 A minimum threshold of 4096 tokens is selected to satisfy the operational boundary of Google Cloud Vertex AI Context Caching for static system instructions and pre-indexed knowledge corpora. In addition, dynamically retrieved chunks and conversational turns benefit from automatic KV cache prefix reuse across sequential interactions.
 
+% ==============================================================================
+% TODO [METODIPÄIVITYS - STRATEGIA 1: JAETTU STAATTINEN PREFIKSI & FEW-SHOT ICL]
+% ==============================================================================
+% Lisättävä teksti / kappaleen laajennus (Strategia 1 toteutuksessa):
+% Kontekstivälimuistin (M_3) toteutus perustuu jaetun staattisen prefiksin erottamiseen
+% dynaamisesta hakusisällöstä (Shared Static Prefix Caching):
+% 
+% 1. Staattisen ja dynaamisen sisällön tiukka eriyttäminen:
+%    - Välimuistiin (Google Cloud Vertex AI CachedContent) tallennetaan ainoastaan
+%      muuttumaton järjestelmäkehote (System Prompt) ja kuratoitu In-Context Learning
+%      (ICL) Few-Shot -päättelykirjasto (8 laajaa Chain-of-Thought -demonstraatiota,
+%      koko n. 5 100 tokenia). Tämä ylittää 4 096 tokenin minimikynnyksen luonnollisesti
+%      ilman keinotekoista täytetekstiä.
+%    - Dynaamisesti noudetut dokumenttilohkot (top-k chunkit) ja käyttäjän kysely
+%      lähetetään ajonaikaisen pyynnön dynaamisessa osassa erillisenä sisältönä.
+%    - Lähdeviitteet:
+%      * \citep{gim2024promptcache} (Prompt Cache: modulaarinen huomion uudelleenkäyttö)
+%      * \citep{wei2025instructrag} (InstructRAG: päättelydemonstraatiot ja denoising)
+%      * \citep{lu2025turborag} (TurboRAG: KV-välimuistin eriyttäminen ja kieltäytymissäännöt)
+%      * \citep{xu2025collabrag} (Collab-RAG: moniportaisten kysymysten ketjutus)
+%
+% 2. Deterministinen välimuistiavain ja 100 % Cache Hit Rate:
+%    - Välimuistiavain irrotetaan noudetuista dokumenttilohkoista ja sidotaan vain
+%      staattiseen prefiksiin ja malliversioon:
+%      sha256(PROMPT_SCHEMA_VERSION :: provider :: model :: instructionHash).
+%    - Koska dynaamiset chunkit eivät muuta avainta, saavutetaan toistuvissa
+%      kyselyissä 100 %:n välimuistiosuma (Cache Hit) ensimmäisen kyselyn jälkeen,
+%      mikä poistaa jokaisella kyselyllä toistuvan välimuistin luontiviiveen ja -kulun.
+% ==============================================================================
+
 \paragraph{Hybrid Model Routing ($M_4$).}
 To replicate real-world enterprise deployments where query complexity is unknown a priori, an automated zero-shot classifier powered by Gemini 3.5 Flash-Lite dynamically evaluates incoming queries. Straightforward single-hop requests are handled directly by Gemini 3.5 Flash-Lite, intermediate queries requiring multi-passage synthesis are escalated to Gemini 3.8 Flash, and complex multi-hop reasoning tasks are routed to Gemini 3.1 Pro. The latency overhead ($T_{\text{route}}$) and token costs of the classifier are explicitly recorded in the evaluation.
 
@@ -170,6 +200,17 @@ where $T_{\text{embed}}$ denotes query vectorization duration (measured jointly 
 
 Both median ($P_{50}$) and 95th percentile tail ($P_{95}$) latencies are reported across the steady-state executions to evaluate enterprise SLA compliance.
 
+% ==============================================================================
+% TODO [METODIPÄIVITYS - STRATEGIA 1: LATENSSIPROFIILI JA TTFT-NOPEUTUS]
+% ==============================================================================
+% Lisättävä huomautus yhtälöön 4.1 (Eq. \ref{eq:latency}) ja TTFT-määritelmään:
+% - Jaetun staattisen prefiksin ansiosta T_cache(q) arvioidaan toistuvissa kyselyissä
+%   suoraan paikallisesta muistista ilman etäluontia (T_cache < 2 ms vs. 500-1000 ms).
+% - Generaattorin esitäyttöaika T_prefill(q) lyhenee jopa 60-70 %, koska n. 5 100 tokenin
+%   staattisen prefiksin KV-huomiotilat luetaan suoraan palvelimen välimuistista.
+% Lähdeviite: \citep{gim2024promptcache, lu2025turborag}
+% ==============================================================================
+
 \subsubsection{Operational Cost Accounting}
 \label{sec:costs}
 
@@ -182,6 +223,19 @@ Operational expenditure constitutes a critical bottleneck for enterprise RAG ado
 & + N_{\text{comp}}(q) \cdot P_{\text{comp}}^{(m(q))} + N_{\text{rerank}}(q) \cdot P_{\text{rerank}} + N_{\text{route}}(q) \cdot P_{\text{route}}
 \end{split}
 \end{equation}
+
+% ==============================================================================
+% TODO [METODIPÄIVITYS - STRATEGIA 1: KUSTANNUSLASKENTA JA PREFIX-ALENNUS]
+% ==============================================================================
+% Lisättävä selvennys yhtälöön 4.3 (Eq. \ref{eq:costs}) koskien M_3-moduulia:
+% - Staattisen prefiksin n. 5 100 tokenia laskutetaan toistuvissa kyselyissä
+%   alennetulla hinnalla P_cached^(m(q)) (75-90 % alennus Gemini Flash -hinnoittelussa).
+% - Normaali syötehinta P_prompt^(m(q)) kohdistuu ainoastaan dynaamisesti
+%   noudettuihin lohkoihin (N_uncached ~ 1 000 - 2 000 tokenia) ja käyttäjän kyselyyn.
+% - Välimuistin kirjoitusmaksu maksetaan vain kerran ajon alussa eikä jokaisella kyselyllä,
+%   mikä kääntää M_3:n kokonaiskustannuksen selvästi säästäväksi (RQ2).
+% Lähdeviite: \citep{gim2024promptcache}
+% ==============================================================================
 
 where $m(q) \in \{\text{Flash-Lite}, \text{Flash}, \text{Pro}\}$ represents the active generative model tier selected for query $q$, $N_{\text{embed}}$ is the number of query tokens vectorized at unit rate $P_{\text{embed}}$, $N_{\text{uncached}}$ and $N_{\text{cached}}$ represent uncached and cached prompt tokens billed at tier-specific rates $P_{\text{prompt}}^{(m(q))}$ and $P_{\text{cached}}^{(m(q))}$ (reflecting the 90\% discount applied to cached input context), $N_{\text{comp}}$ denotes the generated completion tokens billed at rate $P_{\text{comp}}^{(m(q))}$, $N_{\text{rerank}}$ represents the count of candidate passages evaluated by the cross-encoder at per-document rate $P_{\text{rerank}}$, and $N_{\text{route}}$ denotes tokens consumed by the classifier during model routing ($M_4$) at rate $P_{\text{route}}$. Fixed persistent infrastructure expenses, such as base Cloud SQL hosting, are invariant across configurations and therefore excluded from per-query operational cost calculations. The complete unit tariff schedule, encompassing all evaluated generative model tiers, cross-encoder ranking services, and embedding models alongside official vendor documentation references and acquisition timestamps (September 2026), is detailed in Appendix~\ref{sec:appendix_pricing} (Table~\ref{tab:pricing_catalog}).
 

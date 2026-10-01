@@ -456,25 +456,19 @@ public class RagQueryService {
 
         if (modules.contains(ModuleId.M3)) {
             Timer.Sample cacheSample = Timer.start(meterRegistry);
-            String contextContent = promptRenderer.renderContext(contextDocuments);
             String systemInstruction = promptRenderer.getSystemInstruction();
-            String fullCacheableContent = (systemInstruction != null && !systemInstruction.isBlank())
-                    ? systemInstruction + "\n\n" + contextContent
-                    : contextContent;
             long estimatedTokens = promptRenderer.estimateTokens(
-                    fullCacheableContent, promptCacheProperties.charsPerTokenEstimate());
+                    systemInstruction, promptCacheProperties.charsPerTokenEstimate());
             String cacheKey = promptRenderer.computeCanonicalCacheKey(
                     promptCacheProperties.provider().name().toLowerCase(),
                     effectiveModelName,
-                    searchTable,
-                    systemInstruction,
-                    contextDocuments);
+                    systemInstruction);
 
             CacheRequest cacheRequest = new CacheRequest(
                     cacheKey,
                     effectiveModelName,
                     systemInstruction,
-                    contextContent,
+                    "",
                     estimatedTokens);
 
             cacheResult = promptCache.getOrCreate(cacheRequest);
@@ -484,7 +478,7 @@ public class RagQueryService {
             cacheMetadata = CacheMetadataDto.fromDomain(cacheResult);
 
             if (cacheResult.isExplicitlyCached()) {
-                String dynamicSuffix = promptRenderer.renderDynamicSuffix(query);
+                String dynamicPayload = promptRenderer.renderDynamicPayload(query, contextDocuments);
                 GoogleGenAiChatOptions.Builder chatOptionsBuilder = GoogleGenAiChatOptions.builder()
                         .model(effectiveModelName)
                         .cachedContentName(cacheResult.cacheId())
@@ -492,7 +486,7 @@ public class RagQueryService {
                 if (generationProperties.thinkingBudget() != null && generationProperties.thinkingBudget() >= 0) {
                     chatOptionsBuilder.thinkingBudget(generationProperties.thinkingBudget());
                 }
-                promptToSend = new Prompt(dynamicSuffix, chatOptionsBuilder.build());
+                promptToSend = new Prompt(dynamicPayload, chatOptionsBuilder.build());
                 logger.info("Explicit prompt cache {} (id={}) evaluated in {} ms",
                         cacheStatus, cacheResult.cacheId(), cacheMs);
             } else {

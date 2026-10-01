@@ -2,35 +2,35 @@
 \centering
 \scriptsize
 \setlength{\tabcolsep}{2.2pt}
-\caption{Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline configurations on the unconstrained raw Enterprise Knowledge Corpus ($N = 100$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$).}
-\label{tab:quality_enterprise_raw}
+\caption{Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline configurations on the Enterprise Knowledge Corpus ($N = 100$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$).}
+\label{tab:quality_enterprise}
 \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c c c @{}}
 \toprule
 \textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Refusal Acc. /}\\\textbf{FRR (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\
 \midrule
 \multicolumn{8}{l}{\textbf{Baseline ($k=0$)}} \\
-$C_{0}$ & Naive RAG Baseline & 0.866 & 0.896 & 0.938 & 0.788 & 100.0\% / 0.0\% & 0.8538 \\
+$C_{0}$ & Naive RAG Baseline & 0.833 & 0.938 & 0.915 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004} \\
 \midrule
 \multicolumn{8}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-$C_{1}$ & S2B & 0.931 & 1.000 & 0.993 & 0.812 & 100.0\% / 0.0\% & \textbf{0.9193}\textsuperscript{ns} \\
-$C_{2}$ & SR & 0.793 & 0.896 & 1.000 & 0.790 & 100.0\% / 0.0\% & 0.8249\textsuperscript{ns} \\
-$C_{3}$ & PC & 0.801 & 0.896 & 0.187 & 0.824 & 0.0\% / 0.0\% & 0.3750\textsuperscript{ns} \\
-$C_{4}$ & MC & 0.853 & 0.896 & 0.868 & 0.670 & 100.0\% / 12.5\% & 0.8573\textsuperscript{ns} \\
+$C_{1}$ & S2B & 0.955 & 0.875 & 0.953 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+$C_{2}$ & SR & 0.869 & 0.938 & 0.975 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+$C_{3}$ & PC & 0.854 & 0.938 & 0.492 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+$C_{4}$ & MC & 0.854 & 0.938 & 0.894 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
 \midrule
 \multicolumn{8}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\
-$C_{5}$ & S2B + SR & 0.979 & 0.917 & 0.988 & 0.817 & 100.0\% / 0.0\% & 0.9139\textsuperscript{ns} \\
-$C_{6}$ & S2B + PC & 0.937 & 1.000 & 0.176 & 0.827 & 0.0\% / 0.0\% & 0.4413\textsuperscript{ns} \\
-$C_{7}$ & S2B + MC & 0.937 & 1.000 & 0.984 & 0.797 & 100.0\% / 0.0\% & 0.9143\textsuperscript{ns} \\
-$C_{8}$ & SR + PC & 0.811 & 0.896 & 0.082 & 0.811 & 0.0\% / 0.0\% & 0.4674\textsuperscript{ns} \\
-$C_{9}$ & SR + MC & 0.862 & 0.896 & 1.000 & 0.808 & 100.0\% / 0.0\% & 0.8679\textsuperscript{ns} \\
-$C_{10}$ & PC + MC & 0.814 & 0.896 & 0.208 & 0.823 & 0.0\% / 0.0\% & 0.6135\textsuperscript{ns} \\
+$C_{5}$ & S2B + SR & 0.886 & 0.812 & 0.934 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+$C_{6}$ & S2B + PC & 0.962 & 0.875 & 0.360 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+$C_{7}$ & S2B + MC & 1.000 & 0.938 & 0.951 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+$C_{8}$ & SR + PC & 0.844 & 0.938 & 0.353 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+$C_{9}$ & SR + MC & 0.869 & 0.938 & 0.840 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+$C_{10}$ & PC + MC & 0.856 & 0.938 & 0.362 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
 \midrule
 \multicolumn{8}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\
-$C_{11}$ & S2B + SR + PC & 0.979 & 0.917 & 0.187 & 0.835 & 0.0\% / 0.0\% & 0.4422\textsuperscript{ns} \\
-$C_{12}$ & S2B + SR + MC & 0.948 & 0.917 & 0.984 & 0.796 & 100.0\% / 0.0\% & 0.8989\textsuperscript{ns} \\
-$C_{13}$ & S2B + PC + MC & 0.931 & 1.000 & 0.296 & 0.814 & 0.0\% / 0.0\% & 0.6403\textsuperscript{ns} \\
-$C_{14}$ & SR + PC + MC & 0.814 & 0.896 & 0.100 & 0.817 & 0.0\% / 0.0\% & 0.3858\textsuperscript{ns} \\
-$C_{15}$ & S2B + SR + PC + MC (Full-Stack) & 0.948 & 0.917 & 0.368 & 0.823 & 0.0\% / 0.0\% & 0.6378\textsuperscript{ns} \\
+$C_{11}$ & S2B + SR + PC & 0.865 & 0.812 & 0.602 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+$C_{12}$ & S2B + SR + MC & 0.886 & 0.812 & 0.944 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+$C_{13}$ & S2B + PC + MC & 0.962 & 0.938 & 0.376 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+$C_{14}$ & SR + PC + MC & 0.879 & 1.000 & 0.454 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+$C_{15}$ & S2B + SR + PC + MC (Full-Stack) & 0.765 & 0.833 & 0.261 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
