@@ -38,6 +38,36 @@ echo "========================================================================"
 echo -e "\n>>> [0/16] Verifying Judge Connectivity..."
 "$PYTHON" src/cli.py test-judge --judge "$JUDGE" --judge-model "$JUDGE_MODEL"
 
+# Pre-Flight Prompt Cache Verification (Isolation & Explicit Hit)
+echo -e "\n>>> [0.5/16] Verifying Prompt Cache Pre-Flight Integrity..."
+"$PYTHON" src/cli.py test-cache --url "$URL"
+
+# Helper: Clear remote and local prompt cache on the RAG service between configs
+# to guarantee configuration independence, prevent state leaks, and avoid quota limits.
+clear_cache() {
+  echo -e "\n>>> Clearing prompt cache on service (${URL}/api/benchmark/cache/clear)..."
+  curl -s -f -X POST "${URL}/api/benchmark/cache/clear" > /dev/null || echo "  Warning: Failed to clear prompt cache on ${URL}"
+  sleep 2
+}
+
+prewarm_cache() {
+  echo -e "\n>>> Pre-warming prompt cache on service (${URL}/api/benchmark/cache/prewarm)..."
+  curl -s -f -X POST "${URL}/api/benchmark/cache/prewarm" > /dev/null || echo "  Warning: Failed to prewarm prompt cache on ${URL}"
+  sleep 2
+}
+
+# Warm-up queries to eliminate JVM JIT, connection pool, and TLS cold-start distortions (Thesis §4.1)
+if [ "$WARMUP" -gt 0 ]; then
+  echo -e "\n>>> Executing $WARMUP unmeasured warm-up queries..."
+  for i in $(seq 1 "$WARMUP"); do
+    curl -s -o /dev/null -w "  Warm-up $i: HTTP %{http_code} (%{time_total}s)\n" \
+      "${URL}/api/v1/query" \
+      -H "Content-Type: application/json" \
+      -d "{\"query\": \"warm-up query $i\", \"tableName\": \"$TABLE_NAME\"}"
+  done
+fi
+clear_cache
+
 # ------------------------------------------------------------------------------
 # Stage 0: Naive Baseline (k=0)
 # ------------------------------------------------------------------------------
@@ -48,6 +78,7 @@ echo -e "\n>>> [1/16] Running C0: Baseline..."
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C0_baseline.jsonl"
+clear_cache
 
 # ------------------------------------------------------------------------------
 # Stage 1: Single-Factor Isolated Optimizations (k=1)
@@ -60,6 +91,7 @@ echo -e "\n>>> [2/16] Running C1: Small-to-Big (M1)..."
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C1_M1.jsonl"
+clear_cache
 
 echo -e "\n>>> [3/16] Running C2: Semantic Re-ranking (M2)..."
 "$PYTHON" src/cli.py run \
@@ -69,8 +101,10 @@ echo -e "\n>>> [3/16] Running C2: Semantic Re-ranking (M2)..."
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C2_M2.jsonl"
+clear_cache
 
 echo -e "\n>>> [4/16] Running C3: Prompt Caching (M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run \
   --url "$URL" \
   --sample --limit "$LIMIT" --stream \
@@ -78,6 +112,7 @@ echo -e "\n>>> [4/16] Running C3: Prompt Caching (M3)..."
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C3_M3.jsonl"
+clear_cache
 
 echo -e "\n>>> [5/16] Running C4: Model Routing (M4)..."
 "$PYTHON" src/cli.py run \
@@ -87,6 +122,7 @@ echo -e "\n>>> [5/16] Running C4: Model Routing (M4)..."
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C4_M4.jsonl"
+clear_cache
 
 # ------------------------------------------------------------------------------
 # Stage 2: Pairwise Combinations (k=2)
@@ -99,8 +135,10 @@ echo -e "\n>>> [6/16] Running C5: Small-to-Big + Re-ranking (M1+M2)..."
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C5_M1_M2.jsonl"
+clear_cache
 
 echo -e "\n>>> [7/16] Running C6: Small-to-Big + Prompt Caching (M1+M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run \
   --url "$URL" \
   --sample --limit "$LIMIT" --stream \
@@ -108,6 +146,7 @@ echo -e "\n>>> [7/16] Running C6: Small-to-Big + Prompt Caching (M1+M3)..."
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C6_M1_M3.jsonl"
+clear_cache
 
 echo -e "\n>>> [8/16] Running C7: Small-to-Big + Model Routing (M1+M4)..."
 "$PYTHON" src/cli.py run \
@@ -117,8 +156,10 @@ echo -e "\n>>> [8/16] Running C7: Small-to-Big + Model Routing (M1+M4)..."
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C7_M1_M4.jsonl"
+clear_cache
 
 echo -e "\n>>> [9/16] Running C8: Re-ranking + Prompt Caching (M2+M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run \
   --url "$URL" \
   --sample --limit "$LIMIT" --stream \
@@ -126,6 +167,7 @@ echo -e "\n>>> [9/16] Running C8: Re-ranking + Prompt Caching (M2+M3)..."
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C8_M2_M3.jsonl"
+clear_cache
 
 echo -e "\n>>> [10/16] Running C9: Re-ranking + Model Routing (M2+M4)..."
 "$PYTHON" src/cli.py run \
@@ -135,8 +177,10 @@ echo -e "\n>>> [10/16] Running C9: Re-ranking + Model Routing (M2+M4)..."
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C9_M2_M4.jsonl"
+clear_cache
 
 echo -e "\n>>> [11/16] Running C10: Prompt Caching + Model Routing (M3+M4)..."
+prewarm_cache
 "$PYTHON" src/cli.py run \
   --url "$URL" \
   --sample --limit "$LIMIT" --stream \
@@ -144,11 +188,13 @@ echo -e "\n>>> [11/16] Running C10: Prompt Caching + Model Routing (M3+M4)..."
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C10_M3_M4.jsonl"
+clear_cache
 
 # ------------------------------------------------------------------------------
 # Stage 2: Multi-Module Triplets (k=3)
 # ------------------------------------------------------------------------------
 echo -e "\n>>> [12/16] Running C11: S2B + Re-ranking + Prompt Caching (M1+M2+M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run \
   --url "$URL" \
   --sample --limit "$LIMIT" --stream \
@@ -156,6 +202,7 @@ echo -e "\n>>> [12/16] Running C11: S2B + Re-ranking + Prompt Caching (M1+M2+M3)
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C11_M1_M2_M3.jsonl"
+clear_cache
 
 echo -e "\n>>> [13/16] Running C12: S2B + Re-ranking + Model Routing (M1+M2+M4)..."
 "$PYTHON" src/cli.py run \
@@ -165,8 +212,10 @@ echo -e "\n>>> [13/16] Running C12: S2B + Re-ranking + Model Routing (M1+M2+M4).
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C12_M1_M2_M4.jsonl"
+clear_cache
 
 echo -e "\n>>> [14/16] Running C13: S2B + Prompt Caching + Model Routing (M1+M3+M4)..."
+prewarm_cache
 "$PYTHON" src/cli.py run \
   --url "$URL" \
   --sample --limit "$LIMIT" --stream \
@@ -174,8 +223,10 @@ echo -e "\n>>> [14/16] Running C13: S2B + Prompt Caching + Model Routing (M1+M3+
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C13_M1_M3_M4.jsonl"
+clear_cache
 
 echo -e "\n>>> [15/16] Running C14: Re-ranking + Prompt Caching + Model Routing (M2+M3+M4)..."
+prewarm_cache
 "$PYTHON" src/cli.py run \
   --url "$URL" \
   --sample --limit "$LIMIT" --stream \
@@ -183,11 +234,13 @@ echo -e "\n>>> [15/16] Running C14: Re-ranking + Prompt Caching + Model Routing 
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C14_M2_M3_M4.jsonl"
+clear_cache
 
 # ------------------------------------------------------------------------------
 # Stage 2: Full-Stack Integration (k=4)
 # ------------------------------------------------------------------------------
 echo -e "\n>>> [16/16] Running C15: Full Stack (M1+M2+M3+M4)..."
+prewarm_cache
 "$PYTHON" src/cli.py run \
   --url "$URL" \
   --sample --limit "$LIMIT" --stream \
@@ -195,6 +248,7 @@ echo -e "\n>>> [16/16] Running C15: Full Stack (M1+M2+M3+M4)..."
   --table-name "$TABLE_NAME" \
   --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C15_M1_M2_M3_M4.jsonl"
+clear_cache
 
 # ------------------------------------------------------------------------------
 # Statistical Hypothesis Testing (Wilcoxon Signed-Rank Tests vs Baseline)

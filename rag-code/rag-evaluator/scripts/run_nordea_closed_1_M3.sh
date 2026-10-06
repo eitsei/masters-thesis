@@ -43,9 +43,19 @@ clear_cache() {
   sleep 2
 }
 
+prewarm_cache() {
+  echo -e "\n>>> Pre-warming prompt cache on service (${URL}/api/benchmark/cache/prewarm)..."
+  curl -s -f -X POST "${URL}/api/benchmark/cache/prewarm" > /dev/null || echo "  Warning: Failed to prewarm prompt cache on ${URL}"
+  sleep 2
+}
+
 # 0. Check Judge Connectivity
 echo -e "\n>>> Verifying Judge Connectivity..."
 "$PYTHON" src/cli.py test-judge --judge "$JUDGE" --judge-model "$JUDGE_MODEL"
+
+# Pre-Flight Prompt Cache Verification (Isolation & Explicit Hit)
+echo -e "\n>>> Verifying Prompt Cache Pre-Flight Integrity..."
+"$PYTHON" src/cli.py test-cache --url "$URL"
 
 # Warm-up queries to eliminate JVM JIT, connection pool, and TLS jitter
 if [ "$WARMUP" -gt 0 ]; then
@@ -77,6 +87,7 @@ clear_cache
 # Stage 1: Prompt caching (M3 / C1)
 # ------------------------------------------------------------------------------
 echo -e "\n>>> [2/2] Running Prompt Caching (M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \

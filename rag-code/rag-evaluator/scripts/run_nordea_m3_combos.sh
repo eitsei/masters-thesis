@@ -45,6 +45,30 @@ if [ ! -f "$QUESTIONS_FILE" ]; then
   exit 1
 fi
 
+# Helper: Clear remote and local prompt cache on the RAG service between configs
+# to guarantee configuration independence, prevent state leaks, and avoid quota limits.
+clear_cache() {
+  echo -e "\n>>> Clearing prompt cache on service (${URL}/api/benchmark/cache/clear)..."
+  curl -s -f -X POST "${URL}/api/benchmark/cache/clear" > /dev/null || echo "  Warning: Failed to clear prompt cache on ${URL}"
+  sleep 2
+}
+
+prewarm_cache() {
+  echo -e "\n>>> Pre-warming prompt cache on service (${URL}/api/benchmark/cache/prewarm)..."
+  curl -s -f -X POST "${URL}/api/benchmark/cache/prewarm" > /dev/null || echo "  Warning: Failed to prewarm prompt cache on ${URL}"
+  sleep 2
+}
+
+# 0. Check Judge Connectivity
+echo -e "\n>>> Verifying Judge Connectivity..."
+"$PYTHON" src/cli.py test-judge --judge "$JUDGE" --judge-model "$JUDGE_MODEL"
+
+# Pre-Flight Prompt Cache Verification (Isolation & Explicit Hit)
+echo -e "\n>>> Verifying Prompt Cache Pre-Flight Integrity..."
+"$PYTHON" src/cli.py test-cache --url "$URL"
+
+clear_cache
+
 # 1. M0: Baseline (C0)
 echo -e "\n>>> [1/8] Running C0: Baseline..."
 "$PYTHON" src/cli.py run-questions \
@@ -54,6 +78,7 @@ echo -e "\n>>> [1/8] Running C0: Baseline..."
   --table-name "$TABLE_NAME" \
   --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C0_baseline.jsonl"
+clear_cache
 
 # 2. M1: Small-to-Big (C1)
 echo -e "\n>>> [2/8] Running C1: Small-to-Big (M1)..."
@@ -65,6 +90,7 @@ echo -e "\n>>> [2/8] Running C1: Small-to-Big (M1)..."
   --table-name "$TABLE_NAME" \
   --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C1_M1.jsonl"
+clear_cache
 
 # 3. M2: Semantic Re-ranking (C2)
 echo -e "\n>>> [3/8] Running C2: Semantic Re-ranking (M2)..."
@@ -76,9 +102,11 @@ echo -e "\n>>> [3/8] Running C2: Semantic Re-ranking (M2)..."
   --table-name "$TABLE_NAME" \
   --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C2_M2.jsonl"
+clear_cache
 
 # 4. M3: Prompt Caching (C3)
 echo -e "\n>>> [4/8] Running C3: Prompt Caching (M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \
@@ -87,6 +115,7 @@ echo -e "\n>>> [4/8] Running C3: Prompt Caching (M3)..."
   --table-name "$TABLE_NAME" \
   --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C3_M3.jsonl"
+clear_cache
 
 # 5. M1+M2: Small-to-Big + Re-ranking (C5)
 echo -e "\n>>> [5/8] Running C5: Small-to-Big + Re-ranking (M1+M2)..."
@@ -98,9 +127,11 @@ echo -e "\n>>> [5/8] Running C5: Small-to-Big + Re-ranking (M1+M2)..."
   --table-name "$TABLE_NAME" \
   --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C5_M1_M2.jsonl"
+clear_cache
 
 # 6. M1+M3: Small-to-Big + Prompt Caching (C6)
 echo -e "\n>>> [6/8] Running C6: Small-to-Big + Prompt Caching (M1+M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \
@@ -109,9 +140,11 @@ echo -e "\n>>> [6/8] Running C6: Small-to-Big + Prompt Caching (M1+M3)..."
   --table-name "$TABLE_NAME" \
   --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C6_M1_M3.jsonl"
+clear_cache
 
 # 7. M2+M3: Re-ranking + Prompt Caching (C8)
 echo -e "\n>>> [7/8] Running C8: Re-ranking + Prompt Caching (M2+M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \
@@ -120,9 +153,11 @@ echo -e "\n>>> [7/8] Running C8: Re-ranking + Prompt Caching (M2+M3)..."
   --table-name "$TABLE_NAME" \
   --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C8_M2_M3.jsonl"
+clear_cache
 
 # 8. M1+M2+M3: Full Multi-Module Stack (C11)
 echo -e "\n>>> [8/8] Running C11: S2B + Re-ranking + Prompt Caching (M1+M2+M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \
@@ -131,6 +166,7 @@ echo -e "\n>>> [8/8] Running C11: S2B + Re-ranking + Prompt Caching (M1+M2+M3)..
   --table-name "$TABLE_NAME" \
   --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C11_M1_M2_M3.jsonl"
+clear_cache
 
 echo "========================================================================"
 echo " Statistical Hypothesis Testing (Wilcoxon Signed-Rank Tests vs Baseline)"

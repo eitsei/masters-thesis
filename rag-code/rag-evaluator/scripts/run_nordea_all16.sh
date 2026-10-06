@@ -53,9 +53,19 @@ clear_cache() {
   sleep 2
 }
 
+prewarm_cache() {
+  echo -e "\n>>> Pre-warming prompt cache on service (${URL}/api/benchmark/cache/prewarm)..."
+  curl -s -f -X POST "${URL}/api/benchmark/cache/prewarm" > /dev/null || echo "  Warning: Failed to prewarm prompt cache on ${URL}"
+  sleep 2
+}
+
 # 0. Check Judge Connectivity
 echo -e "\n>>> [0/16] Verifying Judge Connectivity..."
 "$PYTHON" src/cli.py test-judge --judge "$JUDGE" --judge-model "$JUDGE_MODEL"
+
+# Pre-Flight Prompt Cache Verification (Isolation & Explicit Hit)
+echo -e "\n>>> [0.5/16] Verifying Prompt Cache Pre-Flight Integrity..."
+"$PYTHON" src/cli.py test-cache --url "$URL"
 
 # Warm-up: 2 unmeasured queries to eliminate JVM JIT, connection pool, and TLS
 # cold-start distortions (Thesis §4.1)
@@ -111,6 +121,7 @@ echo -e "\n>>> [3/16] Running C2: Semantic Re-ranking (M2)..."
 clear_cache
 
 echo -e "\n>>> [4/16] Running C3: Prompt Caching (M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \
@@ -150,6 +161,7 @@ echo -e "\n>>> [6/16] Running C5: Small-to-Big + Re-ranking (M1+M2)..."
 clear_cache
 
 echo -e "\n>>> [7/16] Running C6: Small-to-Big + Prompt Caching (M1+M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \
@@ -174,6 +186,7 @@ echo -e "\n>>> [8/16] Running C7: Small-to-Big + Model Routing (M1+M4)..."
 clear_cache
 
 echo -e "\n>>> [9/16] Running C8: Re-ranking + Prompt Caching (M2+M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \
@@ -198,6 +211,7 @@ echo -e "\n>>> [10/16] Running C9: Re-ranking + Model Routing (M2+M4)..."
 clear_cache
 
 echo -e "\n>>> [11/16] Running C10: Prompt Caching + Model Routing (M3+M4)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \
@@ -213,6 +227,7 @@ clear_cache
 # Stage 2: Multi-Module Triplets (k=3)
 # ------------------------------------------------------------------------------
 echo -e "\n>>> [12/16] Running C11: S2B + Re-ranking + Prompt Caching (M1+M2+M3)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \
@@ -237,6 +252,7 @@ echo -e "\n>>> [13/16] Running C12: S2B + Re-ranking + Model Routing (M1+M2+M4).
 clear_cache
 
 echo -e "\n>>> [14/16] Running C13: S2B + Prompt Caching + Model Routing (M1+M3+M4)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \
@@ -249,6 +265,7 @@ echo -e "\n>>> [14/16] Running C13: S2B + Prompt Caching + Model Routing (M1+M3+
 clear_cache
 
 echo -e "\n>>> [15/16] Running C14: Re-ranking + Prompt Caching + Model Routing (M2+M3+M4)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \
@@ -264,6 +281,7 @@ clear_cache
 # Stage 2: Full-Stack Integration (k=4)
 # ------------------------------------------------------------------------------
 echo -e "\n>>> [16/16] Running C15: Full Stack (M1+M2+M3+M4)..."
+prewarm_cache
 "$PYTHON" src/cli.py run-questions \
   --input "$QUESTIONS_FILE" \
   --url "$URL" \
