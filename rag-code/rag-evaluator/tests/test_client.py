@@ -212,3 +212,156 @@ class TestRagClientEndpoints:
         with RagClient(base_url="http://localhost:8080", session=mock_session, auto_iam=False) as client:
             assert client.base_url == "http://localhost:8080"
         mock_session.close.assert_called_once()
+
+    def test_clear_cache(self, client, mock_session):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "status": "cleared",
+            "configured": True,
+            "message": "Successfully cleared owned prompt cache resources.",
+        }
+        mock_session.post.return_value = mock_resp
+
+        result = client.clear_cache()
+        assert result["status"] == "cleared"
+        mock_session.post.assert_called_once_with(
+            "http://localhost:8080/api/benchmark/cache/clear", timeout=60.0
+        )
+
+    def test_prewarm_cache_default(self, client, mock_session):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "status": "prewarmed",
+            "configured": True,
+            "models": [],
+        }
+        mock_session.post.return_value = mock_resp
+
+        result = client.prewarm_cache()
+        assert result["status"] == "prewarmed"
+        mock_session.post.assert_called_once_with(
+            "http://localhost:8080/api/benchmark/cache/prewarm",
+            json={},
+            timeout=60.0,
+        )
+
+    def test_prewarm_cache_with_models(self, client, mock_session):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "status": "prewarmed",
+            "configured": True,
+            "models": [{"model": "gemini-3.5-flash"}],
+        }
+        mock_session.post.return_value = mock_resp
+
+        result = client.prewarm_cache(models=["gemini-3.5-flash", "gemini-3.8-flash"])
+        assert result["status"] == "prewarmed"
+        mock_session.post.assert_called_once_with(
+            "http://localhost:8080/api/benchmark/cache/prewarm",
+            json={"models": ["gemini-3.5-flash", "gemini-3.8-flash"]},
+            timeout=60.0,
+        )
+
+    def test_verify_cache_behavior_expect_cached_success(self, client, mock_session):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "answer": "Cached answer",
+            "tokenUsage": {"cachedTokens": 4500, "promptTokens": 500},
+            "cacheStatus": "EXPLICIT_HIT",
+        }
+        mock_session.post.return_value = mock_resp
+
+        ok, msg, resp = client.verify_cache_behavior(expect_cached=True, table_name="test_table")
+        assert ok is True
+        assert msg == "Explicit prompt cache hit confirmed (4500 tokens cached)"
+        assert resp == mock_resp.json.return_value
+        mock_session.post.assert_called_once_with(
+            "http://localhost:8080/api/query",
+            json={
+                "query": "Benchmark pre-flight cache verification probe",
+                "modules": ["M3"],
+                "tableName": "test_table",
+            },
+            timeout=60.0,
+        )
+
+    def test_verify_cache_behavior_expect_cached_retry_success(self, client, mock_session):
+        mock_resp1 = MagicMock()
+        mock_resp1.json.return_value = {
+            "answer": "First response (miss)",
+            "tokenUsage": {"cachedTokens": 0, "promptTokens": 5000},
+            "cacheStatus": "EXPLICIT_MISS",
+        }
+        mock_resp2 = MagicMock()
+        mock_resp2.json.return_value = {
+            "answer": "Second response (hit)",
+            "tokenUsage": {"cachedTokens": 4500, "promptTokens": 500},
+            "cacheStatus": "EXPLICIT_HIT",
+        }
+        mock_session.post.side_effect = [mock_resp1, mock_resp2]
+
+        ok, msg, resp = client.verify_cache_behavior(expect_cached=True)
+        assert ok is True
+        assert msg == "Explicit prompt cache hit confirmed (4500 tokens cached)"
+        assert resp == mock_resp2.json.return_value
+        assert mock_session.post.call_count == 2
+
+    def test_verify_cache_behavior_expect_cached_failure(self, client, mock_session):
+        mock_resp1 = MagicMock()
+        mock_resp1.json.return_value = {
+            "answer": "First response",
+            "tokenUsage": {"cachedTokens": 0, "promptTokens": 5000},
+            "cacheStatus": "EXPLICIT_MISS",
+        }
+        mock_resp2 = MagicMock()
+        mock_resp2.json.return_value = {
+            "answer": "Second response",
+            "tokenUsage": {"cachedTokens": 0, "promptTokens": 5000},
+            "cacheStatus": "EXPLICIT_MISS",
+        }
+        mock_session.post.side_effect = [mock_resp1, mock_resp2]
+
+        ok, msg, resp = client.verify_cache_behavior(expect_cached=True)
+        assert ok is False
+        assert msg == "Expected cached tokens but got 0 (status=EXPLICIT_MISS)"
+        assert resp == mock_resp2.json.return_value
+        assert mock_session.post.call_count == 2
+
+    def test_verify_cache_behavior_expect_uncached_success(self, client, mock_session):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "answer": "Uncached response",
+            "tokenUsage": {"cachedTokens": 0, "promptTokens": 2000},
+            "cacheStatus": "NONE",
+        }
+        mock_session.post.return_value = mock_resp
+
+        ok, msg, resp = client.verify_cache_behavior(expect_cached=False, table_name="test_table")
+        assert ok is True
+        assert msg == "Cache isolation confirmed: 0 cached tokens for non-M3 query"
+        assert resp == mock_resp.json.return_value
+        mock_session.post.assert_called_once_with(
+            "http://localhost:8080/api/query",
+            json={
+                "query": "Benchmark pre-flight cache verification probe",
+                "modules": [],
+                "tableName": "test_table",
+            },
+            timeout=60.0,
+        )
+
+    def test_verify_cache_behavior_expect_uncached_leakage_failure(self, client, mock_session):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "answer": "Leaked cached response",
+            "tokenUsage": {"cachedTokens": 1500, "promptTokens": 500},
+            "cacheStatus": "EXPLICIT_HIT",
+        }
+        mock_session.post.return_value = mock_resp
+
+        ok, msg, resp = client.verify_cache_behavior(expect_cached=False)
+        assert ok is False
+        assert msg == "Implicit cache leakage detected: received 1500 cached tokens in non-M3 query"
+        assert resp == mock_resp.json.return_value
+        assert mock_session.post.call_count == 1
+

@@ -189,9 +189,9 @@ def summarize_run_records(records: Sequence[Mapping[str, Any]]) -> dict[str, flo
     mean_cp = float(np.mean(cps)) if cps else 0.0
     mean_cr = float(np.mean(crs)) if crs else 0.0
 
-    # Composite Q from answerable records (filtering out any legacy poisoned 0.0003 values)
+    # Composite Q from answerable records (keeping all finite non-negative values)
     comp_qs = _extract_valid_metric_values(ans_records, "composite_quality")
-    valid_comp_qs = [q for q in comp_qs if q > 0.001]
+    valid_comp_qs = [q for q in comp_qs if q >= 0.0]
     if valid_comp_qs:
         mean_comp_q = float(np.mean(valid_comp_qs))
     elif ans_records and (mean_cp > 0 or mean_cr > 0 or mean_faith > 0 or mean_ar > 0):

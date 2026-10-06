@@ -89,7 +89,7 @@ rag:
   prompt-cache:
     provider: ${RAG_PROMPT_CACHE_PROVIDER:noop}
     min-tokens: ${RAG_PROMPT_CACHE_MIN_TOKENS:4096}
-    ttl: ${RAG_PROMPT_CACHE_TTL:300s}
+    ttl: ${RAG_PROMPT_CACHE_TTL:3600s}
     chars-per-token-estimate: 3.5
     display-name-prefix: "rag-benchmark-"
   router:

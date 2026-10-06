@@ -22,6 +22,7 @@ from src.metrics import (
     compute_total_latency,
     compute_ttft,
     exact_match,
+    get_pricing_tier,
     is_refusal_answer,
     is_refusal_ground_truth,
     is_sample_unanswerable,
@@ -228,6 +229,28 @@ def test_compute_cost_routing_split():
         tier="gemini-3.8-flash",
     )
     assert math.isclose(cost_combined, 0.015105, rel_tol=1e-9)
+
+
+def test_get_pricing_tier_gemini_35_flash_vs_lite():
+    """Ensures gemini-3.5-flash and gemini-3.5-flash-lite are strictly isolated."""
+    tier_flash = get_pricing_tier("gemini-3.5-flash")
+    tier_lite = get_pricing_tier("gemini-3.5-flash-lite")
+
+    assert tier_flash.name == "gemini-3.5-flash"
+    assert tier_flash.prompt_price_per_million == 0.15
+    assert tier_flash.comp_price_per_million == 0.60
+    assert tier_flash.cached_price_per_million == 0.0375
+
+    assert tier_lite.name == "gemini-3.5-flash-lite"
+    assert tier_lite.prompt_price_per_million == 0.075
+    assert tier_lite.comp_price_per_million == 0.30
+    assert tier_lite.cached_price_per_million == 0.01875
+
+    # Prefixed and fuzzy variants must resolve without collision
+    assert get_pricing_tier("models/gemini-3.5-flash").prompt_price_per_million == 0.15
+    assert get_pricing_tier("models/gemini-3.5-flash-lite").prompt_price_per_million == 0.075
+    assert get_pricing_tier("3.5-flash").prompt_price_per_million == 0.15
+    assert get_pricing_tier("3.5-flash-lite").prompt_price_per_million == 0.075
 
 
 # =====================================================================

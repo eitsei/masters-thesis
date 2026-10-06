@@ -1,39 +1,39 @@
 \begin{table}[htbp]
 \centering
 \scriptsize
-\setlength{\tabcolsep}{1.6pt}
-\caption{Retrieval and generation quality metrics across 16 pipeline configurations on the MuSiQue multi-hop benchmark ($N = 100$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$).}
+\setlength{\tabcolsep}{2.2pt}
+\caption{Retrieval, generation, and multi-hop reasoning quality metrics across 16 pipeline configurations on the MuSiQue benchmark ($N = 10$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$).}
 \label{tab:quality_musique}
 \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c c c c @{}}
 \toprule
-\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Token}\\\textbf{$F_1$ (\%)}} & \makecell{\textbf{Exact}\\\textbf{Match (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\
+\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Token}\\\textbf{F1 (\%)}} & \makecell{\textbf{Exact}\\\textbf{Match (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\
 \midrule
 \multicolumn{9}{l}{\textbf{Baseline ($k=0$)}} \\
-$C_{0}$ & Naive RAG Baseline & 0.550 & 0.600 & 0.867 & 0.338 & 28.1\% & 20.0\% & 0.3186 \\
+$C_{0}$ & Naive RAG Baseline & 0.400 & 0.800 & 0.733 & 0.612 & 41.5\% & 20.0\% & 0.3334 \\
 \midrule
 \multicolumn{9}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-$C_{1}$ & S2B & 0.450 & 0.700 & 0.875 & 0.418 & 25.5\% & 20.0\% & 0.3723\textsuperscript{ns} \\
-$C_{2}$ & SR & 0.595 & 0.600 & 0.900 & 0.267 & 26.1\% & 20.0\% & 0.2543\textsuperscript{ns} \\
-$C_{3}$ & PC & 0.550 & 0.600 & 0.369 & 0.761 & 14.2\% & \phantom{0}0.0\% & 0.3879\textsuperscript{ns} \\
-$C_{4}$ & MC & 0.444 & 0.556 & 0.778 & 0.314 & 22.8\% & 11.1\% & 0.1874\textsuperscript{ns} \\
+$C_{1}$ & S2B & 0.433 & 0.800 & 0.950 & 0.569 & 33.1\% & 10.0\% & \textbf{0.4431}\textsuperscript{ns} \\
+$C_{2}$ & SR & 0.450 & 0.750 & 0.850 & 0.612 & 36.7\% & 10.0\% & 0.3942\textsuperscript{ns} \\
+$C_{3}$ & PC & 0.450 & 0.833 & 0.683 & 0.601 & 41.3\% & 20.0\% & 0.3847\textsuperscript{ns} \\
+$C_{4}$ & MC & 0.500 & 0.889 & 0.537 & 0.369 & 28.5\% & 11.1\% & 0.3406\textsuperscript{ns} \\
 \midrule
 \multicolumn{9}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\
-$C_{5}$ & S2B + SR & 0.483 & 0.600 & 0.775 & 0.403 & 34.4\% & 30.0\% & 0.3159\textsuperscript{ns} \\
-$C_{6}$ & S2B + PC & 0.450 & 0.700 & 0.520 & 0.752 & 19.4\% & \phantom{0}0.0\% & 0.4123\textsuperscript{ns} \\
-$C_{7}$ & S2B + MC & 0.475 & 0.700 & 0.900 & 0.326 & 32.8\% & 20.0\% & 0.3245\textsuperscript{ns} \\
-$C_{8}$ & SR + PC & 0.537 & 0.700 & 0.390 & 0.738 & 28.0\% & 10.0\% & 0.4062\textsuperscript{ns} \\
-$C_{9}$ & SR + MC & 0.595 & 0.600 & 0.850 & 0.334 & 31.0\% & 20.0\% & 0.3134\textsuperscript{ns} \\
-$C_{10}$ & PC + MC & 0.550 & 0.600 & 0.471 & 0.804 & 21.1\% & \phantom{0}0.0\% & 0.4453\textsuperscript{ns} \\
+$C_{5}$ & S2B + SR & 0.550 & 0.900 & 0.777 & 0.503 & 32.0\% & 10.0\% & 0.3791\textsuperscript{ns} \\
+$C_{6}$ & S2B + PC & 0.383 & 0.625 & 0.900 & 0.559 & 36.1\% & 10.0\% & 0.3014\textsuperscript{ns} \\
+$C_{7}$ & S2B + MC & 0.483 & 0.850 & 0.700 & 0.556 & 32.8\% & 10.0\% & 0.2756\textsuperscript{ns} \\
+$C_{8}$ & SR + PC & 0.450 & 0.900 & 0.900 & 0.638 & 36.6\% & 10.0\% & 0.4054\textsuperscript{ns} \\
+$C_{9}$ & SR + MC & 0.350 & 0.850 & 0.500 & 0.431 & 27.6\% & 10.0\% & 0.3238\textsuperscript{ns} \\
+$C_{10}$ & PC + MC & 0.383 & 1.000 & 0.650 & 0.460 & 28.3\% & 10.0\% & 0.3683\textsuperscript{ns} \\
 \midrule
 \multicolumn{9}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\
-$C_{11}$ & S2B + SR + PC & 0.533 & 0.600 & 0.442 & 0.742 & 19.5\% & \phantom{0}0.0\% & 0.4456\textsuperscript{ns} \\
-$C_{12}$ & S2B + SR + MC & 0.483 & 0.600 & 0.550 & 0.192 & 27.5\% & 20.0\% & 0.1421\textsuperscript{ns} \\
-$C_{13}$ & S2B + PC + MC & 0.475 & 0.700 & 0.483 & 0.806 & 16.6\% & \phantom{0}0.0\% & \textbf{0.4624}\textsuperscript{ns} \\
-$C_{14}$ & SR + PC + MC & 0.637 & 0.700 & 0.266 & 0.801 & 13.8\% & \phantom{0}0.0\% & 0.2599\textsuperscript{ns} \\
-$C_{15}$ & S2B + SR + PC + MC (Full-Stack) & 0.483 & 0.700 & 0.457 & 0.781 & 22.2\% & \phantom{0}0.0\% & 0.4508\textsuperscript{ns} \\
+$C_{11}$ & S2B + SR + PC & 0.450 & 0.500 & 0.783 & 0.552 & 37.5\% & 20.0\% & 0.3801\textsuperscript{ns} \\
+$C_{12}$ & S2B + SR + MC & 0.550 & 0.550 & 0.625 & 0.462 & 24.6\% & 10.0\% & 0.3809\textsuperscript{ns} \\
+$C_{13}$ & S2B + PC + MC & 0.483 & 0.800 & 0.683 & 0.452 & 36.7\% & 20.0\% & 0.3594\textsuperscript{ns} \\
+$C_{14}$ & SR + PC + MC & 0.350 & 0.767 & 0.700 & 0.430 & 20.4\% & 0.0\% & 0.2430\textsuperscript{ns} \\
+$C_{15}$ & S2B + SR + PC + MC (Full-Stack) & 0.450 & 0.817 & 0.750 & 0.430 & 26.1\% & 10.0\% & 0.3122\textsuperscript{ns} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
 \parbox{\linewidth}{\footnotesize
-\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas}. Token $F_1$ and Exact Match (EM) assess lexical precision against gold multi-hop answers. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across all four RAGAS dimensions (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
+\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Token F1 and Exact Match evaluate lexical overlap against reference answers. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Highest composite quality score is highlighted in bold. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
 \end{table}

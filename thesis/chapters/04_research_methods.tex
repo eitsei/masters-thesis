@@ -132,6 +132,33 @@ The candidate retrieval pool for $M_2$ is generated using dense vector embedding
 A minimum threshold of 4096 tokens is selected to satisfy the operational boundary of Google Cloud Vertex AI Context Caching for static system instructions and pre-indexed knowledge corpora. In addition, dynamically retrieved chunks and conversational turns benefit from automatic KV cache prefix reuse across sequential interactions.
 
 % ==============================================================================
+% TODO [METODIPÄIVITYS - STRATEGIA 3: KYNNYS, MALLIKOHTAISET VÄLIMUISTIT, IMPLISIITTINEN]
+% ==============================================================================
+% 1. Lähdeviite 4 096 tokenin kynnykselle: Google Cloud Context cache overview,
+%    Limits-taulukko ("Minimum cache token count for implicit and explicit caching:
+%    Gemini 3 family models: 4,096 tokens"). Kynnys koskee kaikkia käytettyjä malleja
+%    (3.5 Flash-Lite, 3.5 Flash / 3.8 Flash, 3.1 Pro); 6 144 tokenin raja koskee vain
+%    implisiittistä välimuistia (3.1 Pro Preview, 3.7 Flash, 3.8 Flash).
+%    Työratsumallina pidetään toistaiseksi gemini-3.5-flash (syöte $0,150/1M, cached
+%    $0,0375/1M, 75 % alennus; output $0,60/1M). Mikäli malliksi vaihdetaan
+%    gemini-3.8-flash, syöte on $0,750/1M, cached $0,075/1M (90 % alennus).
+% 2. Poistettava/korvattava lause "automatic KV cache prefix reuse": implisiittinen
+%    välimuisti kytketään pois päältä GCP-projektitasolla (ZDR / Zero Data Retention),
+%    ja se verifioidaan cacheReadInputTokens == 0 -arvolla ei-M3 -konfiguraatioissa
+%    M_3:n vaikutuksen eristämiseksi (ks. Internal Validity). Ainoa välimuistimekanismi
+%    on eksplisiittinen CachedContent.
+%    -> Harkittava myös moduulin nimen "Dual-Tier Prompt Caching" muuttamista
+%       (Taulukko \ref{tab:optimization_modules}), koska toista tasoa ei enää ole.
+% 3. CachedContent on sidottu malliversioon: M_4:n kanssa luodaan oma välimuisti
+%    jokaiselle tierille (Flash-Lite, Flash, Pro), välimuistiavain
+%    sha256(PROMPT_SCHEMA_VERSION :: provider :: model :: instructionHash).
+%    Esilämmitys (pre-warming) on toteutettu taustajärjestelmän rajapintaan
+%    POST /api/benchmark/cache/prewarm ja lisätty kaikkiin ajuriskripteihin (run_*.sh),
+%    mikä takaa puhtaan P95-latenssimittauksen ilman kylmäluontiviivettä.
+% Ks. STRATEGY_CACHE_AWARE_ROUTING.md (luvut 1.1-1.2).
+% ==============================================================================
+
+% ==============================================================================
 % TODO [METODIPÄIVITYS - STRATEGIA 1: JAETTU STAATTINEN PREFIKSI & FEW-SHOT ICL]
 % ==============================================================================
 % Lisättävä teksti / kappaleen laajennus (Strategia 1 toteutuksessa):
@@ -146,6 +173,9 @@ A minimum threshold of 4096 tokens is selected to satisfy the operational bounda
 %      ilman keinotekoista täytetekstiä.
 %    - Dynaamisesti noudetut dokumenttilohkot (top-k chunkit) ja käyttäjän kysely
 %      lähetetään ajonaikaisen pyynnön dynaamisessa osassa erillisenä sisältönä.
+%    - Työratsumallina pidetään toistaiseksi gemini-3.5-flash (syöte $0,150/1M, cached
+%      $0,0375/1M, 75 % alennus; output $0,60/1M). Mikäli malliksi vaihdetaan
+%      gemini-3.8-flash, syöte on $0,750/1M, cached $0,075/1M (90 % alennus).
 %    - Lähdeviitteet:
 %      * \citep{gim2024promptcache} (Prompt Cache: modulaarinen huomion uudelleenkäyttö)
 %      * \citep{wei2025instructrag} (InstructRAG: päättelydemonstraatiot ja denoising)
@@ -157,12 +187,47 @@ A minimum threshold of 4096 tokens is selected to satisfy the operational bounda
 %      staattiseen prefiksiin ja malliversioon:
 %      sha256(PROMPT_SCHEMA_VERSION :: provider :: model :: instructionHash).
 %    - Koska dynaamiset chunkit eivät muuta avainta, saavutetaan toistuvissa
-%      kyselyissä 100 %:n välimuistiosuma (Cache Hit) ensimmäisen kyselyn jälkeen,
-%      mikä poistaa jokaisella kyselyllä toistuvan välimuistin luontiviiveen ja -kulun.
+%      kyselyissä 100 %:n välimuistiosuma (Cache Hit) ensimmäisen kyselyn jälkeen.
+%    - Esilämmitys (pre-warming) on toteutettu taustajärjestelmän rajapintaan
+%      POST /api/benchmark/cache/prewarm ja lisätty kaikkiin ajuriskripteihin (run_*.sh),
+%      mikä takaa 100 %:n osuman jo ensimmäisestä mitatusta kyselystä alkaen ja
+%      puhtaan P95-latenssimittauksen ilman kylmäluontiviivettä.
+%    - Implisiittinen välimuisti kytketään pois päältä GCP-projektitasolla (ZDR),
+%      ja verifioidaan cacheReadInputTokens == 0 -arvolla ei-M3 -konfiguraatioissa.
 % ==============================================================================
 
 \paragraph{Hybrid Model Routing ($M_4$).}
 To replicate real-world enterprise deployments where query complexity is unknown a priori, an automated zero-shot classifier powered by Gemini 3.5 Flash-Lite dynamically evaluates incoming queries. Straightforward single-hop requests are handled directly by Gemini 3.5 Flash-Lite, intermediate queries requiring multi-passage synthesis are escalated to Gemini 3.8 Flash, and complex multi-hop reasoning tasks are routed to Gemini 3.1 Pro. The latency overhead ($T_{\text{route}}$) and token costs of the classifier are explicitly recorded in the evaluation.
+
+% ==============================================================================
+% TODO [METODIPÄIVITYS - STRATEGIA 3: VÄLIMUISTITIETOINEN MALLIPORRASTUS]
+% ==============================================================================
+% Lisättävä M_4-kappaleeseen (ks. STRATEGY_CACHE_AWARE_ROUTING.md):
+% 1. Ortogonaalisuus: M_4 valitsee ainoastaan generointimallin. Hakuputki (M_1/M_2),
+%    top-k ja prompt-sisältö ovat identtiset kaikissa tiereissä ja määräytyvät
+%    yksinomaan aktiivisista moduuleista. Ei tier-kohtaisia hakulaajennuksia eikä
+%    hauttomia oikopolkuja.
+% 2. OOD- ja unanswerable-kyselyt kulkevat normaalin hakuputken läpi: OOD ohjautuu
+%    tyypillisesti 1-hop-tieriin (Flash-Lite), in-domain unanswerable 2- tai
+%    3-hop-tieriin; kieltäytyminen tuotetaan haetun kontekstin perusteella.
+% 3. Yhdistelmä M_3 + M_4 (C_10, C_13, C_14, C_15): kullekin tierille ylläpidetään oma
+%    eksplisiittinen välimuisti (Flash-Lite, Flash, Pro), koska CachedContent on
+%    sidottu malliversioon. Staattinen prefiksi (~5 100 tokenia) ylittää 4 096 tokenin
+%    kynnyksen kaikilla malleilla -> 100 % M_3-kattavuus.
+%    Esilämmitys (pre-warming) on toteutettu taustajärjestelmän rajapintaan
+%    POST /api/benchmark/cache/prewarm ja lisätty kaikkiin ajuriskripteihin (run_*.sh),
+%    mikä esilämmittää kaikkien tierien välimuistit ja takaa puhtaan P95-latenssimittauksen.
+% 4. Työratsumallina (2-hop tier) pidetään toistaiseksi gemini-3.5-flash (syöte $0,150/1M,
+%    cached $0,0375/1M, 75 % alennus; output $0,60/1M). Mikäli malliksi vaihdetaan
+%    gemini-3.8-flash, syöte on $0,750/1M, cached $0,075/1M (90 % alennus).
+%    Luokittimen prompti ei sisällä viittauksia benchmark-datasetteihin.
+%    Virhetilanteessa (aikakatkaisu 1 500 ms) fallback on 2-hop-tier (gemini-3.5-flash / gemini-3.8-flash).
+% 5. Raportoitavat lisämittarit: tier-jakauma per datasetti sekä reititystarkkuus
+%    (confusion matrix luokittimen tier vs. gold hop -label); oracle-reititin
+%    (gold hop -labelit) ylärajana.
+% 6. Odotettava tulos kirjattava hypoteesina: MuSiQuessa (ei 1-hop-kysymyksiä)
+%    C_4 voi olla C_0:aa kalliimpi Pro-osuuden vuoksi.
+% ==============================================================================
 
 \subsection{Benchmark Datasets}
 \label{subsec:bench_datasets}
@@ -206,8 +271,12 @@ Both median ($P_{50}$) and 95th percentile tail ($P_{95}$) latencies are reporte
 % Lisättävä huomautus yhtälöön 4.1 (Eq. \ref{eq:latency}) ja TTFT-määritelmään:
 % - Jaetun staattisen prefiksin ansiosta T_cache(q) arvioidaan toistuvissa kyselyissä
 %   suoraan paikallisesta muistista ilman etäluontia (T_cache < 2 ms vs. 500-1000 ms).
+% - Esilämmitys (pre-warming) on toteutettu taustajärjestelmän rajapintaan
+%   POST /api/benchmark/cache/prewarm ja lisätty kaikkiin ajuriskripteihin (run_*.sh),
+%   mikä takaa puhtaan P95-latenssimittauksen ilman kylmäluontiviivettä jo 1. kyselystä alkaen.
 % - Generaattorin esitäyttöaika T_prefill(q) lyhenee jopa 60-70 %, koska n. 5 100 tokenin
 %   staattisen prefiksin KV-huomiotilat luetaan suoraan palvelimen välimuistista.
+% - Työratsumallina pidetään toistaiseksi gemini-3.5-flash (vaihtoehtona gemini-3.8-flash).
 % Lähdeviite: \citep{gim2024promptcache, lu2025turborag}
 % ==============================================================================
 
@@ -228,16 +297,48 @@ Operational expenditure constitutes a critical bottleneck for enterprise RAG ado
 % TODO [METODIPÄIVITYS - STRATEGIA 1: KUSTANNUSLASKENTA JA PREFIX-ALENNUS]
 % ==============================================================================
 % Lisättävä selvennys yhtälöön 4.3 (Eq. \ref{eq:costs}) koskien M_3-moduulia:
+% - Työratsumallina pidetään toistaiseksi gemini-3.5-flash (syöte $0,150/1M, cached
+%   $0,0375/1M, 75 % alennus; output $0,60/1M). Mikäli malliksi vaihdetaan
+%   gemini-3.8-flash, syöte on $0,750/1M, cached $0,075/1M (90 % alennus; output $3,75/1M).
 % - Staattisen prefiksin n. 5 100 tokenia laskutetaan toistuvissa kyselyissä
-%   alennetulla hinnalla P_cached^(m(q)) (75-90 % alennus Gemini Flash -hinnoittelussa).
+%   alennetulla hinnalla P_cached^(m(q)) (75 % tai 90 % alennus Gemini Flash -mallista riippuen).
 % - Normaali syötehinta P_prompt^(m(q)) kohdistuu ainoastaan dynaamisesti
 %   noudettuihin lohkoihin (N_uncached ~ 1 000 - 2 000 tokenia) ja käyttäjän kyselyyn.
-% - Välimuistin kirjoitusmaksu maksetaan vain kerran ajon alussa eikä jokaisella kyselyllä,
+% - Esilämmitys (pre-warming) on toteutettu taustajärjestelmän rajapintaan
+%   POST /api/benchmark/cache/prewarm ja lisätty kaikkiin ajuriskripteihin (run_*.sh).
+%   Välimuistin luontikulu maksetaan vain kerran ajon alussa eikä jokaisella kyselyllä,
 %   mikä kääntää M_3:n kokonaiskustannuksen selvästi säästäväksi (RQ2).
 % Lähdeviite: \citep{gim2024promptcache}
 % ==============================================================================
 
 where $m(q) \in \{\text{Flash-Lite}, \text{Flash}, \text{Pro}\}$ represents the active generative model tier selected for query $q$, $N_{\text{embed}}$ is the number of query tokens vectorized at unit rate $P_{\text{embed}}$, $N_{\text{uncached}}$ and $N_{\text{cached}}$ represent uncached and cached prompt tokens billed at tier-specific rates $P_{\text{prompt}}^{(m(q))}$ and $P_{\text{cached}}^{(m(q))}$ (reflecting the 90\% discount applied to cached input context), $N_{\text{comp}}$ denotes the generated completion tokens billed at rate $P_{\text{comp}}^{(m(q))}$, $N_{\text{rerank}}$ represents the count of candidate passages evaluated by the cross-encoder at per-document rate $P_{\text{rerank}}$, and $N_{\text{route}}$ denotes tokens consumed by the classifier during model routing ($M_4$) at rate $P_{\text{route}}$. Fixed persistent infrastructure expenses, such as base Cloud SQL hosting, are invariant across configurations and therefore excluded from per-query operational cost calculations. The complete unit tariff schedule, encompassing all evaluated generative model tiers, cross-encoder ranking services, and embedding models alongside official vendor documentation references and acquisition timestamps (September 2026), is detailed in Appendix~\ref{sec:appendix_pricing} (Table~\ref{tab:pricing_catalog}).
+
+% ==============================================================================
+% TODO [METODIPÄIVITYS - STRATEGIA 3: MALLIKOHTAISET ALENNUKSET JA YLLÄPITOKULU]
+% ==============================================================================
+% Korjattava yllä olevaan selitteeseen ja yhtälöön \ref{eq:costs}:
+% - "(reflecting the 90% discount applied to cached input context)" on virheellinen
+%   kaikille tiereille. Hinnaston (Table \ref{tab:pricing_catalog}) mukaan alennus on
+%   mallikohtainen:
+%   * Työratsumalli gemini-3.5-flash: syöte $0,150/1M, cached $0,0375/1M (75 % alennus), output $0,60/1M.
+%   * Vaihtoehtoinen työratsu gemini-3.8-flash: syöte $0,750/1M, cached $0,075/1M (90 % alennus), output $3,75/1M.
+%   * Gemini 3.5 Flash-Lite: syöte $0,075/1M, cached $0,01875/1M (75 % alennus), output $0,30/1M.
+%   * Gemini 3.1 Pro: syöte $1,250/1M, cached $0,3125/1M (75 % alennus), output $5,00/1M.
+% - Esilämmitys (pre-warming) on toteutettu taustajärjestelmän rajapintaan
+%   POST /api/benchmark/cache/prewarm ja lisätty kaikkiin ajuriskripteihin (run_*.sh).
+% - Lisättävä välimuistin luonti- ja säilytyskulu (storage, $/1M tokenia/h) joko omana
+%   terminä tai per konfiguraatio kirjattavana erillisenä kuluna. M_3 + M_4
+%   -konfiguraatioissa aktiivisena on enintään kolme mallikohtaista välimuistia
+%   (Flash-Lite, Flash, Pro, kukin ~5 100 tokenia), ja välimuistit nollataan
+%   konfiguraatioiden välillä -> luontikulu toistuu jokaisessa konfiguraatiossa.
+%   Vaihtoehtoisesti perusteltava kulu merkityksettömäksi suhteessa kyselykuluihin.
+% - Esimerkkilaskelma (N_static ~5 100, N_dyn ~1 500, N_comp ~150), $/kysely:
+%   * Flash-Lite: 0.00054 -> 0.00025 (-53 %)
+%   * gemini-3.5-flash: 0.00108 -> 0.00051 (-53 %)
+%   * gemini-3.8-flash: 0.00551 -> 0.00207 (-62 %)
+%   * Pro: 0.00900 -> 0.00422 (-53 %)
+% Ks. STRATEGY_CACHE_AWARE_ROUTING.md (luku 1.3).
+% ==============================================================================
 
 Because individual execution expenditures in highly optimized or cached architectures are fractional (frequently falling below $\$0.001$ per request), presenting single-query costs directly introduces significant rounding truncation in empirical summaries. Consequently, operational expenditures in benchmark summary tables and Pareto frontier analyses are normalized and reported per 1,000 queries:
 
@@ -354,6 +455,31 @@ Beyond the evaluation judge, the generation of the enterprise dataset also relie
 
 \paragraph{Internal Validity.}
 Distributed computer systems and network environments introduce numerous sources of latency variance, ranging from cold-start overheads to transient network jitter. To mitigate cold-start distortions (such as JVM Just-In-Time compilation, database connection pool initialization, and TLS handshakes), multiple unmeasured warm-up runs are executed prior to recording steady-state measurements. Additionally, the software stack and database are deployed within a dedicated VPC in the \texttt{europe-north1} region to minimize network hops and isolate the testbed from public internet routing fluctuations. Finally, application and database caches are explicitly reset between distinct experimental configurations to prevent cross-run state leakage.
+
+% ==============================================================================
+% TODO [METODIPÄIVITYS - STRATEGIA 3: IMPLISIITTINEN VÄLIMUISTI POIS KÄYTÖSTÄ]
+% ==============================================================================
+% Lisättävä Internal Validity -kappaleeseen:
+% - Gemini 3.x -mallit tekevät oletuksena implisiittistä prefix-välimuistia
+%   (kynnys: Gemini 3 -perhe 4 096 tokenia; 3.1 Pro Preview / 3.7 Flash / 3.8 Flash
+%   6 144 tokenia). Baselinen (C_0) täysi prompti (~6 600 tokenia) ylittäisi kynnyksen,
+%   jolloin ei-M_3-konfiguraatiot saisivat automaattisen alennuksen ja M_3:n vaikutus
+%   sekoittuisi.
+% - Työratsumallina pidetään toistaiseksi gemini-3.5-flash (syöte $0,150/1M, cached
+%   $0,0375/1M, 75 % alennus; output $0,60/1M). Mikäli malliksi vaihdetaan
+%   gemini-3.8-flash, syöte on $0,750/1M, cached $0,075/1M (90 % alennus).
+% - Kontrolli: implisiittinen välimuisti kytketään pois päältä GCP-projektitasolla
+%   (ZDR / Zero Data Retention -asetus / disable caching).
+% - Verifiointi: cacheReadInputTokens kirjataan jokaisessa kutsussa; ei-M_3-
+%   konfiguraatioissa (C_0, C_1, C_2, C_4, C_5, C_7, C_9, C_12) arvon on oltava 0.
+% - Esilämmitys (pre-warming): toteutettu taustajärjestelmän rajapintaan
+%   POST /api/benchmark/cache/prewarm ja lisätty kaikkiin ajuriskripteihin (run_*.sh).
+%   Kaikki konfiguraatiossa aktiiviset mallikohtaiset eksplisiittiset välimuistit
+%   esilämmitetään ennen mittausajoa, mikä takaa puhtaan P95-latenssimittauksen ilman
+%   kylmäluontiviivettä (500-1000 ms).
+% Lähdeviite: Google Cloud Context cache overview (Limits) -- lisättävä .bib-tiedostoon.
+% Ks. STRATEGY_CACHE_AWARE_ROUTING.md (luku 1.2).
+% ==============================================================================
 
 \paragraph{External Validity.}
 Practically all of the systems introduced in Section~\ref{sec:literature-review} are implemented using a very homogeneous set of programming languages, relying mostly on Python. A primary motivation of this study is to examine how these optimization concepts generalize into enterprise-standard languages and frameworks, specifically Java and Spring AI. There is also a risk that the pre-training corpus of the underlying LLMs might include academic benchmarks used in this study, potentially enabling the model to answer queries based on memorized parametric knowledge rather than retrieved context. To mitigate this issue, the standardized MuSiQue dataset~\citep{trivedi2022musique} is paired with a domain-specific synthetic customer support dataset to assess model generalizability.

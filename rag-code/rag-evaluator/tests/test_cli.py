@@ -562,6 +562,213 @@ def test_pacing_delay_with_spinner():
     assert elapsed >= 0.04
 
 
+def test_cli_test_cache_help():
+    res = runner.invoke(app, ["test-cache", "--help"])
+    assert res.exit_code == 0
+    assert "--url" in res.stdout
+    assert "--models" in res.stdout
+    assert "--table-name" in res.stdout
+    assert "--timeout" in res.stdout
+    assert "--debug" in res.stdout
+
+
+@patch("src.cli.RagBenchmarkClient")
+def test_cli_test_cache_success(mock_client_cls):
+    mock_instance = MagicMock()
+    mock_client_cls.return_value = mock_instance
+    mock_instance.health_check.return_value = True
+    mock_instance.verify_cache_behavior.side_effect = [
+        (True, "Cache isolation confirmed: 0 cached tokens for non-M3 query", {}),
+        (True, "Explicit prompt cache hit confirmed (1200 tokens cached)", {}),
+    ]
+    mock_instance.prewarm_cache.return_value = {"status": "SUCCESS", "models": ["gemini-3.8-flash"]}
+    mock_instance.clear_cache.return_value = {"status": "SUCCESS", "cleared": 1}
+
+    res = runner.invoke(app, [
+        "test-cache",
+        "--url", "http://localhost:8080",
+        "--models", "gemini-3.8-flash",
+        "--table-name", "vector_store_nordea",
+    ])
+
+    assert res.exit_code == 0
+    assert "Prompt Cache Verification Summary" in res.stdout
+    assert "PASS" in res.stdout
+    assert "All prompt cache verification stages passed successfully!" in res.stdout
+    assert mock_instance.health_check.called
+    assert mock_instance.prewarm_cache.called
+    assert mock_instance.clear_cache.called
+    assert mock_instance.verify_cache_behavior.call_count == 2
+
+
+@patch("src.cli.RagBenchmarkClient")
+def test_cli_test_cache_baseline_leakage_failure(mock_client_cls):
+    mock_instance = MagicMock()
+    mock_client_cls.return_value = mock_instance
+    mock_instance.health_check.return_value = True
+    mock_instance.verify_cache_behavior.side_effect = [
+        (False, "Implicit cache leakage detected: received 1500 cached tokens in non-M3 query", {}),
+        (True, "Explicit prompt cache hit confirmed", {}),
+    ]
+    mock_instance.prewarm_cache.return_value = {"status": "SUCCESS"}
+    mock_instance.clear_cache.return_value = {"status": "SUCCESS"}
+
+    res = runner.invoke(app, [
+        "test-cache",
+        "--url", "http://localhost:8080",
+    ])
+
+    assert res.exit_code == 1
+    assert "FAIL" in res.stdout
+    assert "Prompt cache verification suite failed." in res.stdout
+    assert "Implicit cache leakage detected" in res.stdout
+
+
+@patch("src.cli.RagBenchmarkClient")
+def test_cli_test_cache_explicit_cache_failure(mock_client_cls):
+    mock_instance = MagicMock()
+    mock_client_cls.return_value = mock_instance
+    mock_instance.health_check.return_value = True
+    mock_instance.verify_cache_behavior.side_effect = [
+        (True, "Cache isolation confirmed: 0 cached tokens for non-M3 query", {}),
+        (False, "Expected cached tokens but got 0 (status=NONE)", {}),
+    ]
+    mock_instance.prewarm_cache.return_value = {"status": "SUCCESS"}
+    mock_instance.clear_cache.return_value = {"status": "SUCCESS"}
+
+    res = runner.invoke(app, [
+        "test-cache",
+        "--url", "http://localhost:8080",
+    ])
+
+    assert res.exit_code == 1
+    assert "FAIL" in res.stdout
+    assert "Prompt cache verification suite failed." in res.stdout
+    assert "Expected cached tokens but got 0" in res.stdout
+
+
+@patch("src.cli.RagBenchmarkClient")
+def test_cli_run_preflight_cache_check_m3_success(mock_client_cls, tmp_path: Path, synthetic_run_data):
+    mock_instance = MagicMock()
+    mock_client_cls.return_value = mock_instance
+    mock_instance.health_check.return_value = True
+    mock_instance.verify_cache_behavior.return_value = (
+        True,
+        "Explicit prompt cache hit confirmed (1200 tokens cached)",
+        {},
+    )
+    mock_instance.batch_query.return_value = {
+        "totalQuestions": 6,
+        "results": synthetic_run_data,
+    }
+
+    out_file = tmp_path / "run_m3.jsonl"
+    res = runner.invoke(app, [
+        "run",
+        "--url", "http://localhost:8080",
+        "--limit", "6",
+        "--modules", "M3",
+        "--judge", "none",
+        "--warmup", "0",
+        "--output", str(out_file),
+    ])
+
+    assert res.exit_code == 0
+    assert "Verifying M3 explicit prompt cache pre-flight integrity..." in res.stdout
+    assert "M3 prompt cache verified" in res.stdout
+    mock_instance.verify_cache_behavior.assert_called_once_with(expect_cached=True, table_name=None)
+    assert mock_instance.batch_query.called
+
+
+@patch("src.cli.RagBenchmarkClient")
+def test_cli_run_preflight_cache_check_m3_failure_exits(mock_client_cls, tmp_path: Path, synthetic_run_data):
+    mock_instance = MagicMock()
+    mock_client_cls.return_value = mock_instance
+    mock_instance.health_check.return_value = True
+    mock_instance.verify_cache_behavior.return_value = (
+        False,
+        "Expected cached tokens but got 0 (status=NONE)",
+        {},
+    )
+
+    out_file = tmp_path / "run_m3_fail.jsonl"
+    res = runner.invoke(app, [
+        "run",
+        "--url", "http://localhost:8080",
+        "--limit", "6",
+        "--modules", "M3",
+        "--judge", "none",
+        "--warmup", "0",
+        "--output", str(out_file),
+    ])
+
+    assert res.exit_code == 1
+    assert "CRITICAL: M3 explicit cache pre-flight verification failed" in res.stdout
+    assert "Aborting run to prevent un-cached benchmark execution." in " ".join(res.stdout.split())
+    mock_instance.verify_cache_behavior.assert_called_once_with(expect_cached=True, table_name=None)
+    assert not mock_instance.batch_query.called
+    assert not out_file.exists()
+
+
+@patch("src.cli.RagBenchmarkClient")
+def test_cli_run_preflight_cache_check_non_m3_leakage_failure_exits(mock_client_cls, tmp_path: Path, synthetic_run_data):
+    mock_instance = MagicMock()
+    mock_client_cls.return_value = mock_instance
+    mock_instance.health_check.return_value = True
+    mock_instance.verify_cache_behavior.return_value = (
+        False,
+        "Implicit cache leakage detected: received 1500 cached tokens in non-M3 query",
+        {},
+    )
+
+    out_file = tmp_path / "run_c0_fail.jsonl"
+    res = runner.invoke(app, [
+        "run",
+        "--url", "http://localhost:8080",
+        "--limit", "6",
+        "--modules", "M1",
+        "--judge", "none",
+        "--warmup", "0",
+        "--output", str(out_file),
+    ])
+
+    assert res.exit_code == 1
+    assert "CRITICAL: Baseline cache isolation failed" in res.stdout
+    assert "Aborting run to prevent invalid benchmark results." in " ".join(res.stdout.split())
+    mock_instance.verify_cache_behavior.assert_called_once_with(expect_cached=False, table_name=None)
+    assert not mock_instance.batch_query.called
+    assert not out_file.exists()
+
+
+@patch("src.cli.RagBenchmarkClient")
+def test_cli_run_preflight_cache_check_skipped(mock_client_cls, tmp_path: Path, synthetic_run_data):
+    mock_instance = MagicMock()
+    mock_client_cls.return_value = mock_instance
+    mock_instance.health_check.return_value = True
+    mock_instance.batch_query.return_value = {
+        "totalQuestions": 6,
+        "results": synthetic_run_data,
+    }
+
+    out_file = tmp_path / "run_skipped.jsonl"
+    res = runner.invoke(app, [
+        "run",
+        "--url", "http://localhost:8080",
+        "--limit", "6",
+        "--modules", "M3",
+        "--judge", "none",
+        "--warmup", "0",
+        "--skip-cache-check",
+        "--output", str(out_file),
+    ])
+
+    assert res.exit_code == 0
+    assert not mock_instance.verify_cache_behavior.called
+    assert "Verifying M3 explicit prompt cache pre-flight integrity..." not in res.stdout
+    assert mock_instance.batch_query.called
+
+
+
 
 
 

@@ -10,7 +10,12 @@ from pathlib import Path
 import pytest
 from src.export_latex import (
     export_benchmark_summary_latex,
+    export_cost_latex,
     export_hop_breakdown_latex,
+    export_latency_latex,
+    export_pareto_latex,
+    export_quality_enterprise_latex,
+    export_quality_musique_latex,
     export_wilcoxon_decomposed_latex,
     export_wilcoxon_rq1_ttft_latex,
     export_wilcoxon_tests_latex,
@@ -331,4 +336,180 @@ def test_plot_cost_breakdown_multicomponent(tmp_path: Path):
     result_path = plot_cost_breakdown(data, output_path=out_pdf)
     assert result_path.exists()
     assert result_path.stat().st_size > 1000
+
+
+def test_export_latency_latex(tmp_path: Path, sample_benchmark_records):
+    out_tex = tmp_path / "tab_latency_musique.tex"
+    run_dict = {
+        "C0": sample_benchmark_records,
+        "C1": [
+            {**r, "total_latency_ms": r["total_latency_ms"] * 0.85, "ttft_ms": 120.0}
+            for r in sample_benchmark_records
+        ],
+    }
+    comparisons = [
+        WilcoxonComparison("RQ1", "End-to-End Latency (ms)", "C1", 1312.5, 1115.6, -196.9, 0.0, 0.001, 0.002, "**"),
+    ]
+
+    content = export_latency_latex(
+        run_dict,
+        output_path=out_tex,
+        comparisons=comparisons,
+        label="tab:latency_musique",
+        dataset_name="MuSiQue",
+    )
+
+    assert out_tex.exists()
+    assert "\\label{tab:latency_musique}" in content
+    assert "\\begin{table}[htbp]" in content
+    assert "TTFT $P_{50}$" in content
+    assert "$T_{\\text{total}} P_{50}$" in content
+    assert "$\\Delta T_{\\text{total}}$" in content
+    assert "Baseline ($k=0$)" in content
+    assert "Single-Factor Isolated ($k=1$)" in content
+    assert "\\textsuperscript{**}" in content
+
+
+def test_export_latency_latex_batch_mode_note(tmp_path: Path, sample_benchmark_records):
+    out_tex = tmp_path / "tab_latency_musique_batch.tex"
+    run_dict = {
+        "C0": sample_benchmark_records,  # All records have ttft_ms = 0 by default
+    }
+    content = export_latency_latex(run_dict, output_path=out_tex)
+    assert "batch non-streaming mode" in content
+
+
+def test_export_cost_latex(tmp_path: Path, sample_benchmark_records):
+    out_tex = tmp_path / "tab_cost_musique.tex"
+    run_dict = {
+        "C0": [
+            {**r, "tokenUsage": {"promptTokens": 1000, "completionTokens": 50, "cachedTokens": 0}}
+            for r in sample_benchmark_records
+        ],
+        "C3": [
+            {**r, "tokenUsage": {"promptTokens": 1000, "completionTokens": 50, "cachedTokens": 800}, "cost_usd": 0.00015}
+            for r in sample_benchmark_records
+        ],
+    }
+    comparisons = [
+        WilcoxonComparison("RQ2", "Operational Cost ($)", "C3", 0.00039, 0.00015, -0.00024, 0.0, 0.001, 0.002, "***"),
+    ]
+
+    content = export_cost_latex(
+        run_dict,
+        output_path=out_tex,
+        comparisons=comparisons,
+        label="tab:cost_musique",
+        dataset_name="MuSiQue",
+    )
+
+    assert out_tex.exists()
+    assert "\\label{tab:cost_musique}" in content
+    assert "Uncached" in content
+    assert "Cached" in content
+    assert "Output" in content
+    assert "Cost / 1k" in content
+    assert "\\textsuperscript{***}" in content
+    # For C3: promptTokens is 1000, cachedTokens is 800 -> uncached should be 200
+    assert "200" in content
+    assert "800" in content
+
+
+def test_export_quality_musique_latex(tmp_path: Path, sample_benchmark_records):
+    out_tex = tmp_path / "tab_quality_musique.tex"
+    run_dict = {
+        "C0": sample_benchmark_records,
+        "C1": [
+            {**r, "composite_quality": 0.92, "token_f1": 0.85, "exact_match": 0.75}
+            for r in sample_benchmark_records
+        ],
+    }
+    comparisons = [
+        WilcoxonComparison("RQ3", "Composite Quality Q", "C1", 0.86, 0.92, 0.06, 0.0, 0.002, 0.004, "**"),
+    ]
+
+    content = export_quality_musique_latex(
+        run_dict,
+        output_path=out_tex,
+        comparisons=comparisons,
+        label="tab:quality_musique",
+        dataset_name="MuSiQue",
+    )
+
+    assert out_tex.exists()
+    assert "\\label{tab:quality_musique}" in content
+    assert "Context Precision" in content
+    assert "Context Recall" in content
+    assert "Faithfulness" in content
+    assert "Answer Relevancy" in content
+    assert "Token" in content and "F1" in content
+    assert "Exact" in content and "Match" in content
+    assert "Composite" in content and "Quality" in content
+    # Dynamic N in caption
+    assert "($N = 10$)" in content
+    # Highest Composite Quality Q is in bold
+    assert "\\textbf{0.9200}" in content
+    assert "\\textsuperscript{**}" in content
+
+
+def test_export_quality_enterprise_latex_dynamic_n(tmp_path: Path, sample_benchmark_records):
+    out_tex = tmp_path / "tab_quality_enterprise.tex"
+    # Create 5 records
+    records_5 = sample_benchmark_records[:5]
+    run_dict = {"C0": records_5}
+
+    content = export_quality_enterprise_latex(
+        run_dict,
+        output_path=out_tex,
+        label="tab:quality_enterprise_raw",
+    )
+
+    assert out_tex.exists()
+    assert "\\label{tab:quality_enterprise_raw}" in content
+    assert "($N = 5$)" in content
+    assert "($N = 100$)" not in content
+
+
+def test_export_pareto_latex(tmp_path: Path, sample_benchmark_records):
+    out_tex = tmp_path / "tab_pareto_musique.tex"
+    run_dict = {
+        "C0": sample_benchmark_records,
+        "C1": [
+            # Better Q, lower cost, lower latency -> dominates C0
+            {**r, "composite_quality": 0.95, "cost_usd": 0.0001, "total_latency_ms": 500.0}
+            for r in sample_benchmark_records
+        ],
+    }
+
+    content = export_pareto_latex(
+        run_dict,
+        output_path=out_tex,
+        label="tab:pareto_musique",
+        dataset_name="MuSiQue",
+    )
+
+    assert out_tex.exists()
+    assert "\\label{tab:pareto_musique}" in content
+    assert "Composite" in content and "Quality" in content
+    assert "Cost / 1k" in content
+    assert "$T_{\\text{total}} P_{50}$" in content
+    assert "QPD" in content
+    assert "QPS" in content
+    assert "Pareto" in content and "Optimal" in content
+    # C1 dominates C0: C1 should be Pareto optimal ("Yes"), C0 dominated ("No")
+    assert "Yes" in content
+    assert "No" in content
+
+
+def test_export_hop_breakdown_latex_dataset_name(tmp_path: Path, sample_benchmark_records):
+    out_tex = tmp_path / "hop_breakdown_enterprise.tex"
+    content = export_hop_breakdown_latex(
+        sample_benchmark_records,
+        output_path=out_tex,
+        dataset_name="Enterprise",
+    )
+
+    assert out_tex.exists()
+    assert "stratified by Enterprise reasoning depth tiers." in content
+    assert "Evaluated over the Enterprise multi-hop benchmark sample" in content
 

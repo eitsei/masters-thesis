@@ -171,6 +171,8 @@ class GoogleGenAiModelRouterTest {
         router.route(new RoutingRequest("Check prompt options"));
 
         Prompt capturedPrompt = promptCaptor.getValue();
+        assertThat(capturedPrompt.getContents()).contains("You are a query complexity classifier for an enterprise retrieval-augmented question answering system.");
+        assertThat(capturedPrompt.getContents()).contains("Query: Check prompt options");
         assertThat(capturedPrompt.getOptions()).isNotNull();
         assertThat(capturedPrompt.getOptions().getModel()).isEqualTo("gemini-3.5-flash-lite");
         assertThat(capturedPrompt.getOptions().getTemperature()).isEqualTo(0.0);

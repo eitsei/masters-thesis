@@ -274,6 +274,7 @@ class RagClient:
         modules: Iterable[str] | None = None,
         table_name: str | None = None,
         top_k: int | None = None,
+        warmup_queries: int = 0,
     ) -> dict[str, Any]:
         """Execute a batch query on the server and return aggregate results.
 
@@ -317,6 +318,92 @@ class RagClient:
             logger.error(f"POST {url} failed with status {resp.status_code}: {resp.text}")
             raise requests.HTTPError(f"{err} - Response body: {resp.text}", response=resp) from err
         return resp.json()
+
+    def clear_cache(self) -> dict[str, Any]:
+        """Clear owned prompt cache resources on the server.
+
+        Returns:
+            JSON response from `POST /api/benchmark/cache/clear`.
+        """
+        url = f"{self.base_url}/api/benchmark/cache/clear"
+        self._log_debug(f"POST {url}")
+        resp = self.session.post(url, timeout=self.timeout)
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as err:
+            logger.error(f"POST {url} failed with status {resp.status_code}: {resp.text}")
+            raise requests.HTTPError(f"{err} - Response body: {resp.text}", response=resp) from err
+        return resp.json()
+
+    def prewarm_cache(self, models: list[str] | None = None) -> dict[str, Any]:
+        """Prewarm prompt cache for specified models (or server defaults if None).
+
+        Args:
+            models: Optional list of model names to prewarm prompt cache for.
+
+        Returns:
+            JSON response from `POST /api/benchmark/cache/prewarm`.
+        """
+        url = f"{self.base_url}/api/benchmark/cache/prewarm"
+        payload: dict[str, Any] = {"models": models} if models is not None else {}
+        self._log_debug(f"POST {url} payload={payload}")
+        resp = self.session.post(url, json=payload, timeout=self.timeout)
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as err:
+            logger.error(f"POST {url} failed with status {resp.status_code}: {resp.text}")
+            raise requests.HTTPError(f"{err} - Response body: {resp.text}", response=resp) from err
+        return resp.json()
+
+    def verify_cache_behavior(
+        self,
+        expect_cached: bool,
+        table_name: str | None = None,
+        probe_query: str = "Benchmark pre-flight cache verification probe",
+    ) -> tuple[bool, str, dict[str, Any]]:
+        """Verify prompt cache behavior (explicit hit vs isolation) prior to benchmark execution.
+
+        Args:
+            expect_cached: If True, expects cached tokens for M3 queries.
+                           If False, verifies no cache leakage for non-M3 queries.
+            table_name: Optional override for vector store table.
+            probe_query: Probe query string to execute.
+
+        Returns:
+            Tuple of (success_boolean, status_message, last_response_json).
+        """
+        self._log_debug(
+            f"Verifying cache behavior: expect_cached={expect_cached}, table_name={table_name}"
+        )
+        if expect_cached:
+            resp = self.query(query=probe_query, modules=["M3"], table_name=table_name)
+            token_usage = resp.get("tokenUsage") or {}
+            cached_tokens = token_usage.get("cachedTokens", 0)
+            cache_status = resp.get("cacheStatus")
+
+            if cached_tokens > 0 or cache_status == "EXPLICIT_HIT":
+                return True, f"Explicit prompt cache hit confirmed ({cached_tokens} tokens cached)", resp
+
+            # If the first probe was a miss, retry once to confirm cache entry creation
+            self._log_debug("First M3 probe did not hit cache; retrying verification probe")
+            resp = self.query(query=probe_query, modules=["M3"], table_name=table_name)
+            token_usage = resp.get("tokenUsage") or {}
+            cached_tokens = token_usage.get("cachedTokens", 0)
+            cache_status = resp.get("cacheStatus")
+
+            if cached_tokens > 0 or cache_status == "EXPLICIT_HIT":
+                return True, f"Explicit prompt cache hit confirmed ({cached_tokens} tokens cached)", resp
+
+            return False, f"Expected cached tokens but got 0 (status={cache_status})", resp
+        else:
+            resp = self.query(query=probe_query, modules=[], table_name=table_name)
+            token_usage = resp.get("tokenUsage") or {}
+            cached_tokens = token_usage.get("cachedTokens", 0)
+
+            if cached_tokens == 0:
+                return True, "Cache isolation confirmed: 0 cached tokens for non-M3 query", resp
+
+            return False, f"Implicit cache leakage detected: received {cached_tokens} cached tokens in non-M3 query", resp
 
     def close(self) -> None:
         """Close underlying HTTP session."""

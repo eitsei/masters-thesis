@@ -46,7 +46,7 @@ public record PromptCacheProperties(
             minTokens = 4096;
         }
         if (ttl == null) {
-            ttl = Duration.ofMinutes(5);
+            ttl = Duration.ofHours(1);
         }
         if (charsPerTokenEstimate <= 0.0) {
             charsPerTokenEstimate = 3.5;

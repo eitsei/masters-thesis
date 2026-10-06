@@ -40,11 +40,21 @@ public class GoogleGenAiModelRouter implements ModelRouter, DisposableBean {
     private static final Pattern DIGIT_PATTERN = Pattern.compile("\\b([123])\\b");
 
     private static final String CLASSIFIER_PROMPT_TEMPLATE = """
-            You are a query complexity classifier for an enterprise RAG system.
-            Classify the user query into one of three reasoning difficulty tiers:
-            1 = SINGLE_HOP: Direct factual lookup, single entity, simple definition, or out-of-domain refusal candidate.
-            2 = TWO_HOP: Relational query connecting two concepts/entities, comparison, or two-passage synthesis.
-            3 = MULTI_HOP: Complex multi-step reasoning, 3+ entity deduction chain, or deep analytical synthesis.
+            You are a query complexity classifier for an enterprise retrieval-augmented question answering system.
+            Estimate how many independent reasoning steps (evidence passages) are needed to answer the query,
+            and assign exactly one tier:
+
+            1 = SINGLE_HOP:
+                - The answer can be found in a single passage: a single fact, value, term, or definition.
+                - Greetings, small talk, or questions clearly unrelated to the organization's domain.
+
+            2 = TWO_HOP:
+                - The answer requires connecting two facts or entities from different passages.
+                - Domain questions where it is uncertain whether the answer exists in the documentation.
+
+            3 = MULTI_HOP:
+                - The answer requires a chain of three or more dependent reasoning steps across multiple passages,
+                  or comparative / temporal / numerical synthesis over several entities.
 
             Respond with ONLY the single digit: 1, 2, or 3.
 

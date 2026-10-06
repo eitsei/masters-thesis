@@ -12,7 +12,13 @@ import math
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from src.reporter import summarize_run_records
+import numpy as np
+
+from src.reporter import (
+    _extract_metric_values,
+    compute_latency_percentiles,
+    summarize_run_records,
+)
 from src.stats import WilcoxonComparison
 
 
@@ -117,11 +123,15 @@ def export_hop_breakdown_latex(
     records: Sequence[Mapping[str, Any]],
     output_path: Path | str = "thesis/tables/hop_breakdown.tex",
     label: str = "tab:hop_breakdown",
-    caption: str = "Benchmark evaluation performance stratified by MuSiQue reasoning depth tiers.",
+    caption: str | None = None,
+    dataset_name: str = "MuSiQue",
 ) -> str:
     """Exports hop complexity breakdown table matching thesis publication formatting."""
     target_path = Path(output_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if caption is None:
+        caption = f"Benchmark evaluation performance stratified by {dataset_name} reasoning depth tiers."
 
     # Group by hopCount
     hop_groups: dict[int, list[Mapping[str, Any]]] = {}
@@ -221,7 +231,7 @@ def export_hop_breakdown_latex(
             "\\end{tabular*}",
             "\\vspace{0.5em}",
             "\\parbox{\\textwidth}{\\footnotesize",
-            "\\textbf{Notes:} Evaluated over the MuSiQue multi-hop benchmark sample partitioned across 2-hop, 3-hop, and 4-hop questions. Costs reflect Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. Metrics follow Chapter 4 definitions.}",
+            f"\\textbf{{Notes:}} Evaluated over the {dataset_name} multi-hop benchmark sample partitioned across 2-hop, 3-hop, and 4-hop questions. Costs reflect Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. Metrics follow Chapter 4 definitions.}},",
             "\\end{table}",
             "",
         ]
@@ -670,7 +680,7 @@ def export_quality_enterprise_latex(
     output_path: Path | str = "thesis/tables/enterprise/tab_quality_enterprise.tex",
     comparisons: Sequence[WilcoxonComparison] | None = None,
     label: str = "tab:quality_enterprise",
-    caption: str = "Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline configurations on the Enterprise Knowledge Corpus ($N = 100$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$).",
+    caption: str | None = None,
 ) -> str:
     """Exports modular Enterprise quality LaTeX table with Refusal Acc. / FRR (%) column."""
     target_path = Path(output_path)
@@ -686,6 +696,10 @@ def export_quality_enterprise_latex(
     summaries = {}
     for name, recs in run_dict.items():
         summaries[name] = summarize_run_records(recs)
+
+    n_samples = int(next(iter(summaries.values()))["count"]) if summaries and next(iter(summaries.values())) else 100
+    if caption is None or "$N = 100$" in caption:
+        caption = f"Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline configurations on the Enterprise Knowledge Corpus ($N = {n_samples}$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$)."
 
     best_q = max((s["composite_q_mean"] for s in summaries.values() if s), default=0.0)
 
@@ -762,6 +776,500 @@ def export_quality_enterprise_latex(
             r"\vspace{0.5em}",
             r"\parbox{\linewidth}{\footnotesize",
             r"\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Refusal Accuracy evaluates correct abstention on unanswerable out-of-domain (OOD) queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
+            r"\end{table}",
+            "",
+        ]
+    )
+
+    content = "\n".join(latex_lines)
+    target_path.write_text(content, encoding="utf-8")
+    return content
+
+
+def export_latency_latex(
+    run_dict: Mapping[str, Sequence[Mapping[str, Any]]],
+    output_path: Path | str = "thesis/tables/tab_latency_musique.tex",
+    comparisons: Sequence[WilcoxonComparison] | None = None,
+    label: str = "tab:latency_musique",
+    caption: str | None = None,
+    dataset_name: str = "MuSiQue",
+) -> str:
+    """Exports modular latency LaTeX table with TTFT and end-to-end percentiles."""
+    target_path = Path(output_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    sig_map: dict[str, str] = {}
+    if comparisons:
+        for c in comparisons:
+            if c.target_rq == "RQ1" and ("end-to-end" in c.metric_name.lower() or "total" in c.metric_name.lower()):
+                sig_map[c.config_name] = c.significance
+
+    summaries: dict[str, dict[str, Any]] = {}
+    for name, recs in run_dict.items():
+        summaries[name] = summarize_run_records(recs)
+
+    baseline_key = next((k for k in run_dict.keys() if "c0" in k.lower() or "base" in k.lower()), None)
+    base_summary = summaries.get(baseline_key) if baseline_key else None
+    base_tot_p50 = base_summary["latency_p50"] if base_summary else 0.0
+
+    all_ttft_zero = True
+    for recs in run_dict.values():
+        ttfts = _extract_metric_values(recs, "ttft_ms")
+        if any(t > 0.0 for t in ttfts):
+            all_ttft_zero = False
+            break
+
+    if caption is None:
+        caption = (
+            f"End-to-end execution latency and Time-to-First-Token (TTFT) across 16 pipeline configurations "
+            f"on {dataset_name}. Statistical significance flags denote Holm-Bonferroni-adjusted paired "
+            f"Wilcoxon signed-rank tests against the naive baseline ($C_0$)."
+        )
+
+    latex_lines = [
+        r"\begin{table}[htbp]",
+        r"\centering",
+        r"\small",
+        r"\setlength{\tabcolsep}{3.5pt}",
+        f"\\caption{{{caption}}}",
+        f"\\label{{{label}}}",
+        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l r r r r r @{}}",
+        r"\toprule",
+        r"\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{TTFT $P_{50}$}\\\scriptsize{(ms)}} & \makecell{\textbf{TTFT $P_{95}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$T_{\text{total}} P_{95}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$\Delta T_{\text{total}}$}\\\scriptsize{(\%)}} \\",
+        r"\midrule",
+    ]
+
+    current_tier = None
+    for name in run_dict.keys():
+        s = summaries.get(name)
+        if not s:
+            continue
+        recs = run_dict[name]
+        cid_tex, pipe_name, tier = _resolve_config_info(name)
+        tier_group = 3 if tier >= 3 else tier
+        if tier_group != current_tier:
+            current_tier = tier_group
+            if tier_group == 0:
+                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Baseline ($k=0$)}} \\")
+            elif tier_group == 1:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
+            elif tier_group == 2:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\")
+            elif tier_group == 3:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\")
+
+        ttfts = _extract_metric_values(recs, "ttft_ms")
+        ttft_stats = compute_latency_percentiles(ttfts)
+        ttft_p50 = ttft_stats["p50"]
+        ttft_p95 = ttft_stats["p95"]
+        tot_p50 = s["latency_p50"]
+        tot_p95 = s["latency_p95"]
+
+        if tier == 0:
+            delta_str = "--"
+        else:
+            if base_tot_p50 > 0.0:
+                delta_val = ((tot_p50 - base_tot_p50) / base_tot_p50) * 100.0
+                delta_str = f"{delta_val:+.1f}\\%"
+            else:
+                delta_str = "--"
+
+            sig = sig_map.get(name, "")
+            if not sig:
+                for k_sig, v_sig in sig_map.items():
+                    if name in k_sig or k_sig in name or cid_tex in k_sig:
+                        sig = v_sig
+                        break
+            if sig:
+                delta_str += f"\\textsuperscript{{{sig}}}"
+
+        row = (
+            f"${cid_tex}$ & {pipe_name} & "
+            f"{ttft_p50:.1f} & "
+            f"{ttft_p95:.1f} & "
+            f"{tot_p50:.1f} & "
+            f"{tot_p95:.1f} & "
+            f"{delta_str} \\\\"
+        )
+        latex_lines.append(row)
+
+    ttft_note = (
+        " As TTFT is 0.0\\,ms across all records, responses were generated in batch non-streaming mode."
+        if all_ttft_zero
+        else ""
+    )
+    latex_lines.extend(
+        [
+            r"\bottomrule",
+            r"\end{tabular*}",
+            r"\vspace{0.5em}",
+            r"\parbox{\linewidth}{\footnotesize",
+            f"\\textbf{{Notes:}} $P_{{50}}$ and $P_{{95}}$ denote median and 95th percentile execution latencies. "
+            f"TTFT denotes Time-to-First-Token.{ttft_note} "
+            f"$\\Delta T_{{\\text{{total}}}}$ reflects percentage change in median latency relative to baseline ($C_0$). "
+            f"Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{{*}} p < 0.05$, $^{{**}} p < 0.01$, $^{{***}} p < 0.001$, $\\mathrm{{ns}} = p \\ge 0.05$).}}",
+            r"\end{table}",
+            "",
+        ]
+    )
+
+    content = "\n".join(latex_lines)
+    target_path.write_text(content, encoding="utf-8")
+    return content
+
+
+def export_cost_latex(
+    run_dict: Mapping[str, Sequence[Mapping[str, Any]]],
+    output_path: Path | str = "thesis/tables/tab_cost_musique.tex",
+    comparisons: Sequence[WilcoxonComparison] | None = None,
+    label: str = "tab:cost_musique",
+    caption: str | None = None,
+    dataset_name: str = "MuSiQue",
+) -> str:
+    """Exports modular operational cost LaTeX table with token breakdowns and delta costs."""
+    target_path = Path(output_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    sig_map: dict[str, str] = {}
+    if comparisons:
+        for c in comparisons:
+            if c.target_rq == "RQ2" and "cost" in c.metric_name.lower():
+                sig_map[c.config_name] = c.significance
+
+    summaries: dict[str, dict[str, Any]] = {}
+    for name, recs in run_dict.items():
+        summaries[name] = summarize_run_records(recs)
+
+    baseline_key = next((k for k in run_dict.keys() if "c0" in k.lower() or "base" in k.lower()), None)
+    base_summary = summaries.get(baseline_key) if baseline_key else None
+    base_cost_1k = (base_summary["cost_mean"] * 1000.0) if base_summary else 0.0
+
+    if caption is None:
+        caption = (
+            f"Operational cost and token consumption breakdown across 16 pipeline configurations on {dataset_name}. "
+            f"Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$)."
+        )
+
+    latex_lines = [
+        r"\begin{table}[htbp]",
+        r"\centering",
+        r"\small",
+        r"\setlength{\tabcolsep}{3.5pt}",
+        f"\\caption{{{caption}}}",
+        f"\\label{{{label}}}",
+        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l r r r r r @{}}",
+        r"\toprule",
+        r"\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Uncached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Cached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Output}\\\textbf{Tokens}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$\Delta$ Cost}\\\scriptsize{(\%)}} \\",
+        r"\midrule",
+    ]
+
+    current_tier = None
+    for name in run_dict.keys():
+        s = summaries.get(name)
+        if not s:
+            continue
+        recs = run_dict[name]
+        cid_tex, pipe_name, tier = _resolve_config_info(name)
+        tier_group = 3 if tier >= 3 else tier
+        if tier_group != current_tier:
+            current_tier = tier_group
+            if tier_group == 0:
+                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Baseline ($k=0$)}} \\")
+            elif tier_group == 1:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
+            elif tier_group == 2:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\")
+            elif tier_group == 3:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\")
+
+        uncached_list = []
+        cached_list = []
+        out_list = []
+        for r in recs:
+            tu = r.get("tokenUsage") if isinstance(r.get("tokenUsage"), dict) else {}
+            p_tok = float(tu.get("promptTokens") or tu.get("prompt_tokens") or r.get("prompt_tokens") or 0.0)
+            c_tok = float(tu.get("cachedTokens") or tu.get("cached_tokens") or r.get("cached_tokens") or 0.0)
+            o_tok = float(tu.get("completionTokens") or tu.get("completion_tokens") or r.get("completion_tokens") or 0.0)
+            u_tok = max(0.0, p_tok - c_tok) if c_tok > 0 else p_tok
+            uncached_list.append(u_tok)
+            cached_list.append(c_tok)
+            out_list.append(o_tok)
+
+        mean_uncached = float(np.mean(uncached_list)) if uncached_list else 0.0
+        mean_cached = float(np.mean(cached_list)) if cached_list else 0.0
+        mean_out = float(np.mean(out_list)) if out_list else 0.0
+        cost_1k = s["cost_mean"] * 1000.0
+
+        if tier == 0:
+            delta_str = "--"
+        else:
+            if base_cost_1k > 0.0:
+                delta_val = ((cost_1k - base_cost_1k) / base_cost_1k) * 100.0
+                delta_str = f"{delta_val:+.1f}\\%"
+            else:
+                delta_str = "--"
+
+            sig = sig_map.get(name, "")
+            if not sig:
+                for k_sig, v_sig in sig_map.items():
+                    if name in k_sig or k_sig in name or cid_tex in k_sig:
+                        sig = v_sig
+                        break
+            if sig:
+                delta_str += f"\\textsuperscript{{{sig}}}"
+
+        row = (
+            f"${cid_tex}$ & {pipe_name} & "
+            f"{mean_uncached:,.0f} & "
+            f"{mean_cached:,.0f} & "
+            f"{mean_out:,.0f} & "
+            f"\\${cost_1k:.3f} & "
+            f"{delta_str} \\\\"
+        )
+        latex_lines.append(row)
+
+    latex_lines.extend(
+        [
+            r"\bottomrule",
+            r"\end{tabular*}",
+            r"\vspace{0.5em}",
+            r"\parbox{\linewidth}{\footnotesize",
+            r"\textbf{Notes:} Prompt and completion tokens represent query sample averages. If cached prompt tokens are reported ($N_{\text{cached}} > 0$), uncached prompt tokens are computed as $\max(0, N_{\text{prompt}} - N_{\text{cached}})$. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. $\Delta\text{Cost}$ reflects percentage change relative to baseline ($C_0$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
+            r"\end{table}",
+            "",
+        ]
+    )
+
+    content = "\n".join(latex_lines)
+    target_path.write_text(content, encoding="utf-8")
+    return content
+
+
+def export_quality_musique_latex(
+    run_dict: Mapping[str, Sequence[Mapping[str, Any]]],
+    output_path: Path | str = "thesis/tables/tab_quality_musique.tex",
+    comparisons: Sequence[WilcoxonComparison] | None = None,
+    label: str = "tab:quality_musique",
+    caption: str | None = None,
+    dataset_name: str = "MuSiQue",
+) -> str:
+    """Exports modular MuSiQue quality LaTeX table with RAGAS, Token F1, EM, and Composite Q."""
+    target_path = Path(output_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    sig_map: dict[str, str] = {}
+    if comparisons:
+        for c in comparisons:
+            if c.target_rq == "RQ3" and "composite quality" in c.metric_name.lower():
+                sig_map[c.config_name] = c.significance
+
+    summaries: dict[str, dict[str, Any]] = {}
+    for name, recs in run_dict.items():
+        summaries[name] = summarize_run_records(recs)
+
+    n_samples = int(next(iter(summaries.values()))["count"]) if summaries and next(iter(summaries.values())) else 0
+    if caption is None:
+        caption = (
+            f"Retrieval, generation, and multi-hop reasoning quality metrics across 16 pipeline configurations "
+            f"on the {dataset_name} benchmark ($N = {n_samples}$). Statistical significance flags denote "
+            f"Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$)."
+        )
+
+    best_q = max((s["composite_q_mean"] for s in summaries.values() if s), default=0.0)
+
+    latex_lines = [
+        r"\begin{table}[htbp]",
+        r"\centering",
+        r"\scriptsize",
+        r"\setlength{\tabcolsep}{2.2pt}",
+        f"\\caption{{{caption}}}",
+        f"\\label{{{label}}}",
+        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c c c c @{}}",
+        r"\toprule",
+        r"\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Token}\\\textbf{F1 (\%)}} & \makecell{\textbf{Exact}\\\textbf{Match (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\",
+        r"\midrule",
+    ]
+
+    current_tier = None
+    for name in run_dict.keys():
+        s = summaries.get(name)
+        if not s:
+            continue
+        cid_tex, pipe_name, tier = _resolve_config_info(name)
+        tier_group = 3 if tier >= 3 else tier
+        if tier_group != current_tier:
+            current_tier = tier_group
+            if tier_group == 0:
+                latex_lines.append(r"\multicolumn{9}{l}{\textbf{Baseline ($k=0$)}} \\")
+            elif tier_group == 1:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{9}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
+            elif tier_group == 2:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{9}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\")
+            elif tier_group == 3:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{9}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\")
+
+        q_val = s["composite_q_mean"]
+        q_fmt = f"{q_val:.4f}"
+        if abs(q_val - best_q) < 1e-6 and best_q > 0:
+            q_str = f"\\textbf{{{q_fmt}}}"
+        else:
+            q_str = q_fmt
+
+        sig = sig_map.get(name, "")
+        if not sig:
+            for k_sig, v_sig in sig_map.items():
+                if name in k_sig or k_sig in name or cid_tex in k_sig:
+                    sig = v_sig
+                    break
+        if sig and tier > 0:
+            q_str += f"\\textsuperscript{{{sig}}}"
+
+        row = (
+            f"${cid_tex}$ & {pipe_name} & "
+            f"{s['context_precision_mean']:.3f} & "
+            f"{s['context_recall_mean']:.3f} & "
+            f"{s['faithfulness_mean']:.3f} & "
+            f"{s['answer_relevancy_mean']:.3f} & "
+            f"{s['f1_mean'] * 100.0:.1f}\\% & "
+            f"{s['em_mean'] * 100.0:.1f}\\% & "
+            f"{q_str} \\\\"
+        )
+        latex_lines.append(row)
+
+    latex_lines.extend(
+        [
+            r"\bottomrule",
+            r"\end{tabular*}",
+            r"\vspace{0.5em}",
+            r"\parbox{\linewidth}{\footnotesize",
+            r"\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Token F1 and Exact Match evaluate lexical overlap against reference answers. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Highest composite quality score is highlighted in bold. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
+            r"\end{table}",
+            "",
+        ]
+    )
+
+    content = "\n".join(latex_lines)
+    target_path.write_text(content, encoding="utf-8")
+    return content
+
+
+def export_pareto_latex(
+    run_dict: Mapping[str, Sequence[Mapping[str, Any]]],
+    output_path: Path | str = "thesis/tables/tab_pareto_musique.tex",
+    label: str = "tab:pareto_musique",
+    caption: str | None = None,
+    dataset_name: str = "MuSiQue",
+) -> str:
+    """Exports modular Pareto trade-off LaTeX table with 3D non-domination optimality flags."""
+    target_path = Path(output_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    summaries: dict[str, dict[str, Any]] = {}
+    for name, recs in run_dict.items():
+        summaries[name] = summarize_run_records(recs)
+
+    # 3D Pareto non-domination across (max Q, min Cost, min Latency)
+    config_points: dict[str, tuple[float, float, float]] = {}
+    for name, s in summaries.items():
+        if s:
+            config_points[name] = (
+                s["composite_q_mean"],
+                s["cost_mean"],
+                s["latency_p50"],
+            )
+
+    pareto_optimal_set: set[str] = set()
+    for name_a, (qa, ca, la) in config_points.items():
+        dominated = False
+        for name_b, (qb, cb, lb) in config_points.items():
+            if name_a == name_b:
+                continue
+            if (qb >= qa - 1e-9 and cb <= ca + 1e-9 and lb <= la + 1e-9) and (
+                qb > qa + 1e-6 or cb < ca - 1e-6 or lb < la - 1e-6
+            ):
+                dominated = True
+                break
+        if not dominated:
+            pareto_optimal_set.add(name_a)
+
+    if caption is None:
+        caption = (
+            f"Multi-objective Pareto efficiency and 3D non-domination trade-off metrics across "
+            f"16 pipeline configurations on {dataset_name}."
+        )
+
+    latex_lines = [
+        r"\begin{table}[htbp]",
+        r"\centering",
+        r"\small",
+        r"\setlength{\tabcolsep}{3.5pt}",
+        f"\\caption{{{caption}}}",
+        f"\\label{{{label}}}",
+        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c r r r r c @{}}",
+        r"\toprule",
+        r"\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(s)}} & \textbf{QPD} & \textbf{QPS} & \makecell{\textbf{Pareto}\\\textbf{Optimal}} \\",
+        r"\midrule",
+    ]
+
+    current_tier = None
+    for name in run_dict.keys():
+        s = summaries.get(name)
+        if not s:
+            continue
+        cid_tex, pipe_name, tier = _resolve_config_info(name)
+        tier_group = 3 if tier >= 3 else tier
+        if tier_group != current_tier:
+            current_tier = tier_group
+            if tier_group == 0:
+                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Baseline ($k=0$)}} \\")
+            elif tier_group == 1:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
+            elif tier_group == 2:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\")
+            elif tier_group == 3:
+                latex_lines.append(r"\midrule")
+                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\")
+
+        q_val = s["composite_q_mean"]
+        cost_1k = s["cost_mean"] * 1000.0
+        lat_s = s["latency_p50"] / 1000.0
+        qpd = s["qpd"]
+        qps = s["qps"]
+        is_pareto = name in pareto_optimal_set
+        pareto_str = r"\textbf{Yes}" if is_pareto else "No"
+
+        qpd_str = f"{qpd:,.0f}" if qpd < 100_000 else f"{qpd:.2e}"
+        qps_str = f"{qps:.2f}"
+
+        row = (
+            f"${cid_tex}$ & {pipe_name} & "
+            f"{q_val:.4f} & "
+            f"\\${cost_1k:.3f} & "
+            f"{lat_s:.2f} & "
+            f"{qpd_str} & "
+            f"{qps_str} & "
+            f"{pareto_str} \\\\"
+        )
+        latex_lines.append(row)
+
+    latex_lines.extend(
+        [
+            r"\bottomrule",
+            r"\end{tabular*}",
+            r"\vspace{0.5em}",
+            r"\parbox{\linewidth}{\footnotesize",
+            r"\textbf{Notes:} Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across RAGAS dimensions (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. $T_{\text{total}} P_{50}$ represents median execution latency in seconds. Quality per Dollar ($\mathrm{QPD} = Q / \text{Cost}$) and Quality per Second ($\mathrm{QPS} = Q / T_{\text{total}}$) measure resource efficiency. Pareto optimality denotes non-domination in the 3D trade-off space $(\max Q, \min \text{Cost}, \min T_{\text{total}})$.}",
             r"\end{table}",
             "",
         ]

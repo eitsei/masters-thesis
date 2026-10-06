@@ -125,6 +125,15 @@ PRICING_CATALOG: dict[str, PricingTier] = {
         rerank_price_per_doc=0.0001,
         embed_price_per_million=0.025,
     ),
+    # Gemini 3.5 Flash standard tier
+    "gemini-3.5-flash": PricingTier(
+        name="gemini-3.5-flash",
+        prompt_price_per_million=0.15,
+        comp_price_per_million=0.60,
+        cached_price_per_million=0.0375,
+        rerank_price_per_doc=0.0001,
+        embed_price_per_million=0.025,
+    ),
     # Gemini 3.5 Flash-Lite (Low-latency / tier-1 router)
     "gemini-3.5-flash-lite": PricingTier(
         name="gemini-3.5-flash-lite",
@@ -225,12 +234,34 @@ def get_pricing_tier(tier: PricingTier | str | None = "gemini-3.8-flash") -> Pri
     if isinstance(tier, PricingTier):
         return tier
     tier_key = str(tier).strip().lower()
+    if not tier_key:
+        return PRICING_CATALOG["gemini-3.8-flash"]
     if tier_key in PRICING_CATALOG:
         return PRICING_CATALOG[tier_key]
-    # Fuzzy alias match
-    for k, v in PRICING_CATALOG.items():
-        if tier_key in k or k in tier_key:
-            return v
+
+    normalized = tier_key.removeprefix("models/").strip()
+    if normalized in PRICING_CATALOG:
+        return PRICING_CATALOG[normalized]
+
+    # Distinguish "lite" variants explicitly so -lite never matches standard and vice versa
+    is_lite = "lite" in tier_key
+    candidate_keys = sorted(
+        PRICING_CATALOG.keys(),
+        key=lambda k: (("lite" in k) == is_lite, len(k)),
+        reverse=True,
+    )
+    # First pass: check candidates that match the "lite" designation
+    for k in candidate_keys:
+        if is_lite != ("lite" in k):
+            continue
+        if tier_key in k or k in tier_key or normalized in k or k in normalized:
+            return PRICING_CATALOG[k]
+
+    # Fallback pass for remaining candidates
+    for k in candidate_keys:
+        if tier_key in k or k in tier_key or normalized in k or k in normalized:
+            return PRICING_CATALOG[k]
+
     # Fallback to default
     return PRICING_CATALOG["gemini-3.8-flash"]
 
