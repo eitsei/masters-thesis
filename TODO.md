@@ -23,15 +23,12 @@
   - Päivitä Judge-malli teksteihin ja varmista krediitit.
 
 ### Taustajärjestelmä (`rag-benchmark`)
-- [ ] **Generointimallin lämpötila (Temperature):**
+- [x] **Generointimallin lämpötila (Temperature):**
   - `RagQueryService.java`:ssa generointikutsulle ei aseteta eksplisiittistä lämpötilaa (käyttää oletusta $T=1.0$), toisin kuin routerissa ($T=0.0$) tai evaluointituomarissa ($T=0.0$).
-  - *Korjaus:* Aseta `temperature: 0.0` myös generointiin toistettavuuden varmistamiseksi, tai dokumentoi metodiluvussa oletuslämpötilan ja `thinkingBudget = 0` käyttö.
+  - *Korjaus:* Asetettu `temperature: 0.0` oletukseksi `GenerationProperties.java`- ja `application.yml`-tiedostoihin sekä eksplisiittisesti `GoogleGenAiChatOptions`-olioon `RagQueryService`:ssä determinismin varmistamiseksi.
 - [ ] **HNSW-indeksin parametrit kantaan:**
   - Teksti määrittelee $M=16, ef\_construction=64, ef\_search=40$. Koodissa käytetään pgvectorin oletuksia ilman eksplisiittistä määrittelyä.
-  - *Korjaus:* Lisää `SET hnsw.ef_search = 40` kantaistunnon alustukseen tai varmista dokumentaatiossa oletusarvojen vastaavuus.
-- [ ] **M3 + M4 Pro-mallin Context Cache 32k -rajapyykki (HTTP 503):**
-  - Kun M4 reitittää Gemini 3.1 Prolle, Google GenAI vaatii Pro-malleille vähintään 32 768 tokenin prefiksin (nykyinen ~7 150 t).
-  - *Korjaus:* `GoogleGenAiPromptCache`: Älä yritä luoda kontekstivälimuistia Pro-mallille, jos tokenit jäävät alle 32 768:n (merkitse `NOT_ELIGIBLE` ja jatka ilman välimuistia).
+  - *Huomio:* pgvectorin sisäänrakennetut oletusarvot ovat täsmälleen $M=16, ef\_construction=64, ef\_search=40$, joten teksti vastaa oletuksia suoraan.
 - [ ] **M4 Quota 429 / Pro preview RPM Rate Limit retry-logiikka:**
   - Peräkkäiset Pro-mallin kutsut voivat ylittää 5 RPM -kiintiön.
   - *Korjaus:* Lisää WebClientiin tai `RagQueryService`-luokkaan automaattinen retry-backoff 429-virheille.
@@ -58,9 +55,6 @@
 - [x] **Implisiittisen välimuistin poiskytkentä GCP-projektitasolla (M3-eristys & Internal Validity):**
   - Gemini 3.x -mallit käyttävät oletuksena automaattista implisiittistä prefix-välimuistia (kynnys: 4 096 tai 6 144 tokenia). Jotta peruskonfiguraatiot (C0, C4 jne.) eivät saa automaattisia alennuksia ja M3:n eksplisiittisen CachedContentin vaikutus voidaan mitata täysin puhtaana, implisiittinen välimuisti on kytketty pois päältä GCP-projektin asetuksista (`disableCache: true`).
   - Verifiointi ja automaattinen suojaus: varmistettu savutesteillä ja lisätty automaattinen pre-flight -varmistus `rag-evaluator`-ajuriin (`cli.py test-cache` ja `_verify_cache_preflight`), joka estää ajon mikäli ei-M3-ajossa cacheReadInputTokens > 0 tai M3-ajossa cacheReadInputTokens == 0.
-- [ ] **M3 + M4 Pro-mallin Context Cache 32k -rajapyykki (HTTP 503 / puuttuvat näytteet):**
-  - Kun M4 reitittää Gemini 3.1 Prolle, M3 yrittää luoda etävälimuistia. Google GenAI API vaatii Pro-malleilla vähintään 32 768 tokenin esitäytön (kehotteen prefiksi oli vain ~7 150t). Tämä palauttaa virheen 400 -> HTTP 503, jolloin kysymys putoaa pois datasta (aiheutti C13 N=8 ja C14 N=9).
-  - *Korjaus:* `GoogleGenAiPromptCache`: Älä yritä luoda kontekstivälimuistia Pro-mallille, jos tokenit jäävät alle 32 768:n (merkitse `NOT_ELIGIBLE` tai ohita).
 - [ ] **M4 Quota 429 / Pro preview RPM Rate Limit (MuSiQue C4 N=9):**
   - Peräkkäiset Pro-mallin kyselyt ylittivät 5 RPM -kiintiön.
   - *Korjaus:* Lisää Spring Bootin `RagQueryService`-luokkaan tai WebClientiin automaattinen retry-backoff 429-virheille.

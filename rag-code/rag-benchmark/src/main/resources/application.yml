@@ -20,6 +20,7 @@ spring:
         chat:
           model: ${GOOGLE_GENAI_CHAT_MODEL:${rag.models.google-genai.flash}}
           options:
+            temperature: 0.0
             thinking-budget: ${RAG_GENERATION_THINKING_BUDGET:0}
             include-extended-usage-metadata: true
         embedding:
@@ -75,6 +76,7 @@ logging:
 rag:
   generation:
     thinking-budget: ${RAG_GENERATION_THINKING_BUDGET:0}
+    temperature: ${RAG_GENERATION_TEMPERATURE:0.0}
   query:
     snippet-length-chars: 200
     top-k: 5

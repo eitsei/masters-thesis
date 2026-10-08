@@ -9,17 +9,21 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * token budgets in frontier models (e.g. Gemini 2.5 / 3.x Flash and Pro).</p>
  */
 @ConfigurationProperties(prefix = "rag.generation")
-public record GenerationProperties(Integer thinkingBudget) {
+public record GenerationProperties(Integer thinkingBudget, Double temperature) {
 
     public static final int DEFAULT_THINKING_BUDGET = 0;
+    public static final double DEFAULT_TEMPERATURE = 0.0;
 
     public GenerationProperties {
         if (thinkingBudget == null) {
             thinkingBudget = DEFAULT_THINKING_BUDGET;
         }
+        if (temperature == null || temperature < 0.0) {
+            temperature = DEFAULT_TEMPERATURE;
+        }
     }
 
     public static GenerationProperties defaultProperties() {
-        return new GenerationProperties(DEFAULT_THINKING_BUDGET);
+        return new GenerationProperties(DEFAULT_THINKING_BUDGET, DEFAULT_TEMPERATURE);
     }
 }

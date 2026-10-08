@@ -489,6 +489,9 @@ public class RagQueryService {
                         .cachedContentName(cacheResult.cacheId())
                         .useCachedContent(true)
                         .includeExtendedUsageMetadata(true);
+                if (generationProperties.temperature() != null) {
+                    chatOptionsBuilder.temperature(generationProperties.temperature());
+                }
                 if (generationProperties.thinkingBudget() != null && generationProperties.thinkingBudget() >= 0) {
                     chatOptionsBuilder.thinkingBudget(generationProperties.thinkingBudget());
                 }
@@ -671,19 +674,28 @@ public class RagQueryService {
             GoogleGenAiChatOptions.Builder optionsBuilder = GoogleGenAiChatOptions.builder()
                     .model(modelName)
                     .includeExtendedUsageMetadata(true);
+            if (generationProperties.temperature() != null) {
+                optionsBuilder.temperature(generationProperties.temperature());
+            }
             if (generationProperties.thinkingBudget() != null && generationProperties.thinkingBudget() >= 0) {
                 optionsBuilder.thinkingBudget(generationProperties.thinkingBudget());
             }
             return new Prompt(promptContent, optionsBuilder.build());
         }
         if (this.chatModel instanceof OllamaChatModel) {
-            return new Prompt(promptContent, OllamaChatOptions.builder()
-                    .model(modelName)
-                    .build());
+            OllamaChatOptions.Builder optionsBuilder = OllamaChatOptions.builder()
+                    .model(modelName);
+            if (generationProperties.temperature() != null) {
+                optionsBuilder.temperature(generationProperties.temperature());
+            }
+            return new Prompt(promptContent, optionsBuilder.build());
         }
-        return new Prompt(promptContent, ChatOptions.builder()
-                .model(modelName)
-                .build());
+        ChatOptions.Builder optionsBuilder = ChatOptions.builder()
+                .model(modelName);
+        if (generationProperties.temperature() != null) {
+            optionsBuilder.temperature(generationProperties.temperature());
+        }
+        return new Prompt(promptContent, optionsBuilder.build());
     }
 
     private TokenUsageDto extractTokenUsage(ChatResponse chatResponse, CacheLookupResult cacheResult) {

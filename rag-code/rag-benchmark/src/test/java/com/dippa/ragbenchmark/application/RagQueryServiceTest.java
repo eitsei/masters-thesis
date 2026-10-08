@@ -376,7 +376,7 @@ class RagQueryServiceTest {
                 promptCache,
                 promptRenderer,
                 promptCacheProperties,
-                new GenerationProperties(256),
+                new GenerationProperties(256, 0.0),
                 "gemini-3.8-flash",
                 meterRegistry,
                 Integer.MAX_VALUE,
@@ -401,6 +401,7 @@ class RagQueryServiceTest {
 
         GoogleGenAiChatOptions options = (GoogleGenAiChatOptions) promptCaptor.getValue().getOptions();
         assertThat(options.getThinkingBudget()).isEqualTo(256);
+        assertThat(options.getTemperature()).isEqualTo(0.0);
     }
 
     @Test
@@ -555,6 +556,7 @@ class RagQueryServiceTest {
         Prompt generationPrompt = promptCaptor.getValue();
         assertThat(generationPrompt.getOptions()).isNotNull();
         assertThat(generationPrompt.getOptions().getModel()).isEqualTo("gemini-3.1-pro");
+        assertThat(generationPrompt.getOptions().getTemperature()).isEqualTo(0.0);
     }
 
     @Test
