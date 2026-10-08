@@ -60,7 +60,7 @@ public record PromptCacheProperties(
         return new PromptCacheProperties(
                 Provider.NOOP,
                 4096,
-                Duration.ofMinutes(5),
+                Duration.ofHours(1),
                 3.5,
                 "rag-benchmark-");
     }
