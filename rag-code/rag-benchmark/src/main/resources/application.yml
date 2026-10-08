@@ -77,6 +77,8 @@ rag:
   generation:
     thinking-budget: ${RAG_GENERATION_THINKING_BUDGET:0}
     temperature: ${RAG_GENERATION_TEMPERATURE:0.0}
+    retry-max-attempts: ${RAG_GENERATION_RETRY_MAX_ATTEMPTS:3}
+    retry-backoff-ms: ${RAG_GENERATION_RETRY_BACKOFF_MS:5000}
   query:
     snippet-length-chars: 200
     top-k: 5

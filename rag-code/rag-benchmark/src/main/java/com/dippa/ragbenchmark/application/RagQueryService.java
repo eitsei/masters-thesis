@@ -512,78 +512,121 @@ public class RagQueryService {
                     promptRenderer.renderFullPrompt(query, contextDocuments), effectiveModelName);
         }
 
-        long startGenTime = System.currentTimeMillis();
-        java.util.concurrent.ScheduledFuture<?> progressTask = PROGRESS_SCHEDULER.scheduleAtFixedRate(() -> {
-            long elapsedSeconds = (System.currentTimeMillis() - startGenTime) / 1000;
-            logger.info("Still generating answer... took {}s", elapsedSeconds);
-        }, 3, 3, TimeUnit.SECONDS);
+        int maxAttempts = generationProperties.retryMaxAttempts();
+        long backoffMs = generationProperties.retryBackoffMs();
 
-        logger.info("Dispatching answer generation to model '{}' (streaming)...", effectiveModelName);
-
-        Timer.Sample generationSample = Timer.start(meterRegistry);
-        long generationNanos;
         StringBuilder answerBuilder = new StringBuilder();
         AtomicReference<ChatResponse> lastResponse = new AtomicReference<>();
         AtomicReference<ChatResponse> responseWithUsage = new AtomicReference<>();
         AtomicLong firstTokenTime = new AtomicLong(0L);
 
-        try {
-            Flux<ChatResponse> responseFlux = null;
-            try {
-                responseFlux = chatModel.stream(promptToSend);
-            } catch (UnsupportedOperationException e) {
-                logger.debug("ChatModel does not support streaming, falling back to call: {}", e.getMessage());
-            }
+        long generationMs = 0L;
+        long prefillMs = 0L;
+        long ttftMs = 0L;
 
-            if (responseFlux != null) {
-                responseFlux.doOnNext(chunk -> {
-                    if (chunk != null) {
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            answerBuilder.setLength(0);
+            lastResponse.set(null);
+            responseWithUsage.set(null);
+            firstTokenTime.set(0L);
+
+            long startGenTime = System.currentTimeMillis();
+            java.util.concurrent.ScheduledFuture<?> progressTask = PROGRESS_SCHEDULER.scheduleAtFixedRate(() -> {
+                long elapsedSeconds = (System.currentTimeMillis() - startGenTime) / 1000;
+                logger.info("Still generating answer... took {}s", elapsedSeconds);
+            }, 3, 3, TimeUnit.SECONDS);
+
+            logger.info("Dispatching answer generation to model '{}' (streaming, attempt {}/{})...",
+                    effectiveModelName, attempt, maxAttempts);
+
+            Timer.Sample generationSample = Timer.start(meterRegistry);
+
+            try {
+                Flux<ChatResponse> responseFlux = null;
+                try {
+                    responseFlux = chatModel.stream(promptToSend);
+                } catch (UnsupportedOperationException e) {
+                    logger.debug("ChatModel does not support streaming, falling back to call: {}", e.getMessage());
+                }
+
+                if (responseFlux != null) {
+                    responseFlux.doOnNext(chunk -> {
+                        if (chunk != null) {
+                            firstTokenTime.compareAndSet(0L, System.currentTimeMillis());
+                            lastResponse.set(chunk);
+                            if (chunk.getResult() != null && chunk.getResult().getOutput() != null) {
+                                String text = chunk.getResult().getOutput().getText();
+                                if (text != null && !text.isEmpty()) {
+                                    answerBuilder.append(text);
+                                }
+                            }
+                            if (chunk.getMetadata() != null && chunk.getMetadata().getUsage() != null) {
+                                Usage usage = chunk.getMetadata().getUsage();
+                                if ((usage.getPromptTokens() != null && usage.getPromptTokens() > 0)
+                                        || (usage.getCompletionTokens() != null && usage.getCompletionTokens() > 0)
+                                        || (usage.getTotalTokens() != null && usage.getTotalTokens() > 0)) {
+                                    responseWithUsage.set(chunk);
+                                }
+                            }
+                        }
+                    }).blockLast();
+                } else {
+                    // Fallback for mocks / environments where streaming is un-stubbed
+                    ChatResponse fallbackResponse = chatModel.call(promptToSend);
+                    if (fallbackResponse != null) {
                         firstTokenTime.compareAndSet(0L, System.currentTimeMillis());
-                        lastResponse.set(chunk);
-                        if (chunk.getResult() != null && chunk.getResult().getOutput() != null) {
-                            String text = chunk.getResult().getOutput().getText();
-                            if (text != null && !text.isEmpty()) {
+                        lastResponse.set(fallbackResponse);
+                        if (fallbackResponse.getResult() != null && fallbackResponse.getResult().getOutput() != null) {
+                            String text = fallbackResponse.getResult().getOutput().getText();
+                            if (text != null) {
                                 answerBuilder.append(text);
                             }
                         }
-                        if (chunk.getMetadata() != null && chunk.getMetadata().getUsage() != null) {
-                            Usage usage = chunk.getMetadata().getUsage();
-                            if ((usage.getPromptTokens() != null && usage.getPromptTokens() > 0)
-                                    || (usage.getCompletionTokens() != null && usage.getCompletionTokens() > 0)
-                                    || (usage.getTotalTokens() != null && usage.getTotalTokens() > 0)) {
-                                responseWithUsage.set(chunk);
-                            }
-                        }
-                    }
-                }).blockLast();
-            } else {
-                // Fallback for mocks / environments where streaming is un-stubbed
-                ChatResponse fallbackResponse = chatModel.call(promptToSend);
-                if (fallbackResponse != null) {
-                    firstTokenTime.compareAndSet(0L, System.currentTimeMillis());
-                    lastResponse.set(fallbackResponse);
-                    if (fallbackResponse.getResult() != null && fallbackResponse.getResult().getOutput() != null) {
-                        String text = fallbackResponse.getResult().getOutput().getText();
-                        if (text != null) {
-                            answerBuilder.append(text);
+                        if (fallbackResponse.getMetadata() != null && fallbackResponse.getMetadata().getUsage() != null) {
+                            responseWithUsage.set(fallbackResponse);
                         }
                     }
                 }
+
+                // If execution succeeded without exception, record latency for THIS attempt only
+                long generationNanos = generationSample.stop(meterRegistry.timer("rag.pipeline.generation"));
+                generationMs = TimeUnit.NANOSECONDS.toMillis(generationNanos);
+
+                long firstTokenTs = firstTokenTime.get();
+                prefillMs = (firstTokenTs > 0L) ? Math.max(0L, firstTokenTs - startGenTime) : generationMs;
+                ttftMs = retrievalMs + rerankMs + expansionMs + cacheMs + routeMs + prefillMs;
+
+                if (attempt > 1) {
+                    logger.info("Generation succeeded on retry attempt {}/{} for model '{}' in {} ms (ttft={} ms)",
+                            attempt, maxAttempts, effectiveModelName, generationMs, ttftMs);
+                }
+                break;
+
+            } catch (Exception ex) {
+                boolean isRateLimit = isRateLimitException(ex);
+                if (isRateLimit && attempt < maxAttempts) {
+                    logger.warn("Generation attempt {}/{} failed with rate limit (429) for model '{}': '{}'. Retrying after {} ms backoff (wait time excluded from benchmark latency)...",
+                            attempt, maxAttempts, effectiveModelName, ex.getMessage(), backoffMs);
+                    try {
+                        Thread.sleep(backoffMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Generation retry backoff interrupted", ie);
+                    }
+                } else {
+                    logger.error("Generation attempt {}/{} failed permanently for model '{}': {}",
+                            attempt, maxAttempts, effectiveModelName, ex.getMessage(), ex);
+                    throw (ex instanceof RuntimeException re) ? re : new RuntimeException("Generation failed: " + ex.getMessage(), ex);
+                }
+            } finally {
+                progressTask.cancel(false);
             }
-        } finally {
-            progressTask.cancel(false);
-            generationNanos = generationSample.stop(meterRegistry.timer("rag.pipeline.generation"));
         }
-        long generationMs = TimeUnit.NANOSECONDS.toMillis(generationNanos);
 
         String answer = answerBuilder.toString();
         ChatResponse finalChatResponse = responseWithUsage.get() != null
                 ? responseWithUsage.get()
                 : lastResponse.get();
-
-        long firstTokenTs = firstTokenTime.get();
-        long prefillMs = (firstTokenTs > 0L) ? Math.max(0L, firstTokenTs - startGenTime) : generationMs;
-        long ttftMs = retrievalMs + rerankMs + expansionMs + cacheMs + routeMs + prefillMs;
 
         int embedTokens = 0;
         if (this.embeddingModel != null) {
@@ -746,5 +789,30 @@ public class RagQueryService {
             return "";
         }
         return text.length() <= snippetLengthChars ? text : text.substring(0, snippetLengthChars) + "...";
+    }
+
+    boolean isRateLimitException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof org.springframework.web.client.HttpStatusCodeException httpEx) {
+                if (httpEx.getStatusCode().value() == 429) {
+                    return true;
+                }
+            }
+            if (current instanceof com.google.genai.errors.ApiException apiEx) {
+                if (apiEx.code() == 429 || (apiEx.status() != null && apiEx.status().equalsIgnoreCase("RESOURCE_EXHAUSTED"))) {
+                    return true;
+                }
+            }
+            String message = current.getMessage();
+            if (message != null) {
+                String lower = message.toLowerCase(java.util.Locale.ROOT);
+                if (lower.contains("429") || lower.contains("resource_exhausted") || lower.contains("quota") || lower.contains("rate limit") || lower.contains("too many requests")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

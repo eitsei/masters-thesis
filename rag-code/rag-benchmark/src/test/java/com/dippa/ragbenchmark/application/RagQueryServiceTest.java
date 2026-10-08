@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -376,7 +377,7 @@ class RagQueryServiceTest {
                 promptCache,
                 promptRenderer,
                 promptCacheProperties,
-                new GenerationProperties(256, 0.0),
+                new GenerationProperties(256, 0.0, 3, 5000L),
                 "gemini-3.8-flash",
                 meterRegistry,
                 Integer.MAX_VALUE,
@@ -657,5 +658,146 @@ class RagQueryServiceTest {
 
         assertThat(result.tokenUsage().embedTokens()).isEqualTo(7);
         verify(mockEmbeddingModel).call(any(EmbeddingRequest.class));
+    }
+
+    @Test
+    void isRateLimitException_detectsVarious429Patterns() {
+        assertThat(ragQueryService.isRateLimitException(new RuntimeException("429 Too Many Requests"))).isTrue();
+        assertThat(ragQueryService.isRateLimitException(new RuntimeException("RESOURCE_EXHAUSTED: quota exceeded"))).isTrue();
+        assertThat(ragQueryService.isRateLimitException(new RuntimeException("Vertex AI rate limit 429"))).isTrue();
+        assertThat(ragQueryService.isRateLimitException(new RuntimeException(new IllegalStateException("quota limit exceeded")))).isTrue();
+        assertThat(ragQueryService.isRateLimitException(new RuntimeException("500 Internal Server Error"))).isFalse();
+        assertThat(ragQueryService.isRateLimitException(new NullPointerException())).isFalse();
+    }
+
+    @Test
+    void generationThrows429_retriesAndSucceeds_latencyMeasuresOnlySuccessfulAttempt() {
+        RagQueryService retryService = new RagQueryService(
+                vectorStore,
+                chatModel,
+                reranker,
+                retrievalExpander,
+                promptCache,
+                promptRenderer,
+                promptCacheProperties,
+                new GenerationProperties(0, 0.0, 3, 5L),
+                "gemini-3.8-flash",
+                meterRegistry,
+                Integer.MAX_VALUE,
+                5,
+                RerankerProperties.defaultProperties(),
+                new ClassPathResource("prompts/answer-generation.st"),
+                "vector_store_test",
+                null,
+                null);
+
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+        when(chatModel.call(any(Prompt.class)))
+                .thenThrow(new RuntimeException("429 RESOURCE_EXHAUSTED: Rate limit exceeded"))
+                .thenReturn(createChatResponse("Recovered answer after 429", null));
+
+        RagQueryResult result = retryService.query("Question encountering 429?", null);
+
+        assertThat(result.answer()).isEqualTo("Recovered answer after 429");
+        verify(chatModel, times(2)).call(any(Prompt.class));
+        // Generation timer must record only the single successful attempt
+        assertThat(meterRegistry.timer("rag.pipeline.generation").count()).isEqualTo(1L);
+    }
+
+    @Test
+    void generationStreamingThrows429_retriesAndSucceeds() {
+        RagQueryService retryService = new RagQueryService(
+                vectorStore,
+                chatModel,
+                reranker,
+                retrievalExpander,
+                promptCache,
+                promptRenderer,
+                promptCacheProperties,
+                new GenerationProperties(0, 0.0, 3, 5L),
+                "gemini-3.8-flash",
+                meterRegistry,
+                Integer.MAX_VALUE,
+                5,
+                RerankerProperties.defaultProperties(),
+                new ClassPathResource("prompts/answer-generation.st"),
+                "vector_store_test",
+                null,
+                null);
+
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+        ChatResponse successResponse = createChatResponse("Clean streaming answer", null);
+        when(chatModel.stream(any(Prompt.class)))
+                .thenReturn(Flux.error(new RuntimeException("429 RESOURCE_EXHAUSTED")))
+                .thenReturn(Flux.just(successResponse));
+
+        RagQueryResult result = retryService.query("Streaming 429 question", null);
+
+        assertThat(result.answer()).isEqualTo("Clean streaming answer");
+        verify(chatModel, times(2)).stream(any(Prompt.class));
+        assertThat(meterRegistry.timer("rag.pipeline.generation").count()).isEqualTo(1L);
+    }
+
+    @Test
+    void generationThrowsNon429_doesNotRetry() {
+        RagQueryService retryService = new RagQueryService(
+                vectorStore,
+                chatModel,
+                reranker,
+                retrievalExpander,
+                promptCache,
+                promptRenderer,
+                promptCacheProperties,
+                new GenerationProperties(0, 0.0, 3, 5L),
+                "gemini-3.8-flash",
+                meterRegistry,
+                Integer.MAX_VALUE,
+                5,
+                RerankerProperties.defaultProperties(),
+                new ClassPathResource("prompts/answer-generation.st"),
+                "vector_store_test",
+                null,
+                null);
+
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+        when(chatModel.call(any(Prompt.class))).thenThrow(new IllegalArgumentException("Invalid input argument"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> retryService.query("Invalid input query", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid input argument");
+
+        verify(chatModel, times(1)).call(any(Prompt.class));
+    }
+
+    @Test
+    void generationThrows429Repeatedly_exhaustsAndFails() {
+        RagQueryService retryService = new RagQueryService(
+                vectorStore,
+                chatModel,
+                reranker,
+                retrievalExpander,
+                promptCache,
+                promptRenderer,
+                promptCacheProperties,
+                new GenerationProperties(0, 0.0, 2, 5L),
+                "gemini-3.8-flash",
+                meterRegistry,
+                Integer.MAX_VALUE,
+                5,
+                RerankerProperties.defaultProperties(),
+                new ClassPathResource("prompts/answer-generation.st"),
+                "vector_store_test",
+                null,
+                null);
+
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+        when(chatModel.call(any(Prompt.class)))
+                .thenThrow(new RuntimeException("429 RESOURCE_EXHAUSTED"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> retryService.query("Exhaustion query", null))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("429 RESOURCE_EXHAUSTED");
+
+        verify(chatModel, times(2)).call(any(Prompt.class));
     }
 }

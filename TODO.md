@@ -29,9 +29,9 @@
 - [ ] **HNSW-indeksin parametrit kantaan:**
   - Teksti määrittelee $M=16, ef\_construction=64, ef\_search=40$. Koodissa käytetään pgvectorin oletuksia ilman eksplisiittistä määrittelyä.
   - *Huomio:* pgvectorin sisäänrakennetut oletusarvot ovat täsmälleen $M=16, ef\_construction=64, ef\_search=40$, joten teksti vastaa oletuksia suoraan.
-- [ ] **M4 Quota 429 / Pro preview RPM Rate Limit retry-logiikka:**
+- [x] **M4 Quota 429 / Pro preview RPM Rate Limit retry-logiikka:**
   - Peräkkäiset Pro-mallin kutsut voivat ylittää 5 RPM -kiintiön.
-  - *Korjaus:* Lisää WebClientiin tai `RagQueryService`-luokkaan automaattinen retry-backoff 429-virheille.
+  - *Korjaus:* Toteutettu `RagQueryService`-luokkaan automaattinen retry-backoff (oletus: 3 yritystä, 5 000 ms odotus, konfiguroitavissa `rag.generation.retry-max-attempts` ja `retry-backoff-ms`). Latenssin laskenta ja Micrometer-ajastimet resetoitu per yritys, jolloin vain onnistunut kutsu mitataan eikä backoff-aika vääristä tuloksia.
 - [ ] **Ajoskriptien oletusotoskoko:**
   - Ajoskripteissä (esim. `run_musique_all16.sh`) oletus on `LIMIT="${LIMIT:-10}"`.
   - *Muistutus:* Varmista täysissä koeajoissa aina `LIMIT=100`.
@@ -55,9 +55,9 @@
 - [x] **Implisiittisen välimuistin poiskytkentä GCP-projektitasolla (M3-eristys & Internal Validity):**
   - Gemini 3.x -mallit käyttävät oletuksena automaattista implisiittistä prefix-välimuistia (kynnys: 4 096 tai 6 144 tokenia). Jotta peruskonfiguraatiot (C0, C4 jne.) eivät saa automaattisia alennuksia ja M3:n eksplisiittisen CachedContentin vaikutus voidaan mitata täysin puhtaana, implisiittinen välimuisti on kytketty pois päältä GCP-projektin asetuksista (`disableCache: true`).
   - Verifiointi ja automaattinen suojaus: varmistettu savutesteillä ja lisätty automaattinen pre-flight -varmistus `rag-evaluator`-ajuriin (`cli.py test-cache` ja `_verify_cache_preflight`), joka estää ajon mikäli ei-M3-ajossa cacheReadInputTokens > 0 tai M3-ajossa cacheReadInputTokens == 0.
-- [ ] **M4 Quota 429 / Pro preview RPM Rate Limit (MuSiQue C4 N=9):**
+- [x] **M4 Quota 429 / Pro preview RPM Rate Limit (MuSiQue C4 N=9):**
   - Peräkkäiset Pro-mallin kyselyt ylittivät 5 RPM -kiintiön.
-  - *Korjaus:* Lisää Spring Bootin `RagQueryService`-luokkaan tai WebClientiin automaattinen retry-backoff 429-virheille.
+  - *Korjaus:* Lisätty `RagQueryService`-luokkaan automaattinen retry-backoff 429- ja kiintiövirheille. Vain onnistunut generointi kirjataan latenssiin ja metriikoihin.
 - [x] **M3 Context Cachen 300 s (5 min) TTL -latenssipiikit:**
   - LLM-as-a-judge -arvioinnin kestäessä kyselyiden välissä, 5 minuutin TTL ehti vanheta kesken ajon, mikä pakotti luomaan uuden välimuistin synkronisesti (kesti 46–70 s ja aiheutti P95-latenssipiikit).
   - *Korjaus:* Nostettu välimuistin oletus-TTL 3600 sekuntiin (60 minuuttiin / 1 tunti) tiedostoissa `application.yml` ja `PromptCacheProperties.java`. Tämä takaa kaikkien mallikohtaisten välimuistien (Lite, Flash, Pro) säilymisen koko mittausajon ajan.
