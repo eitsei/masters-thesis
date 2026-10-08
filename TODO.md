@@ -1,23 +1,43 @@
-#TODO
+## Metodit vs. Koodi -tarkastuksen havainnot ja korjaukset (8.10.2026)
 
-TUTKI TUO ROUNTING JUTTU NYT KUNNOLLA!
+### Luku 4 (`thesis/chapters/04_research_methods.tex`) & Metoditeksti
+- [ ] **M0-chunkkaus ja overlappiteksti (§4.3 Table 4.3 & r. 100, 123):**
+  - Tekstissä väitetään 512 tokenia ja 50 tokenin overlap. Spring AI:n `TokenTextSplitter` ei tue overlappia, eikä sitä ole koodissa. Lisäksi MuSiQue tallennetaan kappaleittain (~100–150 tok) sellaisenaan ilman splitteriä, ja Nordea-kappaleet ovat alle 512 tokenia.
+  - *Korjaus:* Poista maininta 50 tokenin overlapista ja kuvaa todellinen kappalepohjainen / 512 tokenin ylärajalla toimiva lohkominen rehellisesti.
+- [ ] **M1 Boundary Interval-Merging -kuvaus (§4.3 r. 126):**
+  - Tekstissä väitetään, että päällekkäiset parent-ikkunat yhdistetään intervallien yhdistämisellä (interval-merging). Todellisuudessa koodi tekee deduplikoinnin parent-ID:n mukaan, mutta varsinaista intervallien yhdistämistä ei ajeta, koska ingestiossa ei aseteta `window_start`/`window_end`-metatietoja.
+  - *Korjaus:* Muotoile teksti kuvaamaan toteutunut logiikka: deduplikointi parent-ID:n mukaan säilyttää relevanssijärjestyksen; poista tai lievennä väite intervallien yhdistämisestä.
+- [ ] **M4 Routerin timeout-arvo (§4.3 r. 224 TODO vs koodi):**
+  - TODO-kommentissa mainitaan 1 500 ms, mutta koodissa (`application.yml` ja `GoogleGenAiModelRouter`) timeout on 5 000 ms.
+  - *Korjaus:* Päivitä luvun 4 tekstiin viralliseksi arvoksi 5 000 ms (tai säädä konfiguraatio, jos tavoite oli 1 500 ms).
+- [ ] **Pilvideployauksen korvaaminen lokaaliajolla (GCP europe-north1 vs lokaali suoritus):**
+  - Alkuperäinen idea oli ajaa järjestelmä GCP:ssä samassa konesalissa (`europe-north1`) LLM:n kanssa. Koska frontier-mallit (Gemini 3.x) vaativat Googlen `global`-endpointin eikä niitä voi kiinnittää yhteen alueelliseen konesaliin, pilveen vieminen ei poista verkkoviiveitä. Järjestelmä ajetaan hallitusti lokaalisti API-kutsujen yli.
+  - *Korjaus teksteihin:*
+    - **Luku 4.2 (§4.2 r. 81–82):** Poista väite `europe-north1` VPC- ja Cloud SQL -deployauksesta. Kuvaa lokaali/kontitettu Spring Boot + PostgreSQL (pgvector) -suoritusympäristö ja ulkoiset suojatut HTTPS API -kutsut.
+    - **Luku 4.6 (Internal Validity r. 457):** Päivitä verkkolatenssin hallintakeinot (2 unmeasured warm-up -kyselyä, parillinen Wilcoxon-testi, suhteellisten erojen analyysi).
+    - **Luku 6 (Discussion / Threats to Validity):** Dokumentoi reititysrajoite (Google GenAI Global endpoint) ja perustele, miksi parillinen vertailu ($C_k$ vs $C_0$) ja mikrovaiheiden mittaus ($T_{\text{embed}}$, $T_{\text{ret}}$, $T_{\text{rerank}}$ jne.) eristävät optimointien todelliset hyödyt verkkoviiveestä.
+- [ ] **Puhutaanko enterprisesta vai companysta? Kumppaniyhtiön termistö:**
+  - Varmista, että kumppaniin viitataan yhtenäisellä termistöllä kaikkialla tutkielmassa ja liitteissä.
+- [ ] **Viimeistele tekstit ja kieliasu:**
+  - Tarkista väliviivat (`--`), ajatusviivat (`---`) ja termistö. Keskustele vielä Laurin kanssa läpi.
+  - Päivitä Judge-malli teksteihin ja varmista krediitit.
 
-MITES TÄMÄ OVERLAP JUTTU?!
-
-Tsekkaa promptit
-
-Tsekkaa koko koodi läpi muutenkin
-Tsekkaa, että kaikki metodit on oikeasti toteutettu oikein!
-Vastaako koodi kirjoitettua tekstiä ja jos ei, niin korjaa
-Viimeistele tekstit
-Keskustele vielä Laurin kanssa nuo asiat läpi
-Kreditit?
-Päivitä vielä Judge malli
-Varmista, että kaikki väliviivat on --, jos tarvis. Tsekkaa myös että ajatusviivat on oikein käytetty
-
-Varmista, että data voidaan ajaa erikseen evaluaattorista
-
-Puhutaanko enterprisesta vai companysta? Mitä termiä käytetään kumppaniyhtiöstä? Varmista, että on yhteneväinen kaikkialla.
+### Taustajärjestelmä (`rag-benchmark`)
+- [ ] **Generointimallin lämpötila (Temperature):**
+  - `RagQueryService.java`:ssa generointikutsulle ei aseteta eksplisiittistä lämpötilaa (käyttää oletusta $T=1.0$), toisin kuin routerissa ($T=0.0$) tai evaluointituomarissa ($T=0.0$).
+  - *Korjaus:* Aseta `temperature: 0.0` myös generointiin toistettavuuden varmistamiseksi, tai dokumentoi metodiluvussa oletuslämpötilan ja `thinkingBudget = 0` käyttö.
+- [ ] **HNSW-indeksin parametrit kantaan:**
+  - Teksti määrittelee $M=16, ef\_construction=64, ef\_search=40$. Koodissa käytetään pgvectorin oletuksia ilman eksplisiittistä määrittelyä.
+  - *Korjaus:* Lisää `SET hnsw.ef_search = 40` kantaistunnon alustukseen tai varmista dokumentaatiossa oletusarvojen vastaavuus.
+- [ ] **M3 + M4 Pro-mallin Context Cache 32k -rajapyykki (HTTP 503):**
+  - Kun M4 reitittää Gemini 3.1 Prolle, Google GenAI vaatii Pro-malleille vähintään 32 768 tokenin prefiksin (nykyinen ~7 150 t).
+  - *Korjaus:* `GoogleGenAiPromptCache`: Älä yritä luoda kontekstivälimuistia Pro-mallille, jos tokenit jäävät alle 32 768:n (merkitse `NOT_ELIGIBLE` ja jatka ilman välimuistia).
+- [ ] **M4 Quota 429 / Pro preview RPM Rate Limit retry-logiikka:**
+  - Peräkkäiset Pro-mallin kutsut voivat ylittää 5 RPM -kiintiön.
+  - *Korjaus:* Lisää WebClientiin tai `RagQueryService`-luokkaan automaattinen retry-backoff 429-virheille.
+- [ ] **Ajoskriptien oletusotoskoko:**
+  - Ajoskripteissä (esim. `run_musique_all16.sh`) oletus on `LIMIT="${LIMIT:-10}"`.
+  - *Muistutus:* Varmista täysissä koeajoissa aina `LIMIT=100`.
 
 ---
 
