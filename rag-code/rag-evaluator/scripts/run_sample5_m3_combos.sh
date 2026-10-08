@@ -22,12 +22,28 @@ TABLES_DIR="${TABLES_DIR:-../../thesis/tables}"
 FIGURES_DIR="${FIGURES_DIR:-../../thesis/figures}"
 SUBFOLDER="${SUBFOLDER:-sample5_m3_combos}"
 
+STAGE="${STAGE:-all}"
+for arg in "$@"; do
+  case "$arg" in
+    --queries-only|--query-only|--queries) STAGE="queries" ;;
+    --eval-only|--evaluate-only|--eval)    STAGE="eval" ;;
+    --report-only|--export-only|--report)  STAGE="report" ;;
+    --all)                                 STAGE="all" ;;
+  esac
+done
+
+RUN_JUDGE="$JUDGE"
+if [ "$STAGE" = "queries" ]; then
+  RUN_JUDGE="none"
+fi
+
 mkdir -p "$RUN_DIR"
 
 echo "========================================================================"
 echo " Starting Full Factorial Benchmark Suite (C0 - C11: M1, M2, M3)"
 echo " Service URL:    $URL"
 echo " Run Directory:  $RUN_DIR"
+echo " Stage:          $STAGE"
 echo " Judge:          $JUDGE ($JUDGE_MODEL)"
 echo " Target Table:   $TABLE_NAME | Limit: $LIMIT | Warmup: $WARMUP"
 echo " Export Folder:  $SUBFOLDER"
@@ -48,24 +64,27 @@ prewarm_cache() {
 }
 
 # 0. Check Judge Connectivity
-echo -e "\n>>> Verifying Judge Connectivity..."
-"$PYTHON" src/cli.py test-judge --judge "$JUDGE" --judge-model "$JUDGE_MODEL"
-
-# Pre-Flight Prompt Cache Verification (Isolation & Explicit Hit)
-echo -e "\n>>> Verifying Prompt Cache Pre-Flight Integrity..."
-"$PYTHON" src/cli.py test-cache --url "$URL"
-
-# Warm-up queries to eliminate JVM JIT, connection pool, and TLS cold-start distortions (Thesis §4.1)
-if [ "$WARMUP" -gt 0 ]; then
-  echo -e "\n>>> Executing $WARMUP unmeasured warm-up queries..."
-  for i in $(seq 1 "$WARMUP"); do
-    curl -s -o /dev/null -w "  Warm-up $i: HTTP %{http_code} (%{time_total}s)\n" \
-      "${URL}/api/v1/query" \
-      -H "Content-Type: application/json" \
-      -d "{\"query\": \"warm-up query $i\", \"tableName\": \"$TABLE_NAME\"}"
-  done
+if [ "$STAGE" = "eval" ] || [ "$STAGE" = "all" ]; then
+  echo -e "\n>>> Verifying Judge Connectivity..."
+  "$PYTHON" src/cli.py test-judge --judge "$JUDGE" --judge-model "$JUDGE_MODEL"
 fi
-clear_cache
+
+if [ "$STAGE" = "queries" ] || [ "$STAGE" = "all" ]; then
+  # Pre-Flight Prompt Cache Verification (Isolation & Explicit Hit)
+  echo -e "\n>>> Verifying Prompt Cache Pre-Flight Integrity..."
+  "$PYTHON" src/cli.py test-cache --url "$URL"
+
+  # Warm-up queries to eliminate JVM JIT, connection pool, and TLS cold-start distortions (Thesis §4.1)
+  if [ "$WARMUP" -gt 0 ]; then
+    echo -e "\n>>> Executing $WARMUP unmeasured warm-up queries..."
+    for i in $(seq 1 "$WARMUP"); do
+      curl -s -o /dev/null -w "  Warm-up $i: HTTP %{http_code} (%{time_total}s)\n" \
+        "${URL}/api/v1/query" \
+        -H "Content-Type: application/json" \
+        -d "{\"query\": \"warm-up query $i\", \"tableName\": \"$TABLE_NAME\"}"
+    done
+  fi
+  clear_cache
 
 # 1. M0: Baseline (C0)
 echo -e "\n>>> [1/8] Running C0: Baseline..."
@@ -73,7 +92,7 @@ echo -e "\n>>> [1/8] Running C0: Baseline..."
   --url "$URL" \
   --sample --limit "$LIMIT" --stream \
   --table-name "$TABLE_NAME" \
-  --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
+  --warmup "$WARMUP" --judge "$RUN_JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C0_baseline.jsonl"
 clear_cache
 
@@ -84,7 +103,7 @@ echo -e "\n>>> [2/8] Running C1: Small-to-Big (M1)..."
   --sample --limit "$LIMIT" --stream \
   --modules M1 \
   --table-name "$TABLE_NAME" \
-  --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
+  --warmup "$WARMUP" --judge "$RUN_JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C1_M1.jsonl"
 clear_cache
 
@@ -95,7 +114,7 @@ echo -e "\n>>> [3/8] Running C2: Semantic Re-ranking (M2)..."
   --sample --limit "$LIMIT" --stream \
   --modules M2 \
   --table-name "$TABLE_NAME" \
-  --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
+  --warmup "$WARMUP" --judge "$RUN_JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C2_M2.jsonl"
 clear_cache
 
@@ -107,7 +126,7 @@ prewarm_cache
   --sample --limit "$LIMIT" --stream \
   --modules M3 \
   --table-name "$TABLE_NAME" \
-  --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
+  --warmup "$WARMUP" --judge "$RUN_JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C3_M3.jsonl"
 clear_cache
 
@@ -118,7 +137,7 @@ echo -e "\n>>> [5/8] Running C5: Small-to-Big + Re-ranking (M1+M2)..."
   --sample --limit "$LIMIT" --stream \
   --modules M1,M2 \
   --table-name "$TABLE_NAME" \
-  --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
+  --warmup "$WARMUP" --judge "$RUN_JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C5_M1_M2.jsonl"
 clear_cache
 
@@ -130,7 +149,7 @@ prewarm_cache
   --sample --limit "$LIMIT" --stream \
   --modules M1,M3 \
   --table-name "$TABLE_NAME" \
-  --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
+  --warmup "$WARMUP" --judge "$RUN_JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C6_M1_M3.jsonl"
 clear_cache
 
@@ -142,7 +161,7 @@ prewarm_cache
   --sample --limit "$LIMIT" --stream \
   --modules M2,M3 \
   --table-name "$TABLE_NAME" \
-  --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
+  --warmup "$WARMUP" --judge "$RUN_JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C8_M2_M3.jsonl"
 clear_cache
 
@@ -154,57 +173,85 @@ prewarm_cache
   --sample --limit "$LIMIT" --stream \
   --modules M1,M2,M3 \
   --table-name "$TABLE_NAME" \
-  --warmup "$WARMUP" --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
+  --warmup "$WARMUP" --judge "$RUN_JUDGE" --judge-model "$JUDGE_MODEL" \
   --output "${RUN_DIR}/run_C11_M1_M2_M3.jsonl"
 clear_cache
 
-echo "========================================================================"
-echo " Statistical Hypothesis Testing (Wilcoxon Signed-Rank Tests vs Baseline)"
-echo "========================================================================"
+  if [ "$STAGE" = "queries" ]; then
+    echo -e "\n========================================================================"
+    echo " Queries Complete (Stage: queries)"
+    echo " All configurations successfully queried and saved to: $RUN_DIR"
+    echo " To evaluate quality with RAGAS, run:"
+    echo "   $0 --eval-only"
+    echo " or:"
+    echo "   ./scripts/evaluate_run.sh $RUN_DIR --judge $JUDGE --judge-model $JUDGE_MODEL --subfolder $SUBFOLDER"
+    echo "========================================================================"
+  fi
+fi
 
-"$PYTHON" src/cli.py compare \
-  --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
-  --treatment "${RUN_DIR}/run_C1_M1.jsonl" \
-  --config-name "C1: Small-to-Big (M1)"
+# ------------------------------------------------------------------------------
+# Stage: Offline Evaluation (RAGAS Metrics)
+# ------------------------------------------------------------------------------
+if [ "$STAGE" = "eval" ]; then
+  echo "========================================================================"
+  echo " Evaluating RAG Quality Metrics (RAGAS) in $RUN_DIR with $JUDGE"
+  echo "========================================================================"
+  "$PYTHON" src/cli.py evaluate \
+    --input "$RUN_DIR" \
+    --judge "$JUDGE" \
+    --judge-model "$JUDGE_MODEL" \
+    --inplace
+fi
 
-"$PYTHON" src/cli.py compare \
-  --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
-  --treatment "${RUN_DIR}/run_C2_M2.jsonl" \
-  --config-name "C2: Semantic Re-ranking (M2)"
+if [ "$STAGE" = "eval" ] || [ "$STAGE" = "report" ] || [ "$STAGE" = "all" ]; then
+  echo "========================================================================"
+  echo " Statistical Hypothesis Testing (Wilcoxon Signed-Rank Tests vs Baseline)"
+  echo "========================================================================"
 
-"$PYTHON" src/cli.py compare \
-  --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
-  --treatment "${RUN_DIR}/run_C3_M3.jsonl" \
-  --config-name "C3: Prompt Caching (M3)"
+  "$PYTHON" src/cli.py compare \
+    --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
+    --treatment "${RUN_DIR}/run_C1_M1.jsonl" \
+    --config-name "C1: Small-to-Big (M1)"
 
-"$PYTHON" src/cli.py compare \
-  --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
-  --treatment "${RUN_DIR}/run_C5_M1_M2.jsonl" \
-  --config-name "C5: S2B + Re-ranking (M1+M2)"
+  "$PYTHON" src/cli.py compare \
+    --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
+    --treatment "${RUN_DIR}/run_C2_M2.jsonl" \
+    --config-name "C2: Semantic Re-ranking (M2)"
 
-"$PYTHON" src/cli.py compare \
-  --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
-  --treatment "${RUN_DIR}/run_C6_M1_M3.jsonl" \
-  --config-name "C6: S2B + Caching (M1+M3)"
+  "$PYTHON" src/cli.py compare \
+    --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
+    --treatment "${RUN_DIR}/run_C3_M3.jsonl" \
+    --config-name "C3: Prompt Caching (M3)"
 
-"$PYTHON" src/cli.py compare \
-  --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
-  --treatment "${RUN_DIR}/run_C8_M2_M3.jsonl" \
-  --config-name "C8: Re-ranking + Caching (M2+M3)"
+  "$PYTHON" src/cli.py compare \
+    --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
+    --treatment "${RUN_DIR}/run_C5_M1_M2.jsonl" \
+    --config-name "C5: S2B + Re-ranking (M1+M2)"
 
-"$PYTHON" src/cli.py compare \
-  --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
-  --treatment "${RUN_DIR}/run_C11_M1_M2_M3.jsonl" \
-  --config-name "C11: Full Stack (M1+M2+M3)"
+  "$PYTHON" src/cli.py compare \
+    --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
+    --treatment "${RUN_DIR}/run_C6_M1_M3.jsonl" \
+    --config-name "C6: S2B + Caching (M1+M3)"
 
-echo "========================================================================"
-echo " Consolidated LaTeX Tables & Publication Figures Export"
-echo "========================================================================"
+  "$PYTHON" src/cli.py compare \
+    --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
+    --treatment "${RUN_DIR}/run_C8_M2_M3.jsonl" \
+    --config-name "C8: Re-ranking + Caching (M2+M3)"
 
-"$PYTHON" src/cli.py export-thesis \
-  --input "$RUN_DIR" \
-  --tables-dir "$TABLES_DIR" \
-  --figures-dir "$FIGURES_DIR" \
-  --subfolder "$SUBFOLDER"
+  "$PYTHON" src/cli.py compare \
+    --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
+    --treatment "${RUN_DIR}/run_C11_M1_M2_M3.jsonl" \
+    --config-name "C11: Full Stack (M1+M2+M3)"
 
-echo -e "\n✓ Benchmark run and export completed successfully!"
+  echo "========================================================================"
+  echo " Consolidated LaTeX Tables & Publication Figures Export"
+  echo "========================================================================"
+
+  "$PYTHON" src/cli.py export-thesis \
+    --input "$RUN_DIR" \
+    --tables-dir "$TABLES_DIR" \
+    --figures-dir "$FIGURES_DIR" \
+    --subfolder "$SUBFOLDER"
+
+  echo -e "\n✓ Benchmark run and export completed successfully!"
+fi

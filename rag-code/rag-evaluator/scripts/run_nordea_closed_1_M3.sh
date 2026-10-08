@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Nordea Closed Corpus Benchmark: Baseline (C0) & Prompt Caching (M3)
-# Evaluates Baseline and M3 against vector_store_nordea_closed.
-# Console-only execution (no artifact or run directories created).
+# Evaluates Baseline and M3 (C3) against vector_store_nordea_closed
+# using nordea_100_final.jsonl and Llama 4 Scout judge via Vertex AI MaaS.
 # ==============================================================================
 set -euo pipefail
 
@@ -22,12 +22,37 @@ JUDGE="${JUDGE:-llama}"
 JUDGE_MODEL="${JUDGE_MODEL:-meta/llama-4-scout-17b-16e-instruct-maas}"
 WARMUP="${WARMUP:-2}"
 
+RUN_DIR="${RUN_DIR:-runs/nordea_closed_1_M3}"
+TABLES_DIR="${TABLES_DIR:-../../thesis/tables}"
+FIGURES_DIR="${FIGURES_DIR:-../../thesis/figures}"
+SUBFOLDER="${SUBFOLDER:-nordea_closed_1_M3}"
+
+STAGE="${STAGE:-all}"
+for arg in "$@"; do
+  case "$arg" in
+    --queries-only|--query-only|--queries) STAGE="queries" ;;
+    --eval-only|--evaluate-only|--eval)    STAGE="eval" ;;
+    --report-only|--export-only|--report)  STAGE="report" ;;
+    --all)                                 STAGE="all" ;;
+  esac
+done
+
+RUN_JUDGE="$JUDGE"
+if [ "$STAGE" = "queries" ]; then
+  RUN_JUDGE="none"
+fi
+
+mkdir -p "$RUN_DIR"
+
 echo "========================================================================"
 echo " Nordea Closed-Corpus: Baseline (C0) & Prompt Caching (M3)"
 echo " Service URL:     $URL"
+echo " Run Directory:   $RUN_DIR"
+echo " Stage:           $STAGE"
 echo " Questions File:  $QUESTIONS_FILE"
 echo " Judge:           $JUDGE ($JUDGE_MODEL)"
 echo " Target Table:    $TABLE_NAME | Limit: $LIMIT | Timeout: ${TIMEOUT}s"
+echo " Export Folder:   $SUBFOLDER"
 echo "========================================================================"
 
 # Check questions file existence
@@ -50,53 +75,104 @@ prewarm_cache() {
 }
 
 # 0. Check Judge Connectivity
-echo -e "\n>>> Verifying Judge Connectivity..."
-"$PYTHON" src/cli.py test-judge --judge "$JUDGE" --judge-model "$JUDGE_MODEL"
+if [ "$STAGE" = "eval" ] || [ "$STAGE" = "all" ]; then
+  echo -e "\n>>> Verifying Judge Connectivity..."
+  "$PYTHON" src/cli.py test-judge --judge "$JUDGE" --judge-model "$JUDGE_MODEL"
+fi
 
-# Pre-Flight Prompt Cache Verification (Isolation & Explicit Hit)
-echo -e "\n>>> Verifying Prompt Cache Pre-Flight Integrity..."
-"$PYTHON" src/cli.py test-cache --url "$URL"
+if [ "$STAGE" = "queries" ] || [ "$STAGE" = "all" ]; then
+  # Pre-Flight Prompt Cache Verification (Isolation & Explicit Hit)
+  echo -e "\n>>> Verifying Prompt Cache Pre-Flight Integrity..."
+  "$PYTHON" src/cli.py test-cache --url "$URL"
 
-# Warm-up queries to eliminate JVM JIT, connection pool, and TLS jitter
-if [ "$WARMUP" -gt 0 ]; then
-  echo -e "\n>>> Executing $WARMUP unmeasured warm-up queries..."
-  for i in $(seq 1 "$WARMUP"); do
-    curl -s -o /dev/null -w "  Warm-up $i: HTTP %{http_code} (%{time_total}s)\n" \
-      "${URL}/api/query" \
-      -H "Content-Type: application/json" \
-      -d "{\"query\": \"Warmup question: $i\", \"tableName\": \"$TABLE_NAME\"}"
-  done
+  # Warm-up queries to eliminate JVM JIT, connection pool, and TLS jitter
+  if [ "$WARMUP" -gt 0 ]; then
+    echo -e "\n>>> Executing $WARMUP unmeasured warm-up queries..."
+    for i in $(seq 1 "$WARMUP"); do
+      curl -s -o /dev/null -w "  Warm-up $i: HTTP %{http_code} (%{time_total}s)\n" \
+        "${URL}/api/query" \
+        -H "Content-Type: application/json" \
+        -d "{\"query\": \"Warmup question: $i\", \"tableName\": \"$TABLE_NAME\"}"
+    done
+    clear_cache
+  fi
+
+  # ------------------------------------------------------------------------------
+  # Stage 0: Naive Baseline (C0)
+  # ------------------------------------------------------------------------------
+  echo -e "\n>>> [1/2] Running Baseline (C0)..."
+  "$PYTHON" src/cli.py run-questions \
+    --input "$QUESTIONS_FILE" \
+    --url "$URL" \
+    --limit "$LIMIT" \
+    --timeout "$TIMEOUT" \
+    --table-name "$TABLE_NAME" \
+    --judge "$RUN_JUDGE" --judge-model "$JUDGE_MODEL" \
+    --output "${RUN_DIR}/run_C0_baseline.jsonl"
   clear_cache
+
+  # ------------------------------------------------------------------------------
+  # Stage 1: Prompt Caching (M3 / C3)
+  # ------------------------------------------------------------------------------
+  echo -e "\n>>> [2/2] Running Prompt Caching (M3)..."
+  prewarm_cache
+  "$PYTHON" src/cli.py run-questions \
+    --input "$QUESTIONS_FILE" \
+    --url "$URL" \
+    --limit "$LIMIT" \
+    --timeout "$TIMEOUT" \
+    --modules M3 \
+    --table-name "$TABLE_NAME" \
+    --judge "$RUN_JUDGE" --judge-model "$JUDGE_MODEL" \
+    --output "${RUN_DIR}/run_C3_M3.jsonl"
+  clear_cache
+
+  if [ "$STAGE" = "queries" ]; then
+    echo -e "\n========================================================================"
+    echo " Queries Complete (Stage: queries)"
+    echo " All configurations successfully queried and saved to: $RUN_DIR"
+    echo " To evaluate quality with RAGAS, run:"
+    echo "   $0 --eval-only"
+    echo " or:"
+    echo "   ./scripts/evaluate_run.sh $RUN_DIR --judge $JUDGE --judge-model $JUDGE_MODEL --subfolder $SUBFOLDER"
+    echo "========================================================================"
+  fi
 fi
 
 # ------------------------------------------------------------------------------
-# Stage 0: Naive Baseline (C0)
+# Stage: Offline Evaluation (RAGAS Metrics)
 # ------------------------------------------------------------------------------
-echo -e "\n>>> [1/2] Running Baseline (C0)..."
-"$PYTHON" src/cli.py run-questions \
-  --input "$QUESTIONS_FILE" \
-  --url "$URL" \
-  --limit "$LIMIT" \
-  --timeout "$TIMEOUT" \
-  --table-name "$TABLE_NAME" \
-  --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
-  --output /dev/null
-clear_cache
+if [ "$STAGE" = "eval" ]; then
+  echo "========================================================================"
+  echo " Evaluating RAG Quality Metrics (RAGAS) in $RUN_DIR with $JUDGE"
+  echo "========================================================================"
+  "$PYTHON" src/cli.py evaluate \
+    --input "$RUN_DIR" \
+    --judge "$JUDGE" \
+    --judge-model "$JUDGE_MODEL" \
+    --inplace
+fi
 
-# ------------------------------------------------------------------------------
-# Stage 1: Prompt caching (M3 / C1)
-# ------------------------------------------------------------------------------
-echo -e "\n>>> [2/2] Running Prompt Caching (M3)..."
-prewarm_cache
-"$PYTHON" src/cli.py run-questions \
-  --input "$QUESTIONS_FILE" \
-  --url "$URL" \
-  --limit "$LIMIT" \
-  --timeout "$TIMEOUT" \
-  --modules M3 \
-  --table-name "$TABLE_NAME" \
-  --judge "$JUDGE" --judge-model "$JUDGE_MODEL" \
-  --output /dev/null
-clear_cache
+if [ "$STAGE" = "eval" ] || [ "$STAGE" = "report" ] || [ "$STAGE" = "all" ]; then
+  echo "========================================================================"
+  echo " Statistical Hypothesis Testing (Wilcoxon Signed-Rank Tests vs Baseline)"
+  echo "========================================================================"
 
-echo -e "\n✓ Finished Baseline (C0) and Prompt Caching (M3) runs."
+  # Terminal Wilcoxon table: C3 vs C0
+  "$PYTHON" src/cli.py compare \
+    --baseline "${RUN_DIR}/run_C0_baseline.jsonl" \
+    --treatment "${RUN_DIR}/run_C3_M3.jsonl" \
+    --config-name "C3: Prompt Caching (M3)"
+
+  echo "========================================================================"
+  echo " Consolidated LaTeX Tables & Publication Figures Export"
+  echo "========================================================================"
+
+  "$PYTHON" src/cli.py export-thesis \
+    --input "$RUN_DIR" \
+    --tables-dir "$TABLES_DIR" \
+    --figures-dir "$FIGURES_DIR" \
+    --subfolder "$SUBFOLDER"
+
+  echo -e "\n✓ Benchmark run and export completed successfully!"
+fi

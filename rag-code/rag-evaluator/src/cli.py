@@ -308,6 +308,7 @@ def _process_item_metrics(
         item["composite_quality"] = None
         item["qpd"] = None
         item["qps"] = None
+        item["ragas_evaluated"] = True
     else:
         # RAGAS evaluation on answerable queries
         if ragas_evaluator and ragas_evaluator.llm is not None:
@@ -324,12 +325,14 @@ def _process_item_metrics(
             item["answer_relevancy"] = ragas_scores.get("answer_relevancy", 0.0)
             item["context_precision"] = ragas_scores.get("context_precision", 0.0)
             item["context_recall"] = ragas_scores.get("context_recall", 0.0)
+            item["ragas_evaluated"] = True
         else:
             # Default or preserve existing scores
             item.setdefault("faithfulness", 1.0 if em == 1.0 else f1)
             item.setdefault("answer_relevancy", f1)
             item.setdefault("context_precision", 1.0 if item.get("supportingEvidenceFound") else 0.5)
             item.setdefault("context_recall", 1.0 if item.get("supportingEvidenceFound") else 0.5)
+            item.setdefault("ragas_evaluated", False)
 
         comp_q = compute_composite_quality(
             item["context_precision"],
@@ -376,6 +379,8 @@ def _evaluate_item_with_feedback(
     total_items: int,
     pricing_tier: str = "gemini-3.8-flash",
     console: Console = console,
+    resume: bool = True,
+    force: bool = False,
 ) -> dict[str, Any]:
     """Evaluates a single item with active spinner and metric-by-metric progress feedback."""
     if not ragas_evaluator or ragas_evaluator.llm is None:
@@ -390,6 +395,34 @@ def _evaluate_item_with_feedback(
             f"Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
         )
         return processed
+
+    # If resuming and item was already evaluated by a judge, skip LLM calls
+    if resume and not force and item.get("ragas_evaluated") is True:
+        f_score = item.get("faithfulness")
+        ar_score = item.get("answer_relevancy")
+        cp_score = item.get("context_precision")
+        cr_score = item.get("context_recall")
+        q_comp = item.get("composite_quality", 0.0)
+        tot_ms = item.get("total_latency_ms", 0.0)
+        cost = item.get("cost_usd", 0.0)
+        if f_score is None:
+            ref_status = (
+                "[green]Refused (Correct)[/green]"
+                if item.get("is_refusal")
+                else "[bold red]False Positive (Failed to Refuse)[/bold red]"
+            )
+            console.print(
+                f"  [dim green]✓[/dim green] [{item_idx}/{total_items}] Resumed: "
+                f"{ref_status} | Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
+            )
+        else:
+            console.print(
+                f"  [dim green]✓[/dim green] [{item_idx}/{total_items}] Resumed: "
+                f"Faith=[green]{f_score:.2f}[/green] | Rel=[green]{ar_score:.2f}[/green] | "
+                f"Prec=[green]{cp_score:.2f}[/green] | Rec=[green]{cr_score:.2f}[/green] | "
+                f"Q=[yellow]{q_comp:.3f}[/yellow] | Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
+            )
+        return item
 
     with console.status(
         f"[bold magenta][{item_idx}/{total_items}][/bold magenta] Judge [{judge}]: Preparing evaluation...",
@@ -832,19 +865,38 @@ def test_cache(
 
 @app.command()
 def evaluate(
-    input_file: Path = typer.Option(..., "--input", "-i", help="Input JSONL file containing raw benchmark results"),
+    input_file: Path = typer.Option(..., "--input", "-i", help="Input JSONL file or directory containing run JSONL files"),
     judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, gemini, vertex, ollama, none"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSONL path for evaluated results"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSONL path for evaluated results (ignored if input is directory or --inplace is set)"),
+    inplace: bool = typer.Option(False, "--inplace", help="Update input file(s) in place with evaluated metrics"),
+    resume: bool = typer.Option(True, "--resume/--no-resume", help="Skip samples that already have non-surrogate RAGAS scores (default: True)"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force re-evaluation of all samples even if already evaluated"),
     judge_delay: Optional[float] = typer.Option(
         None,
         "--judge-delay",
         help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Claude/Gemini, 0s for Ollama)",
     ),
+    pricing_tier: str = typer.Option("gemini-3.8-flash", "--pricing-tier", help="Default pricing tier for operational cost calculations"),
 ) -> None:
     """Computes EM, F1, RAGAS metrics, and Composite Q on previously gathered run records."""
-    records = _load_jsonl(input_file)
-    console.print(f"Loaded [bold]{len(records)}[/bold] records from [cyan]{input_file}[/cyan].")
+    target_path = Path(input_file)
+    if target_path.is_dir():
+        def _sort_key(p: Path) -> tuple[int, str]:
+            m = re.search(r"[Cc](\d+)", p.stem)
+            return (int(m.group(1)) if m else 999, p.name)
+
+        files_to_process = sorted(target_path.glob("run_*.jsonl"), key=_sort_key)
+        if not files_to_process:
+            files_to_process = sorted(target_path.glob("*.jsonl"), key=_sort_key)
+        if not files_to_process:
+            console.print(f"[red]No JSONL run files found in directory: {target_path}[/red]")
+            return
+        console.print(f"Found [bold]{len(files_to_process)}[/bold] run files to evaluate in [cyan]{target_path}[/cyan].")
+    elif target_path.is_file():
+        files_to_process = [target_path]
+    else:
+        raise typer.BadParameter(f"Input path not found: {input_file}")
 
     effective_delay: float
     if judge_delay is not None:
@@ -867,29 +919,77 @@ def evaluate(
         if effective_delay > 0:
             console.print(f"[dim]Pacing judge requests ({effective_delay:.1f}s delay) to avoid 429 rate limit errors...[/dim]")
 
-    evaluated_records: list[dict[str, Any]] = []
-    out_path = output or input_file.with_name(f"{input_file.stem}_evaluated.jsonl")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    all_evaluated_summary: dict[str, list[dict[str, Any]]] = {}
 
-    for idx, item in enumerate(records, 1):
-        processed = _evaluate_item_with_feedback(
-            item=item,
-            ragas_evaluator=ragas_evaluator,
-            judge=judge,
-            item_idx=idx,
-            total_items=len(records),
-            console=console,
-        )
-        evaluated_records.append(processed)
-        if ragas_evaluator and effective_delay > 0 and idx < len(records):
-            _pacing_delay_with_spinner(effective_delay, current_idx=idx, total_items=len(records), console=console)
+    for file_idx, cur_file in enumerate(files_to_process, 1):
+        records = _load_jsonl(cur_file)
+        console.print(f"\n[bold cyan]=== [{file_idx}/{len(files_to_process)}] Processing: {cur_file.name} ({len(records)} records) ===[/bold cyan]")
 
-    config_name = input_file.stem
-    display_summary_table({config_name: evaluated_records}, console=console)
-    display_hop_breakdown_table(evaluated_records, console=console)
+        # Determine destination path
+        if inplace or (target_path.is_dir() and output is None):
+            out_path = cur_file
+        elif output is not None and target_path.is_dir():
+            out_path = output / cur_file.name
+        elif output is not None:
+            out_path = output
+        else:
+            out_path = cur_file.with_name(f"{cur_file.stem}_evaluated.jsonl")
 
-    _save_jsonl(evaluated_records, out_path)
-    console.print(f"\n[bold green]✓ Evaluated results saved to:[/bold green] [cyan]{out_path}[/cyan]")
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = out_path.with_name(f".{out_path.name}.eval_tmp")
+
+        # Check for existing partial checkpoint if resuming
+        evaluated_records: list[dict[str, Any]] = []
+        if resume and not force and tmp_path.exists():
+            try:
+                evaluated_records = _load_jsonl(tmp_path)
+                console.print(f"  [dim green]Found checkpoint with {len(evaluated_records)} evaluated records in {tmp_path.name}. Resuming...[/dim green]")
+            except Exception:
+                evaluated_records = []
+
+        start_idx = len(evaluated_records)
+        # If tmp checkpoint wasn't found or was reset, start fresh
+        if start_idx == 0 and tmp_path.exists():
+            tmp_path.unlink()
+
+        for idx in range(start_idx, len(records)):
+            item = records[idx]
+            processed = _evaluate_item_with_feedback(
+                item=item,
+                ragas_evaluator=ragas_evaluator,
+                judge=judge,
+                item_idx=idx + 1,
+                total_items=len(records),
+                pricing_tier=pricing_tier,
+                console=console,
+                resume=resume,
+                force=force,
+            )
+            evaluated_records.append(processed)
+
+            # Incremental checkpointing per item to safeguard against interrupts
+            with tmp_path.open("a", encoding="utf-8") as f_tmp:
+                f_tmp.write(json.dumps(processed) + "\n")
+
+            if ragas_evaluator and effective_delay > 0 and (idx + 1) < len(records):
+                _pacing_delay_with_spinner(effective_delay, current_idx=idx + 1, total_items=len(records), console=console)
+
+        # File completed: atomically replace destination with checkpoint
+        if tmp_path.exists():
+            tmp_path.replace(out_path)
+
+        config_name = cur_file.stem.replace("run_", "").replace("_evaluated", "")
+        all_evaluated_summary[config_name] = evaluated_records
+
+        display_summary_table({config_name: evaluated_records}, console=console)
+        display_hop_breakdown_table(evaluated_records, console=console)
+        console.print(f"[bold green]✓ Saved evaluated results to:[/bold green] [cyan]{out_path}[/cyan]")
+
+    if len(files_to_process) > 1:
+        console.print("\n[bold green]========================================================================[/bold green]")
+        console.print("[bold green] Consolidated Evaluation Summary Across All Configurations[/bold green]")
+        console.print("[bold green]========================================================================[/bold green]")
+        display_summary_table(all_evaluated_summary, console=console)
 
 
 @app.command()

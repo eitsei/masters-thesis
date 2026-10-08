@@ -96,6 +96,85 @@ def test_cli_evaluate(tmp_path: Path, synthetic_run_data):
     assert "token_f1" in lines[0]
 
 
+def test_cli_evaluate_inplace(tmp_path: Path, synthetic_run_data):
+    in_file = tmp_path / "run_C0_baseline.jsonl"
+    with in_file.open("w", encoding="utf-8") as f:
+        for r in synthetic_run_data:
+            f.write(json.dumps(r) + "\n")
+
+    res = runner.invoke(app, [
+        "evaluate",
+        "--input", str(in_file),
+        "--judge", "none",
+        "--inplace",
+    ])
+
+    assert res.exit_code == 0
+    with in_file.open("r", encoding="utf-8") as f:
+        lines = [json.loads(l) for l in f]
+    assert len(lines) == 6
+    assert "composite_quality" in lines[0]
+    assert "ragas_evaluated" in lines[0]
+
+
+def test_cli_evaluate_directory(tmp_path: Path, synthetic_run_data):
+    run_dir = tmp_path / "runs_dir"
+    run_dir.mkdir()
+    f0 = run_dir / "run_C0_baseline.jsonl"
+    f1 = run_dir / "run_C1_M1.jsonl"
+
+    for f in (f0, f1):
+        with f.open("w", encoding="utf-8") as fp:
+            for r in synthetic_run_data:
+                fp.write(json.dumps(r) + "\n")
+
+    res = runner.invoke(app, [
+        "evaluate",
+        "--input", str(run_dir),
+        "--judge", "none",
+        "--inplace",
+    ])
+
+    assert res.exit_code == 0
+    assert "Consolidated Evaluation Summary Across All Configurations" in res.stdout
+
+    for f in (f0, f1):
+        with f.open("r", encoding="utf-8") as fp:
+            lines = [json.loads(l) for l in fp]
+        assert len(lines) == 6
+        assert "composite_quality" in lines[0]
+
+
+def test_cli_evaluate_resume_tmp(tmp_path: Path, synthetic_run_data):
+    in_file = tmp_path / "run_C0_baseline.jsonl"
+    with in_file.open("w", encoding="utf-8") as f:
+        for r in synthetic_run_data:
+            f.write(json.dumps(r) + "\n")
+
+    # Simulate an interrupted run with 2 records in .tmp
+    tmp_file = in_file.with_name(f".{in_file.name}.eval_tmp")
+    with tmp_file.open("w", encoding="utf-8") as f:
+        for r in synthetic_run_data[:2]:
+            evaluated = dict(r)
+            evaluated["ragas_evaluated"] = True
+            evaluated["composite_quality"] = 0.95
+            f.write(json.dumps(evaluated) + "\n")
+
+    res = runner.invoke(app, [
+        "evaluate",
+        "--input", str(in_file),
+        "--judge", "none",
+        "--inplace",
+        "--resume",
+    ])
+
+    assert res.exit_code == 0
+    assert "Resuming" in res.stdout
+    with in_file.open("r", encoding="utf-8") as f:
+        lines = [json.loads(l) for l in f]
+    assert len(lines) == 6
+
+
 def test_cli_compare(tmp_path: Path, synthetic_run_data):
     base_file = tmp_path / "base.jsonl"
     treat_file = tmp_path / "treat.jsonl"
