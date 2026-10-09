@@ -99,7 +99,11 @@ public class MusiqueDatasetReader {
             return Optional.empty();
         }
         loadAll();
-        return Optional.ofNullable(questionIndex.get(id));
+        MusiqueQuestion q = questionIndex.get(id);
+        if (q == null) {
+            q = questionIndex.get(id + "_unans");
+        }
+        return Optional.ofNullable(q);
     }
 
     /**
@@ -258,6 +262,9 @@ public class MusiqueDatasetReader {
             String question = root.path("question").asText("");
             String answer = root.path("answer").asText("");
             boolean answerable = root.path("answerable").asBoolean(true);
+            if (!answerable && !id.isBlank() && !id.endsWith("_unans")) {
+                id = id + "_unans";
+            }
 
             List<String> aliases = new ArrayList<>();
             JsonNode aliasesNode = root.path("answer_aliases");

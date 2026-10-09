@@ -87,7 +87,7 @@ class MusiqueDatasetReaderTest {
         MusiqueQuestion question = reader.parseLine(json);
 
         assertThat(question).isNotNull();
-        assertThat(question.id()).isEqualTo("2hop__153573_109006");
+        assertThat(question.id()).isEqualTo("2hop__153573_109006_unans");
         assertThat(question.answerable()).isFalse();
         assertThat(question.answer()).isEqualTo(MusiqueDatasetReader.CANONICAL_REFUSAL_EN);
         assertThat(question.answerAliases()).contains("does not contain sufficient information to answer this query");
@@ -162,6 +162,25 @@ class MusiqueDatasetReaderTest {
 
         MusiqueQuestion found = reader.findById(expectedId).orElseThrow();
         assertThat(found.id()).isEqualTo(expectedId);
+    }
+
+    @Test
+    void loadAll_indexesAllQuestionsWithoutIdCollision() {
+        List<MusiqueQuestion> all = reader.loadAll();
+        assertThat(all).hasSize(4834);
+
+        // Verify that all IDs are strictly unique across the full dataset
+        List<String> ids = all.stream().map(MusiqueQuestion::id).toList();
+        assertThat(java.util.Set.copyOf(ids)).hasSize(4834);
+
+        // Verify that findById retrieves both answerable and unanswerable versions of paired questions
+        MusiqueQuestion ans = reader.findById("2hop__837900_71701").orElseThrow();
+        assertThat(ans.answerable()).isTrue();
+        assertThat(ans.answer()).isEqualTo("November 5");
+
+        MusiqueQuestion unans = reader.findById("2hop__837900_71701_unans").orElseThrow();
+        assertThat(unans.answerable()).isFalse();
+        assertThat(unans.answer()).isEqualTo(MusiqueDatasetReader.CANONICAL_REFUSAL_EN);
     }
 
     @Test
