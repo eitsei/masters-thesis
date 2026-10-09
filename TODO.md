@@ -1,21 +1,52 @@
+# TODO & Havaintoloki
+
+## Testiajoihin valmistautumisen ja moniagenttitarkastuksen havainnot (9.10.2026)
+
+### 🚨 Kriittiset korjattavat ennen testiajoja
+- [x] **[KRIITTINEN] MuSiQue-aineiston kysymys-ID:iden törmäys (`musique_100_final.jsonl` & `MusiqueDatasetReader.java`):**
+  - Korjattu: `MusiqueDatasetReader.parseLine()` suffiksoi vastaamattomat kysymykset `_unans`-päätteellä (`id + "_unans"`), jolloin kaikki 4 834 kysymystä indeksoituvat muistiin ilman ylikirjoituksia ja `findById()` tukee automaattista fallback-hakua.
+  - Vahvistettu: `musique_100_final.jsonl` päivitetty deterministisesti; sisältää tasan 100 riviä ja tasan 100 uniikkia ID:tä (rivi 4 `2hop__837900_71701`, rivi 84 `2hop__837900_71701_unans`). Simuloitu `collector.py`-checkpointointi kerää täydet 100/100 kysymystä.
+
+### ⚙️ Konfiguraatio- ja ympäristövalmistelut (`rag-benchmark` & `rag-evaluator`)
+- [ ] **Tuotantomallien oletukset `application.yml`-tiedostossa vs. Luvun 4 määrittely (syyskuu 2026):**
+  - `application.yml`:ssä oletukset:
+    - `rag.models.google-genai.flash: gemini-3.5-flash` $\to$ gradussa `gemini-3.8-flash`
+    - `rag.models.google-genai.pro: gemini-3.1-pro-preview` $\to$ gradussa `gemini-3.1-pro`
+    - `text.model: gemini-embedding-001` $\to$ gradussa `gemini-embedding-2` (768 d MRL)
+  - *Toimenpide:* Päivitä oletusarvot tiedostoon [`rag-code/rag-benchmark/src/main/resources/application.yml`](rag-code/rag-benchmark/src/main/resources/application.yml) tai varmista ympäristömuuttujat (`GOOGLE_GENAI_CHAT_MODEL`, `GOOGLE_GENAI_PRO_MODEL`, `GOOGLE_GENAI_EMBEDDING_MODEL`) ennen ajoja.
+- [ ] **RAGAS LLM-tuomarin asetus tuotantoajoihin (`rag-evaluator`):**
+  - Koodissa on täysi Claude Sonnet 5 -tuki Vertex AI Model Gardenissa (`judge_factory.py`), mutta `.env`- ja `evaluator.py`-tiedostojen oletuksena on kehitysaikainen `gemini-3.5-flash-lite` / `ollama`.
+  - *Toimenpide:* Varmista, että virallisissa testiajoissa ajetaan parametreilla `--judge claude --judge-model claude-sonnet-5` (tai `JUDGE_PROVIDER=claude`, `JUDGE_MODEL=claude-sonnet-5`).
+- [ ] **Täyden otoskoon varmistus ajoskripteissä (`LIMIT=100`):**
+  - Skripteissä [`run_musique_all16.sh`](rag-code/rag-evaluator/scripts/run_musique_all16.sh) ja [`run_nordea_closed_all16.sh`](rag-code/rag-evaluator/scripts/run_nordea_closed_all16.sh) oletusarvo on `LIMIT="${LIMIT:-10}"` (pilot-testaus).
+  - *Toimenpide:* Aseta oletukseksi `LIMIT=100` tai aja komennolla `LIMIT=100 ./scripts/run_...` täyden 3 200 kutsun matriisin ($16 \times 100 \times 2$) tuottamiseksi.
+
+### 📝 Tutkielmatekstin tarkennukset (`thesis/chapters/04_research_methods.tex`)
+- [x] **Kieltäytymislausekkeen suomenkielinen vastine (§4.4 & §4.5.3):**
+  - Luvussa §4.4 (r. 142) lisätty maininta suomenkielisestä kanonisesta kieltäytymislausekkeesta (*"Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi."*) ja englanninkielisen fraasin roolista hyväksyttynä aliaksena.
+  - Luvussa §4.5.3 (r. 265) tarkennettu indikaattorifunktio $\mathbb{I}_{\text{refusal}}(q)$ ottamaan huomioon englanti (MuSiQue) ja suomi (Nordea).
+- [x] **Small-to-Big terminologian tarkistus (Luku §4.3):**
+  - Tarkistettu: Luvun §4.3 leipäteksti (r. 126) ja Taulukko 4.3 käyttävät jo valmiiksi oikeaa parent-ID -deduplikointitermiä. Ei ristiriitaa.
+
+---
+
 ## Metodit vs. Koodi -tarkastuksen havainnot ja korjaukset (8.10.2026)
 
 ### Luku 4 (`thesis/chapters/04_research_methods.tex`) & Metoditeksti
-- [ ] **M0-chunkkaus ja overlappiteksti (§4.3 Table 4.3 & r. 100, 123):**
+- [x] **M0-chunkkaus ja overlappiteksti (§4.3 Table 4.3 & r. 100, 123):**
   - Tekstissä väitetään 512 tokenia ja 50 tokenin overlap. Spring AI:n `TokenTextSplitter` ei tue overlappia, eikä sitä ole koodissa. Lisäksi MuSiQue tallennetaan kappaleittain (~100–150 tok) sellaisenaan ilman splitteriä, ja Nordea-kappaleet ovat alle 512 tokenia.
-  - *Korjaus:* Poista maininta 50 tokenin overlapista ja kuvaa todellinen kappalepohjainen / 512 tokenin ylärajalla toimiva lohkominen rehellisesti.
-- [ ] **M1 Boundary Interval-Merging -kuvaus (§4.3 r. 126):**
+  - *Korjaus:* Poistettu maininta 50 tokenin overlapista ja kuvattu todellinen kappalepohjainen / 512 tokenin ylärajalla toimiva lohkominen rehellisesti.
+- [x] **M1 Boundary Interval-Merging -kuvaus (§4.3 r. 126):**
   - Tekstissä väitetään, että päällekkäiset parent-ikkunat yhdistetään intervallien yhdistämisellä (interval-merging). Todellisuudessa koodi tekee deduplikoinnin parent-ID:n mukaan, mutta varsinaista intervallien yhdistämistä ei ajeta, koska ingestiossa ei aseteta `window_start`/`window_end`-metatietoja.
-  - *Korjaus:* Muotoile teksti kuvaamaan toteutunut logiikka: deduplikointi parent-ID:n mukaan säilyttää relevanssijärjestyksen; poista tai lievennä väite intervallien yhdistämisestä.
-- [ ] **M4 Routerin timeout-arvo (§4.3 r. 224 TODO vs koodi):**
-  - TODO-kommentissa mainitaan 1 500 ms, mutta koodissa (`application.yml` ja `GoogleGenAiModelRouter`) timeout on 5 000 ms.
-  - *Korjaus:* Päivitä luvun 4 tekstiin viralliseksi arvoksi 5 000 ms (tai säädä konfiguraatio, jos tavoite oli 1 500 ms).
-- [ ] **Pilvideployauksen korvaaminen lokaaliajolla (GCP europe-north1 vs lokaali suoritus):**
+  - *Korjaus:* Muotoiltu teksti kuvaamaan toteutunut logiikka: deduplikointi parent-ID:n mukaan säilyttää korkeimman relevanssijärjestyksen; poistettu väite intervallien yhdistämisestä.
+- [x] **M4 Routerin timeout-arvo (§4.3 r. 224 TODO vs koodi):**
+  - Tarkistettu: lopullisessa Luvun 4 leipätekstissä ei mainita aikakatkaisua (vanha 1 500 ms luonnoskommentti poistettu jo aiemmin). Koodissa käytettävä 5 000 ms on taustajärjestelmän tekninen fallback-varmistus, jota ei tarvitse erikseen avata leipätekstissä. Ei ristiriitaa.
+- [x] **Pilvideployauksen korvaaminen lokaaliajolla (GCP europe-north1 vs lokaali suoritus):**
   - Alkuperäinen idea oli ajaa järjestelmä GCP:ssä samassa konesalissa (`europe-north1`) LLM:n kanssa. Koska frontier-mallit (Gemini 3.x) vaativat Googlen `global`-endpointin eikä niitä voi kiinnittää yhteen alueelliseen konesaliin, pilveen vieminen ei poista verkkoviiveitä. Järjestelmä ajetaan hallitusti lokaalisti API-kutsujen yli.
   - *Korjaus teksteihin:*
-    - **Luku 4.2 (§4.2 r. 81–82):** Poista väite `europe-north1` VPC- ja Cloud SQL -deployauksesta. Kuvaa lokaali/kontitettu Spring Boot + PostgreSQL (pgvector) -suoritusympäristö ja ulkoiset suojatut HTTPS API -kutsut.
-    - **Luku 4.6 (Internal Validity r. 457):** Päivitä verkkolatenssin hallintakeinot (2 unmeasured warm-up -kyselyä, parillinen Wilcoxon-testi, suhteellisten erojen analyysi).
-    - **Luku 6 (Discussion / Threats to Validity):** Dokumentoi reititysrajoite (Google GenAI Global endpoint) ja perustele, miksi parillinen vertailu ($C_k$ vs $C_0$) ja mikrovaiheiden mittaus ($T_{\text{embed}}$, $T_{\text{ret}}$, $T_{\text{rerank}}$ jne.) eristävät optimointien todelliset hyödyt verkkoviiveestä.
+    - [x] **Luku 4.2 (§4.2 r. 81–82):** Poistettu väite `europe-north1` VPC- ja Cloud SQL -deployauksesta. Kuvattu lokaali laptop workstation (Intel Core Ultra 7, 32 GB RAM) + PostgreSQL (pgvector) -suoritusympäristö ja ulkoiset suojatut HTTPS API -kutsut GCP global endpointeihin.
+    - [x] **Luku 4.6 (Internal Validity r. 457):** Päivitetty verkkolatenssin hallintakeinot lokaaliajoon (2 unmeasured warm-up -kyselyä, parillinen Wilcoxon-testi, mikrovaihetelemeteria).
+    - [ ] **Luku 6 (Discussion / Threats to Validity):** Dokumentoi reititysrajoite (Google GenAI Global endpoint) ja perustele, miksi parillinen vertailu ($C_k$ vs $C_0$) ja mikrovaiheiden mittaus ($T_{\text{embed}}$, $T_{\text{ret}}$, $T_{\text{rerank}}$ jne.) eristävät optimointien todelliset hyödyt verkkoviiveestä.
 - [ ] **Puhutaanko enterprisesta vai companysta? Kumppaniyhtiön termistö:**
   - Varmista, että kumppaniin viitataan yhtenäisellä termistöllä kaikkialla tutkielmassa ja liitteissä.
 - [ ] **Viimeistele tekstit ja kieliasu:**
