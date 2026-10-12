@@ -1,7 +1,7 @@
 \begin{table}[!htbp]
 \centering
 \small
-\caption{Paired Wilcoxon signed-rank test results for end-to-end latency (RQ1) against baseline ($C_0$).}
+\caption{Paired Wilcoxon signed-rank test results for end-to-end latency (RQ1) against the naive baseline.}
 \label{tab:wilcoxon_rq1}
 \begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l r r r r r r c @{}}
 \toprule
@@ -27,5 +27,5 @@ C15\_M1\_M2\_M3\_M4 & 1932.5 & 9346.5 & +5296.0 & 5.0 & 0.0195 & 0.2734 & ns \\
 \end{tabular*}
 \vspace{0.5em}
 \parbox{\textwidth}{\footnotesize
-\textbf{Notes:} $\tilde{\mu}_\Delta$ represents the median paired difference ($C_k - C_0$). Two-tailed Wilcoxon signed-rank test evaluated at $\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\text{adj}}$). Significance flags: $^{***}\,p < 0.001$, $^{**}\,p < 0.01$, $^{*}\,p < 0.05$, $\text{ns}\,p \ge 0.05$.}
+\textbf{Notes:} $\tilde{\mu}_\Delta$ represents the median paired difference relative to the naive baseline. Two-tailed Wilcoxon signed-rank test evaluated at $\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\text{adj}}$). Significance flags: $^{***}\,p < 0.001$, $^{**}\,p < 0.01$, $^{*}\,p < 0.05$, $\text{ns}\,p \ge 0.05$.}
 \end{table}

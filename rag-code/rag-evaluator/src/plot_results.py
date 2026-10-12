@@ -57,13 +57,22 @@ _TIER_BG_COLORS: dict[int, str] = {
 }
 
 _CONFIG_FRIENDLY_NAMES: dict[str, str] = {
-    "C0": "$C_0$ (Baseline)",
-    "C1": "$C_1$ (M1)",   "C2": "$C_2$ (M2)",   "C3": "$C_3$ (M3)",   "C4": "$C_4$ (M4)",
-    "C5": "$C_5$ (M1+M2)", "C6": "$C_6$ (M1+M3)", "C7": "$C_7$ (M1+M4)",
-    "C8": "$C_8$ (M2+M3)", "C9": "$C_9$ (M2+M4)", "C10": "$C_{10}$ (M3+M4)",
-    "C11": "$C_{11}$ (M1+M2+M3)", "C12": "$C_{12}$ (M1+M2+M4)",
-    "C13": "$C_{13}$ (M1+M3+M4)", "C14": "$C_{14}$ (M2+M3+M4)",
-    "C15": "$C_{15}$ (Full-Stack)",
+    "C0": "Baseline",
+    "C1": "S2B",
+    "C2": "SR",
+    "C3": "PC",
+    "C4": "MC",
+    "C5": "S2B + SR",
+    "C6": "S2B + PC",
+    "C7": "S2B + MC",
+    "C8": "SR + PC",
+    "C9": "SR + MC",
+    "C10": "PC + MC",
+    "C11": "S2B + SR + PC",
+    "C12": "S2B + SR + MC",
+    "C13": "S2B + PC + MC",
+    "C14": "SR + PC + MC",
+    "C15": "S2B + SR + PC + MC",
 }
 
 
@@ -325,11 +334,11 @@ def plot_pareto_frontier(
     # ── Combined legend below subplots ────────────────────────────────────────
     legend_elements = [
         plt.Line2D([0], [0], color="#d62728", linestyle="--", linewidth=1.8, label="Pareto Frontier ($\\mathcal{P}$)"),
-        Patch(facecolor=_TIER_COLORS[0], edgecolor="k", label="$C_0$ Baseline"),
+        Patch(facecolor=_TIER_COLORS[0], edgecolor="k", label="Baseline ($k=0$)"),
         Patch(facecolor=_TIER_COLORS[1], edgecolor="k", label="Single-opt ($k=1$)"),
         Patch(facecolor=_TIER_COLORS[2], edgecolor="k", label="Dual-opt ($k=2$)"),
         Patch(facecolor=_TIER_COLORS[3], edgecolor="k", label="Triple-opt ($k=3$)"),
-        Patch(facecolor=_TIER_COLORS[4], edgecolor="k", label="Full-Stack ($k=4$)"),
+        Patch(facecolor=_TIER_COLORS[4], edgecolor="k", label="All 4 Modules ($k=4$)"),
     ]
     fig.legend(
         handles=legend_elements,
@@ -549,7 +558,7 @@ def plot_latency_breakdown(
     ax.set_title(f"End-to-End Latency Micro-Phase Breakdown{title_suffix}", fontweight="bold")
     ax.set_xticks(x)
 
-    display_labels = [c.replace("_", " ") for c in configs]
+    display_labels = [_get_friendly_name_pr(c) for c in configs]
     ax.set_xticklabels(display_labels, rotation=45, ha="right", fontsize=9)
 
     ax.set_ylim(0, max_tot * 1.35)
@@ -710,7 +719,7 @@ def plot_ragas_metrics_radar(
         ("(a) Single-Factor Isolated ($k=1$) vs. Baseline", sing_names),
         ("(b) Pairwise Combinations ($k=2$) vs. Baseline", duo_names),
         ("(c) Multi-Module Triplets ($k=3$) vs. Baseline", trio_names),
-        ("(d) Full-Stack Integration ($k=4$) vs. Baseline", quad_names),
+        ("(d) 4-Module Integration ($k=4$) vs. Baseline", quad_names),
     ]
 
     base_name = base_names[0] if base_names else None
@@ -737,7 +746,7 @@ def plot_ragas_metrics_radar(
                 color="#2c3e50",
                 linestyle="--",
                 linewidth=2.0,
-                label="$C_0$ (Baseline)",
+                label="Baseline",
                 zorder=4,
             )
             ax.fill(angles, base_values, color="#2c3e50", alpha=0.08)
@@ -760,7 +769,7 @@ def plot_ragas_metrics_radar(
             values += values[:1]
 
             color = palette[idx % len(palette)]
-            clean_lbl = name.replace("run_", "").replace("_evaluated", "").replace("_", " ")
+            clean_lbl = _get_friendly_name_pr(name)
             ax.plot(angles, values, color=color, linewidth=1.8, label=clean_lbl, zorder=5)
             ax.fill(angles, values, color=color, alpha=0.12)
 
@@ -884,7 +893,7 @@ def plot_quality_lollipop(
     fig = plt.figure(figsize=(fig_w, fig_h), dpi=300)
     title_suffix = f" — {dataset_name}" if dataset_name else ""
     fig.suptitle(
-        f"RAGAS Quality Metrics by Configuration{title_suffix}",
+        f"RAGAS Quality Metrics by Pipeline Architecture{title_suffix}",
         fontsize=12.5, fontweight="bold", y=0.985,
     )
 
@@ -938,11 +947,11 @@ def plot_quality_lollipop(
 
     # ── Tier legend below the figure ──────────────────────────────────────────
     tier_labels = {
-        0: "Baseline ($C_0$)",
-        1: "Single-opt ($C_1$–$C_4$)",
-        2: "Dual-opt ($C_5$–$C_{10}$)",
-        3: "Triple-opt ($C_{11}$–$C_{14}$)",
-        4: "Full-Stack ($C_{15}$)",
+        0: "Baseline ($k=0$)",
+        1: "Single-opt ($k=1$)",
+        2: "Dual-opt ($k=2$)",
+        3: "Triple-opt ($k=3$)",
+        4: "All 4 Modules ($k=4$)",
     }
     handles = [
         Patch(facecolor=_TIER_COLORS[t], edgecolor="k", label=tier_labels[t])
@@ -1074,12 +1083,12 @@ def plot_quality_delta_matrix(
     ax.set_xticklabels(x_labels, fontsize=9.0, fontweight="bold", rotation=20, ha="right")
 
     cbar = fig.colorbar(im, ax=ax, fraction=0.03, pad=0.04)
-    cbar.set_label("Relative Performance vs. Baseline ($C_0$)\n[Green = Improvement, Red = Regression]", fontsize=8.5)
+    cbar.set_label("Relative Performance vs. Baseline\n[Green = Improvement, Red = Regression]", fontsize=8.5)
     cbar.ax.tick_params(labelsize=8.0)
 
     title_suffix = f" for {dataset_name}" if dataset_name else ""
     ax.set_title(
-        f"Executive Performance Delta vs. Baseline ($C_0$){title_suffix}",
+        f"Executive Performance Delta vs. Baseline{title_suffix}",
         fontsize=11.5,
         fontweight="bold",
         pad=15,
@@ -1205,7 +1214,7 @@ def plot_pareto_frontier_3d(
             alpha=0.65,
             edgecolors="k",
             linewidth=0.5,
-            label="Dominated Configurations ($C_i \\notin \\mathcal{P}$)",
+            label="Dominated Pipelines ($p \\notin \\mathcal{P}$)",
             zorder=3,
         )
 
@@ -1277,23 +1286,7 @@ def plot_pareto_frontier_3d(
 
     # Point annotations
     for idx, (x, y, z, lbl) in enumerate(points):
-        display_lbl = lbl.replace("_", " ")
-        if "C0" in display_lbl:
-            display_lbl = "C0 (Base)"
-        elif "C11" in display_lbl:
-            display_lbl = "C11 (All)"
-        elif "C1" in display_lbl and "M1" in display_lbl:
-            display_lbl = "C1 (M1)"
-        elif "C2" in display_lbl and "M2" in display_lbl:
-            display_lbl = "C2 (M2)"
-        elif "C3" in display_lbl and "M3" in display_lbl:
-            display_lbl = "C3 (M3)"
-        elif "C5" in display_lbl:
-            display_lbl = "C5 (M1+M2)"
-        elif "C6" in display_lbl:
-            display_lbl = "C6 (M1+M3)"
-        elif "C8" in display_lbl:
-            display_lbl = "C8 (M2+M3)"
+        display_lbl = _get_friendly_name_pr(lbl)
 
         is_par = idx in pareto_idx_set
         ax.text(
@@ -1575,7 +1568,7 @@ def plot_cost_breakdown(
     ax.set_title(f"Operational Cost Micro-Phase Breakdown (per 1,000 Queries){title_suffix}", fontweight="bold")
     ax.set_xticks(x)
 
-    display_labels = [c.replace("run_", "").replace("_", " ") for c in configs]
+    display_labels = [_get_friendly_name_pr(c) for c in configs]
     ax.set_xticklabels(display_labels, rotation=45, ha="right", fontsize=9)
 
     ax.set_ylim(0, max(max_tot * 1.35, 0.01))

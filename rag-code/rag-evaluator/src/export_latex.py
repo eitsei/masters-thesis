@@ -70,7 +70,7 @@ def export_benchmark_summary_latex(
         f"\\label{{{label}}}",
         "\\begin{tabular*}{\\linewidth}{@{\\extracolsep{\\fill}} l r r r r r r r r r r r r @{}}",
         "\\toprule",
-        "\\textbf{Configuration} & \\textbf{$N$} & \\textbf{$P_{50}$} & \\textbf{$P_{95}$} & \\textbf{Tokens} & \\textbf{Cost (\\$)} & \\textbf{EM} & \\textbf{F1} & \\textbf{Faith} & \\textbf{AR} & \\textbf{CP} & \\textbf{CR} & \\textbf{Comp $Q$} \\\\",
+        "\\textbf{Pipeline} & \\textbf{$N$} & \\textbf{$P_{50}$} & \\textbf{$P_{95}$} & \\textbf{Tokens} & \\textbf{Cost (\\$)} & \\textbf{EM} & \\textbf{F1} & \\textbf{Faith} & \\textbf{AR} & \\textbf{CP} & \\textbf{CR} & \\textbf{Comp $Q$} \\\\",
         " & & \\scriptsize{(ms)} & \\scriptsize{(ms)} & \\scriptsize{avg} & \\scriptsize{per 1k q} & \\scriptsize{(\\%)} & \\scriptsize{(\\%)} & & & & & \\scriptsize{$[0,1]$} \\\\",
         "\\midrule",
     ]
@@ -80,7 +80,8 @@ def export_benchmark_summary_latex(
         if not s:
             continue
 
-        escaped_name = _escape_latex(name) if not name.startswith("$") else name
+        cid_tex, pipe_name, _ = _resolve_config_info(name)
+        escaped_name = pipe_name if pipe_name != name else (_escape_latex(name) if not name.startswith("$") else name)
         em_pct = s["em_mean"] * 100.0
         f1_pct = s["f1_mean"] * 100.0
 
@@ -325,7 +326,7 @@ def export_wilcoxon_tests_latex(
             "\\end{tabular*}",
             "\\vspace{0.5em}",
             "\\parbox{\\textwidth}{\\footnotesize",
-            "\\textbf{Notes:} $\\tilde{\\mu}_\\Delta$ represents the median paired difference ($C_k - C_0$). Two-tailed Wilcoxon signed-rank test evaluated at $\\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\\text{adj}}$). Significance flags: $^{***}\\,p < 0.001$, $^{**}\\,p < 0.01$, $^{*}\\,p < 0.05$, $\\text{ns}\\,p \\ge 0.05$.}",
+            "\\textbf{Notes:} $\\tilde{\\mu}_\\Delta$ represents the median paired difference relative to the naive baseline. Two-tailed Wilcoxon signed-rank test evaluated at $\\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\\text{adj}}$). Significance flags: $^{***}\\,p < 0.001$, $^{**}\\,p < 0.01$, $^{*}\\,p < 0.05$, $\\text{ns}\\,p \\ge 0.05$.}",
             "\\end{table*}",
             "",
         ]
@@ -340,7 +341,7 @@ def export_wilcoxon_rq1_latency_latex(
     comparisons: Sequence[WilcoxonComparison],
     output_path: Path | str = "thesis/tables/wilcoxon_rq1_latency.tex",
     label: str = "tab:wilcoxon_rq1",
-    caption: str = "Paired Wilcoxon signed-rank test results for end-to-end latency (RQ1) against baseline ($C_0$).",
+    caption: str = "Paired Wilcoxon signed-rank test results for end-to-end latency (RQ1) against the naive baseline.",
 ) -> str:
     """Exports RQ1 Latency Wilcoxon signed-rank tests matching thesis publication formatting."""
     target_path = Path(output_path)
@@ -394,7 +395,7 @@ def export_wilcoxon_rq1_latency_latex(
             "\\end{tabular*}",
             "\\vspace{0.5em}",
             "\\parbox{\\textwidth}{\\footnotesize",
-            "\\textbf{Notes:} $\\tilde{\\mu}_\\Delta$ represents the median paired difference ($C_k - C_0$). Two-tailed Wilcoxon signed-rank test evaluated at $\\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\\text{adj}}$). Significance flags: $^{***}\\,p < 0.001$, $^{**}\\,p < 0.01$, $^{*}\\,p < 0.05$, $\\text{ns}\\,p \\ge 0.05$.}",
+            "\\textbf{Notes:} $\\tilde{\\mu}_\\Delta$ represents the median paired difference relative to the naive baseline. Two-tailed Wilcoxon signed-rank test evaluated at $\\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\\text{adj}}$). Significance flags: $^{***}\\,p < 0.001$, $^{**}\\,p < 0.01$, $^{*}\\,p < 0.05$, $\\text{ns}\\,p \\ge 0.05$.}",
             "\\end{table}",
             "",
         ]
@@ -409,7 +410,7 @@ def export_wilcoxon_rq1_ttft_latex(
     comparisons: Sequence[WilcoxonComparison],
     output_path: Path | str = "thesis/tables/wilcoxon_rq1_ttft.tex",
     label: str = "tab:wilcoxon_rq1_ttft",
-    caption: str = "Paired Wilcoxon signed-rank test results for Time to First Token (RQ1) against baseline ($C_0$).",
+    caption: str = "Paired Wilcoxon signed-rank test results for Time to First Token (RQ1) against the naive baseline.",
 ) -> str:
     """Exports RQ1 TTFT Wilcoxon signed-rank tests matching thesis publication formatting."""
     target_path = Path(output_path)
@@ -471,7 +472,7 @@ def export_wilcoxon_rq1_ttft_latex(
             "\\end{tabular*}",
             "\\vspace{0.5em}",
             "\\parbox{\\textwidth}{\\footnotesize",
-            "\\textbf{Notes:} $\\tilde{\\mu}_\\Delta$ represents the median paired difference ($C_k - C_0$). Two-tailed Wilcoxon signed-rank test evaluated at $\\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\\text{adj}}$). Significance flags: $^{***}\\,p < 0.001$, $^{**}\\,p < 0.01$, $^{*}\\,p < 0.05$, $\\text{ns}\\,p \\ge 0.05$.}",
+            "\\textbf{Notes:} $\\tilde{\\mu}_\\Delta$ represents the median paired difference relative to the naive baseline. Two-tailed Wilcoxon signed-rank test evaluated at $\\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\\text{adj}}$). Significance flags: $^{***}\\,p < 0.001$, $^{**}\\,p < 0.01$, $^{*}\\,p < 0.05$, $\\text{ns}\\,p \\ge 0.05$.}",
             "\\end{table}",
             "",
         ]
@@ -486,7 +487,7 @@ def export_wilcoxon_rq2_cost_latex(
     comparisons: Sequence[WilcoxonComparison],
     output_path: Path | str = "thesis/tables/wilcoxon_rq2_cost.tex",
     label: str = "tab:wilcoxon_rq2",
-    caption: str = "Paired Wilcoxon signed-rank test results for operational cost (RQ2) against baseline ($C_0$).",
+    caption: str = "Paired Wilcoxon signed-rank test results for operational cost (RQ2) against the naive baseline.",
 ) -> str:
     """Exports RQ2 Cost Wilcoxon signed-rank tests matching thesis publication formatting."""
     target_path = Path(output_path)
@@ -540,7 +541,7 @@ def export_wilcoxon_rq2_cost_latex(
             "\\end{tabular*}",
             "\\vspace{0.5em}",
             "\\parbox{\\textwidth}{\\footnotesize",
-            "\\textbf{Notes:} $\\tilde{\\mu}_\\Delta$ represents the median paired difference ($C_k - C_0$). Two-tailed Wilcoxon signed-rank test evaluated at $\\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\\text{adj}}$). Significance flags: $^{***}\\,p < 0.001$, $^{**}\\,p < 0.01$, $^{*}\\,p < 0.05$, $\\text{ns}\\,p \\ge 0.05$.}",
+            "\\textbf{Notes:} $\\tilde{\\mu}_\\Delta$ represents the median paired difference relative to the naive baseline. Two-tailed Wilcoxon signed-rank test evaluated at $\\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\\text{adj}}$). Significance flags: $^{***}\\,p < 0.001$, $^{**}\\,p < 0.01$, $^{*}\\,p < 0.05$, $\\text{ns}\\,p \\ge 0.05$.}",
             "\\end{table}",
             "",
         ]
@@ -555,7 +556,7 @@ def export_wilcoxon_rq3_quality_latex(
     comparisons: Sequence[WilcoxonComparison],
     output_path: Path | str = "thesis/tables/wilcoxon_rq3_quality.tex",
     label: str = "tab:wilcoxon_rq3",
-    caption: str = "Paired Wilcoxon signed-rank test results for response quality metrics (RQ3) against baseline ($C_0$).",
+    caption: str = "Paired Wilcoxon signed-rank test results for response quality metrics (RQ3) against the naive baseline.",
 ) -> str:
     """Exports RQ3 Quality Wilcoxon signed-rank tests matching thesis publication formatting."""
     target_path = Path(output_path)
@@ -616,7 +617,7 @@ def export_wilcoxon_rq3_quality_latex(
             "\\end{tabular*}",
             "\\vspace{0.5em}",
             "\\parbox{\\textwidth}{\\footnotesize",
-            "\\textbf{Notes:} $\\tilde{\\mu}_\\Delta$ represents the median paired difference ($C_k - C_0$). Two-tailed Wilcoxon signed-rank test evaluated at $\\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\\text{adj}}$). Significance flags: $^{***}\\,p < 0.001$, $^{**}\\,p < 0.01$, $^{*}\\,p < 0.05$, $\\text{ns}\\,p \\ge 0.05$.}",
+            "\\textbf{Notes:} $\\tilde{\\mu}_\\Delta$ represents the median paired difference relative to the naive baseline. Two-tailed Wilcoxon signed-rank test evaluated at $\\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\\text{adj}}$). Significance flags: $^{***}\\,p < 0.001$, $^{**}\\,p < 0.01$, $^{*}\\,p < 0.05$, $\\text{ns}\\,p \\ge 0.05$.}",
             "\\end{table}",
             "",
         ]
@@ -658,7 +659,7 @@ CONFIG_METADATA: dict[str, tuple[str, str, int]] = {
     "C12": ("C_{12}", "S2B + SR + MC", 3),
     "C13": ("C_{13}", "S2B + PC + MC", 3),
     "C14": ("C_{14}", "SR + PC + MC", 3),
-    "C15": ("C_{15}", "S2B + SR + PC + MC (Full-Stack)", 4),
+    "C15": ("C_{15}", "S2B + SR + PC + MC", 4),
 }
 
 
@@ -699,7 +700,7 @@ def export_quality_enterprise_latex(
 
     n_samples = int(next(iter(summaries.values()))["count"]) if summaries and next(iter(summaries.values())) else 100
     if caption is None or "$N = 100$" in caption:
-        caption = f"Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline configurations on the Enterprise Knowledge Corpus ($N = {n_samples}$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$)."
+        caption = f"Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline architectures on the Enterprise Knowledge Corpus ($N = {n_samples}$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline."
 
     best_q = max((s["composite_q_mean"] for s in summaries.values() if s), default=0.0)
 
@@ -710,9 +711,9 @@ def export_quality_enterprise_latex(
         r"\setlength{\tabcolsep}{2.2pt}",
         f"\\caption{{{caption}}}",
         f"\\label{{{label}}}",
-        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c c c @{}}",
+        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c c c @{}}",
         r"\toprule",
-        r"\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Refusal Acc. /}\\\textbf{FRR (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\",
+        r"\textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Refusal Acc. /}\\\textbf{FRR (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\",
         r"\midrule",
     ]
 
@@ -726,16 +727,16 @@ def export_quality_enterprise_latex(
         if tier_group != current_tier:
             current_tier = tier_group
             if tier_group == 0:
-                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Baseline ($k=0$)}} \\")
+                latex_lines.append(r"\multicolumn{7}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\")
             elif tier_group == 1:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
+                latex_lines.append(r"\multicolumn{7}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
             elif tier_group == 2:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\")
+                latex_lines.append(r"\multicolumn{7}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\")
             elif tier_group == 3:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\")
+                latex_lines.append(r"\multicolumn{7}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\")
 
         q_val = s["composite_q_mean"]
         q_fmt = f"{q_val:.4f}"
@@ -759,7 +760,7 @@ def export_quality_enterprise_latex(
         ref_cell = f"{ref_acc_str} / {frr_str}"
 
         row = (
-            f"${cid_tex}$ & {pipe_name} & "
+            f"{pipe_name} & "
             f"{s['context_precision_mean']:.3f} & "
             f"{s['context_recall_mean']:.3f} & "
             f"{s['faithfulness_mean']:.3f} & "
@@ -775,7 +776,7 @@ def export_quality_enterprise_latex(
             r"\end{tabular*}",
             r"\vspace{0.5em}",
             r"\parbox{\linewidth}{\footnotesize",
-            r"\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Refusal Accuracy evaluates correct abstention on unanswerable out-of-domain (OOD) queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
+            r"\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Refusal Accuracy evaluates correct abstention on unanswerable out-of-domain (OOD) queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
             r"\end{table}",
             "",
         ]
@@ -821,9 +822,9 @@ def export_latency_latex(
 
     if caption is None:
         caption = (
-            f"End-to-end execution latency and Time-to-First-Token (TTFT) across 16 pipeline configurations "
+            f"End-to-end execution latency and Time-to-First-Token (TTFT) across 16 pipeline architectures "
             f"on {dataset_name}. Statistical significance flags denote Holm-Bonferroni-adjusted paired "
-            f"Wilcoxon signed-rank tests against the naive baseline ($C_0$)."
+            f"Wilcoxon signed-rank tests against the naive baseline."
         )
 
     latex_lines = [
@@ -833,9 +834,9 @@ def export_latency_latex(
         r"\setlength{\tabcolsep}{3.5pt}",
         f"\\caption{{{caption}}}",
         f"\\label{{{label}}}",
-        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l r r r r r @{}}",
+        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l r r r r r @{}}",
         r"\toprule",
-        r"\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{TTFT $P_{50}$}\\\scriptsize{(ms)}} & \makecell{\textbf{TTFT $P_{95}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$T_{\text{total}} P_{95}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$\Delta T_{\text{total}}$}\\\scriptsize{(\%)}} \\",
+        r"\textbf{Pipeline} & \makecell{\textbf{TTFT $P_{50}$}\\\scriptsize{(ms)}} & \makecell{\textbf{TTFT $P_{95}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$T_{\text{total}} P_{95}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$\Delta T_{\text{total}}$}\\\scriptsize{(\%)}} \\",
         r"\midrule",
     ]
 
@@ -850,16 +851,16 @@ def export_latency_latex(
         if tier_group != current_tier:
             current_tier = tier_group
             if tier_group == 0:
-                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Baseline ($k=0$)}} \\")
+                latex_lines.append(r"\multicolumn{6}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\")
             elif tier_group == 1:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
+                latex_lines.append(r"\multicolumn{6}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
             elif tier_group == 2:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\")
+                latex_lines.append(r"\multicolumn{6}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\")
             elif tier_group == 3:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\")
+                latex_lines.append(r"\multicolumn{6}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\")
 
         ttfts = _extract_metric_values(recs, "ttft_ms")
         ttft_stats = compute_latency_percentiles(ttfts)
@@ -887,7 +888,7 @@ def export_latency_latex(
                 delta_str += f"\\textsuperscript{{{sig}}}"
 
         row = (
-            f"${cid_tex}$ & {pipe_name} & "
+            f"{pipe_name} & "
             f"{ttft_p50:.1f} & "
             f"{ttft_p95:.1f} & "
             f"{tot_p50:.1f} & "
@@ -909,8 +910,8 @@ def export_latency_latex(
             r"\parbox{\linewidth}{\footnotesize",
             f"\\textbf{{Notes:}} $P_{{50}}$ and $P_{{95}}$ denote median and 95th percentile execution latencies. "
             f"TTFT denotes Time-to-First-Token.{ttft_note} "
-            f"$\\Delta T_{{\\text{{total}}}}$ reflects percentage change in median latency relative to baseline ($C_0$). "
-            f"Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{{*}} p < 0.05$, $^{{**}} p < 0.01$, $^{{***}} p < 0.001$, $\\mathrm{{ns}} = p \\ge 0.05$).}}",
+            f"$\\Delta T_{{\\text{{total}}}}$ reflects percentage change in median latency relative to the naive baseline. "
+            f"Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{{*}} p < 0.05$, $^{{**}} p < 0.01$, $^{{***}} p < 0.001$, $\\mathrm{{ns}} = p \\ge 0.05$).}}",
             r"\end{table}",
             "",
         ]
@@ -949,8 +950,8 @@ def export_cost_latex(
 
     if caption is None:
         caption = (
-            f"Operational cost and token consumption breakdown across 16 pipeline configurations on {dataset_name}. "
-            f"Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$)."
+            f"Operational cost and token consumption breakdown across 16 pipeline architectures on {dataset_name}. "
+            f"Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline."
         )
 
     latex_lines = [
@@ -960,9 +961,9 @@ def export_cost_latex(
         r"\setlength{\tabcolsep}{3.5pt}",
         f"\\caption{{{caption}}}",
         f"\\label{{{label}}}",
-        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l r r r r r @{}}",
+        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l r r r r r @{}}",
         r"\toprule",
-        r"\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Uncached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Cached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Output}\\\textbf{Tokens}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$\Delta$ Cost}\\\scriptsize{(\%)}} \\",
+        r"\textbf{Pipeline} & \makecell{\textbf{Uncached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Cached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Output}\\\textbf{Tokens}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$\Delta$ Cost}\\\scriptsize{(\%)}} \\",
         r"\midrule",
     ]
 
@@ -977,16 +978,16 @@ def export_cost_latex(
         if tier_group != current_tier:
             current_tier = tier_group
             if tier_group == 0:
-                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Baseline ($k=0$)}} \\")
+                latex_lines.append(r"\multicolumn{6}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\")
             elif tier_group == 1:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
+                latex_lines.append(r"\multicolumn{6}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
             elif tier_group == 2:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\")
+                latex_lines.append(r"\multicolumn{6}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\")
             elif tier_group == 3:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{7}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\")
+                latex_lines.append(r"\multicolumn{6}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\")
 
         uncached_list = []
         cached_list = []
@@ -1025,7 +1026,7 @@ def export_cost_latex(
                 delta_str += f"\\textsuperscript{{{sig}}}"
 
         row = (
-            f"${cid_tex}$ & {pipe_name} & "
+            f"{pipe_name} & "
             f"{mean_uncached:,.0f} & "
             f"{mean_cached:,.0f} & "
             f"{mean_out:,.0f} & "
@@ -1040,7 +1041,7 @@ def export_cost_latex(
             r"\end{tabular*}",
             r"\vspace{0.5em}",
             r"\parbox{\linewidth}{\footnotesize",
-            r"\textbf{Notes:} Prompt and completion tokens represent query sample averages. If cached prompt tokens are reported ($N_{\text{cached}} > 0$), uncached prompt tokens are computed as $\max(0, N_{\text{prompt}} - N_{\text{cached}})$. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. $\Delta\text{Cost}$ reflects percentage change relative to baseline ($C_0$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
+            r"\textbf{Notes:} Prompt and completion tokens represent query sample averages. If cached prompt tokens are reported ($N_{\text{cached}} > 0$), uncached prompt tokens are computed as $\max(0, N_{\text{prompt}} - N_{\text{cached}})$. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. $\Delta\text{Cost}$ reflects percentage change relative to the naive baseline. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
             r"\end{table}",
             "",
         ]
@@ -1076,9 +1077,9 @@ def export_quality_musique_latex(
     n_samples = int(next(iter(summaries.values()))["count"]) if summaries and next(iter(summaries.values())) else 0
     if caption is None:
         caption = (
-            f"Retrieval, generation, and multi-hop reasoning quality metrics across 16 pipeline configurations "
+            f"Retrieval, generation, and multi-hop reasoning quality metrics across 16 pipeline architectures "
             f"on the {dataset_name} benchmark ($N = {n_samples}$). Statistical significance flags denote "
-            f"Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$)."
+            f"Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline."
         )
 
     best_q = max((s["composite_q_mean"] for s in summaries.values() if s), default=0.0)
@@ -1087,12 +1088,12 @@ def export_quality_musique_latex(
         r"\begin{table}[htbp]",
         r"\centering",
         r"\scriptsize",
-        r"\setlength{\tabcolsep}{2.2pt}",
+        r"\setlength{\tabcolsep}{1.2pt}",
         f"\\caption{{{caption}}}",
         f"\\label{{{label}}}",
-        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c c c c @{}}",
+        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c c c c @{}}",
         r"\toprule",
-        r"\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Token}\\\textbf{F1 (\%)}} & \makecell{\textbf{Exact}\\\textbf{Match (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\",
+        r"\textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Token}\\\textbf{F1 (\%)}} & \makecell{\textbf{Exact}\\\textbf{Match (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\",
         r"\midrule",
     ]
 
@@ -1106,16 +1107,16 @@ def export_quality_musique_latex(
         if tier_group != current_tier:
             current_tier = tier_group
             if tier_group == 0:
-                latex_lines.append(r"\multicolumn{9}{l}{\textbf{Baseline ($k=0$)}} \\")
+                latex_lines.append(r"\multicolumn{8}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\")
             elif tier_group == 1:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{9}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
+                latex_lines.append(r"\multicolumn{8}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
             elif tier_group == 2:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{9}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\")
+                latex_lines.append(r"\multicolumn{8}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\")
             elif tier_group == 3:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{9}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\")
+                latex_lines.append(r"\multicolumn{8}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\")
 
         q_val = s["composite_q_mean"]
         q_fmt = f"{q_val:.4f}"
@@ -1134,7 +1135,7 @@ def export_quality_musique_latex(
             q_str += f"\\textsuperscript{{{sig}}}"
 
         row = (
-            f"${cid_tex}$ & {pipe_name} & "
+            f"{pipe_name} & "
             f"{s['context_precision_mean']:.3f} & "
             f"{s['context_recall_mean']:.3f} & "
             f"{s['faithfulness_mean']:.3f} & "
@@ -1151,7 +1152,7 @@ def export_quality_musique_latex(
             r"\end{tabular*}",
             r"\vspace{0.5em}",
             r"\parbox{\linewidth}{\footnotesize",
-            r"\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Token F1 and Exact Match evaluate lexical overlap against reference answers. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Highest composite quality score is highlighted in bold. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
+            r"\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Token F1 and Exact Match evaluate lexical overlap against reference answers. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Highest composite quality score is highlighted in bold. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
             r"\end{table}",
             "",
         ]
@@ -1204,7 +1205,7 @@ def export_pareto_latex(
     if caption is None:
         caption = (
             f"Multi-objective Pareto efficiency and 3D non-domination trade-off metrics across "
-            f"16 pipeline configurations on {dataset_name}."
+            f"16 pipeline architectures on {dataset_name}."
         )
 
     latex_lines = [
@@ -1214,9 +1215,9 @@ def export_pareto_latex(
         r"\setlength{\tabcolsep}{3.5pt}",
         f"\\caption{{{caption}}}",
         f"\\label{{{label}}}",
-        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c r r r r c @{}}",
+        r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c r r r r c @{}}",
         r"\toprule",
-        r"\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(s)}} & \textbf{QPD} & \textbf{QPS} & \makecell{\textbf{Pareto}\\\textbf{Optimal}} \\",
+        r"\textbf{Pipeline} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(s)}} & \textbf{QPD} & \textbf{QPS} & \makecell{\textbf{Pareto}\\\textbf{Optimal}} \\",
         r"\midrule",
     ]
 
@@ -1230,16 +1231,16 @@ def export_pareto_latex(
         if tier_group != current_tier:
             current_tier = tier_group
             if tier_group == 0:
-                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Baseline ($k=0$)}} \\")
+                latex_lines.append(r"\multicolumn{7}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\")
             elif tier_group == 1:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
+                latex_lines.append(r"\multicolumn{7}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\")
             elif tier_group == 2:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\")
+                latex_lines.append(r"\multicolumn{7}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\")
             elif tier_group == 3:
                 latex_lines.append(r"\midrule")
-                latex_lines.append(r"\multicolumn{8}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\")
+                latex_lines.append(r"\multicolumn{7}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\")
 
         q_val = s["composite_q_mean"]
         cost_1k = s["cost_mean"] * 1000.0
@@ -1253,7 +1254,7 @@ def export_pareto_latex(
         qps_str = f"{qps:.2f}"
 
         row = (
-            f"${cid_tex}$ & {pipe_name} & "
+            f"{pipe_name} & "
             f"{q_val:.4f} & "
             f"\\${cost_1k:.3f} & "
             f"{lat_s:.2f} & "

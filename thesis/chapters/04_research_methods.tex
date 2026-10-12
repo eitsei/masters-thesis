@@ -10,6 +10,7 @@ The empirical research is conducted using quantitative benchmarking following a 
 \centering
 \caption[Full factorial experimental design matrix]{Full factorial experimental design matrix ($2^4 = 16$ configurations) across the two-stage benchmarking framework.}
 \label{tab:combination_matrix}
+\setlength{\tabcolsep}{4.0pt}
 \begin{tabular}{l l c c c c}
 \toprule
 \textbf{Config} & \textbf{Pipeline Composition} & \textbf{$M_1$: S2B} &\textbf{$M_2$: SR} & \textbf{$M_3$: PC} &
@@ -38,13 +39,13 @@ The empirical research is conducted using quantitative benchmarking following a 
     $C_{13}$ & S2B + PC + MC                  & \checkmark   & --          &\checkmark  & \checkmark  \\
     $C_{14}$ & SR + PC + MC                   & --           & \checkmark  &\checkmark  & \checkmark  \\
 \midrule
-\multicolumn{6}{l}{\textbf{Stage 2: Full-Stack Integration ($k=4$)}} \\
-    $C_{15}$ & S2B + SR + PC + MC (Full-Stack)& \checkmark   & \checkmark  &\checkmark  & \checkmark  \\
+\multicolumn{6}{l}{\textbf{Stage 2: 4-Module Integration ($k=4$)}} \\
+    $C_{15}$ & S2B + SR + PC + MC             & \checkmark   & \checkmark  &\checkmark  & \checkmark  \\
 \bottomrule
 \end{tabular}
 
 \vspace{0.75em}
-\parbox{0.88\textwidth}{\footnotesize
+\parbox{\linewidth}{\footnotesize
 \textbf{Notes:}
 $M_1$: Small-to-Big Retrieval (S2B); $M_2$: Semantic Re-ranking (SR); $M_3$: Prompt Caching (PC); $M_4$: Model Cascading (MC). Checkmarks (\checkmark) denote active optimization components in the pipeline.}
 \end{table}
@@ -56,7 +57,7 @@ Tests are conducted independently across each evaluation metric using a two-tail
 \begin{table}[!htbp]
 \centering
 \small
-\caption{Two-tailed hypothesis formulations mapped to the research questions ($C_k$ vs. $C_0$).}
+\caption{Two-tailed hypothesis formulations mapped to the research questions (treatment pipelines vs. naive baseline).}
 \label{tab:wilcoxon_hypotheses}
 \begin{tabularx}{\textwidth}{l l X X}
 \toprule
@@ -72,7 +73,7 @@ Tests are conducted independently across each evaluation metric using a two-tail
 
 \vspace{0.5em}
 \parbox{\linewidth}{\footnotesize
-\textbf{Notes:} $\tilde{\mu}_{\Delta}$ represents the median paired difference between configuration $C_k$ and the naive baseline $C_0$. Tests are evaluated at significance level $\alpha = 0.05$.}
+\textbf{Notes:} $\tilde{\mu}_{\Delta}$ represents the median paired difference between a treatment pipeline and the naive baseline. Tests are evaluated at significance level $\alpha = 0.05$.}
 \end{table}
 
 \subsection{System Implementation and Models}

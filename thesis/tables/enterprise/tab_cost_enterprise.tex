@@ -2,38 +2,38 @@
 \centering
 \small
 \setlength{\tabcolsep}{3.5pt}
-\caption{Operational cost and token consumption breakdown across 16 pipeline configurations on Enterprise. Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$).}
+\caption{Operational cost and token consumption breakdown across 16 pipeline architectures on Enterprise. Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline.}
 \label{tab:cost_enterprise_raw}
-\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l r r r r r @{}}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l r r r r r @{}}
 \toprule
-\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Uncached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Cached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Output}\\\textbf{Tokens}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$\Delta$ Cost}\\\scriptsize{(\%)}} \\
+\textbf{Pipeline} & \makecell{\textbf{Uncached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Cached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Output}\\\textbf{Tokens}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$\Delta$ Cost}\\\scriptsize{(\%)}} \\
 \midrule
-\multicolumn{7}{l}{\textbf{Baseline ($k=0$)}} \\
-$C_{0}$ & Naive RAG Baseline & 5,646 & 812 & 218 & \$5.662 & -- \\
+\multicolumn{6}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
+Naive RAG Baseline & 5,646 & 812 & 218 & \$5.662 & -- \\
 \midrule
-\multicolumn{7}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-$C_{1}$ & S2B & 7,525 & 0 & 190 & \$6.355 & +12.2\%\textsuperscript{ns} \\
-$C_{2}$ & SR & 5,852 & 0 & 168 & \$10.020 & +77.0\%\textsuperscript{*} \\
-$C_{3}$ & PC & 33 & 0 & 584 & \$6.817 & +20.4\%\textsuperscript{*} \\
-$C_{4}$ & MC & 6,458 & 0 & 163 & \$3.887 & -31.3\%\textsuperscript{ns} \\
+\multicolumn{6}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
+S2B & 7,525 & 0 & 190 & \$6.355 & +12.2\%\textsuperscript{ns} \\
+SR & 5,852 & 0 & 168 & \$10.020 & +77.0\%\textsuperscript{*} \\
+PC & 33 & 0 & 584 & \$6.817 & +20.4\%\textsuperscript{*} \\
+MC & 6,458 & 0 & 163 & \$3.887 & -31.3\%\textsuperscript{ns} \\
 \midrule
-\multicolumn{7}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\
-$C_{5}$ & S2B + SR & 7,895 & 0 & 226 & \$11.771 & +107.9\%\textsuperscript{*} \\
-$C_{6}$ & S2B + PC & 28 & 0 & 428 & \$7.027 & +24.1\%\textsuperscript{ns} \\
-$C_{7}$ & S2B + MC & 7,525 & 0 & 173 & \$5.005 & -11.6\%\textsuperscript{ns} \\
-$C_{8}$ & SR + PC & 26 & 0 & 380 & \$11.073 & +95.6\%\textsuperscript{*} \\
-$C_{9}$ & SR + MC & 5,457 & 392 & 141 & \$8.436 & +49.0\%\textsuperscript{ns} \\
-$C_{10}$ & PC + MC & 24 & 0 & 323 & \$4.488 & -20.7\%\textsuperscript{ns} \\
+\multicolumn{6}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
+S2B + SR & 7,895 & 0 & 226 & \$11.771 & +107.9\%\textsuperscript{*} \\
+S2B + PC & 28 & 0 & 428 & \$7.027 & +24.1\%\textsuperscript{ns} \\
+S2B + MC & 7,525 & 0 & 173 & \$5.005 & -11.6\%\textsuperscript{ns} \\
+SR + PC & 26 & 0 & 380 & \$11.073 & +95.6\%\textsuperscript{*} \\
+SR + MC & 5,457 & 392 & 141 & \$8.436 & +49.0\%\textsuperscript{ns} \\
+PC + MC & 24 & 0 & 323 & \$4.488 & -20.7\%\textsuperscript{ns} \\
 \midrule
-\multicolumn{7}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\
-$C_{11}$ & S2B + SR + PC & 23 & 0 & 396 & \$12.181 & +115.1\%\textsuperscript{*} \\
-$C_{12}$ & S2B + SR + MC & 7,081 & 814 & 160 & \$9.638 & +70.2\%\textsuperscript{ns} \\
-$C_{13}$ & S2B + PC + MC & 28 & 0 & 463 & \$5.070 & -10.5\%\textsuperscript{ns} \\
-$C_{14}$ & SR + PC + MC & 26 & 0 & 477 & \$9.698 & +71.3\%\textsuperscript{ns} \\
-$C_{15}$ & S2B + SR + PC + MC (Full-Stack) & 23 & 0 & 440 & \$8.605 & +52.0\%\textsuperscript{ns} \\
+\multicolumn{6}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
+S2B + SR + PC & 23 & 0 & 396 & \$12.181 & +115.1\%\textsuperscript{*} \\
+S2B + SR + MC & 7,081 & 814 & 160 & \$9.638 & +70.2\%\textsuperscript{ns} \\
+S2B + PC + MC & 28 & 0 & 463 & \$5.070 & -10.5\%\textsuperscript{ns} \\
+SR + PC + MC & 26 & 0 & 477 & \$9.698 & +71.3\%\textsuperscript{ns} \\
+S2B + SR + PC + MC & 23 & 0 & 440 & \$8.605 & +52.0\%\textsuperscript{ns} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
 \parbox{\linewidth}{\footnotesize
-\textbf{Notes:} Prompt and completion tokens represent query sample averages. If cached prompt tokens are reported ($N_{\text{cached}} > 0$), uncached prompt tokens are computed as $\max(0, N_{\text{prompt}} - N_{\text{cached}})$. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. $\Delta\text{Cost}$ reflects percentage change relative to baseline ($C_0$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
+\textbf{Notes:} Prompt and completion tokens represent query sample averages. If cached prompt tokens are reported ($N_{\text{cached}} > 0$), uncached prompt tokens are computed as $\max(0, N_{\text{prompt}} - N_{\text{cached}})$. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. $\Delta\text{Cost}$ reflects percentage change relative to the naive baseline. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
 \end{table}

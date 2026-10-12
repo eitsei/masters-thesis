@@ -63,7 +63,7 @@
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\linewidth]{figures/musique/quality_lollipop_musique.pdf}
-\caption{Multi-dimensional response quality profiles across architectural configurations on the academic multi-hop benchmark (MuSiQue), comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy across architectural tiers ($C_0$--$C_{15}$). Horizontal lollipop plots with tier-stratified background shading isolate configuration-level variations across retrieval and synthesis dimensions.}
+\caption{Multi-dimensional response quality profiles across architectural configurations on the academic multi-hop benchmark (MuSiQue), comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy across architectural tiers ($k=0 \dots 4$). Horizontal lollipop plots with tier-stratified background shading isolate configuration-level variations across retrieval and synthesis dimensions.}
 \label{fig:quality_lollipop_musique}
 \end{figure}
 
@@ -75,7 +75,7 @@
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\linewidth]{figures/enterprise_closed/quality_lollipop_enterprise_closed.pdf}
-\caption{Multi-dimensional response quality profiles across architectural configurations on the enterprise closed benchmark corpus, comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy across architectural tiers ($C_0$--$C_{15}$). Horizontal lollipop plots with tier-stratified background shading isolate configuration-level variations across retrieval and synthesis dimensions.}
+\caption{Multi-dimensional response quality profiles across architectural configurations on the enterprise closed benchmark corpus, comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy across architectural tiers ($k=0 \dots 4$). Horizontal lollipop plots with tier-stratified background shading isolate configuration-level variations across retrieval and synthesis dimensions.}
 \label{fig:quality_lollipop_enterprise}
 \end{figure}
 
@@ -109,19 +109,19 @@
 \subsection{Executive Performance Delta Synthesis}
 \label{subsec:results_delta_heatmap}
 
-To provide a consolidated cross-dimensional view of all 15 architectural optimization treatments ($C_1$--$C_{15}$) relative to the unoptimized naive baseline ($C_0$), Figure~\ref{fig:quality_delta_matrix_musique} and Figure~\ref{fig:quality_delta_matrix_enterprise} visualize relative percentage improvements (green) and regressions (red) across all four RAGAS quality dimensions, Composite Quality ($Q$), median end-to-end latency ($P_{50}$), and operational expenditure per 1,000 queries.
+To provide a consolidated cross-dimensional view of all 15 architectural optimization treatments relative to the unoptimized naive baseline, Figure~\ref{fig:quality_delta_matrix_musique} and Figure~\ref{fig:quality_delta_matrix_enterprise} visualize relative percentage improvements (green) and regressions (red) across all four RAGAS quality dimensions, Composite Quality ($Q$), median end-to-end latency ($P_{50}$), and operational expenditure per 1,000 queries.
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\linewidth]{figures/musique/quality_delta_matrix_musique.pdf}
-\caption{Executive performance delta heatmap relative to the naive baseline ($C_0$) on the academic multi-hop benchmark (MuSiQue). Cells display absolute metrics alongside relative percentage changes ($\pm\%$). Diverging color gradient highlights performance improvements (green) versus cost/latency regressions (red).}
+\caption{Executive performance delta heatmap relative to the naive baseline on the academic multi-hop benchmark (MuSiQue). Cells display absolute metrics alongside relative percentage changes ($\pm\%$). Diverging color gradient highlights performance improvements (green) versus cost/latency regressions (red).}
 \label{fig:quality_delta_matrix_musique}
 \end{figure}
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\linewidth]{figures/enterprise_closed/quality_delta_matrix_enterprise_closed.pdf}
-\caption{Executive performance delta heatmap relative to the naive baseline ($C_0$) on the enterprise closed benchmark corpus. Cells display absolute metrics alongside relative percentage changes ($\pm\%$). Diverging color gradient highlights performance improvements (green) versus cost/latency regressions (red).}
+\caption{Executive performance delta heatmap relative to the naive baseline on the enterprise closed benchmark corpus. Cells display absolute metrics alongside relative percentage changes ($\pm\%$). Diverging color gradient highlights performance improvements (green) versus cost/latency regressions (red).}
 \label{fig:quality_delta_matrix_enterprise}
 \end{figure}
 

@@ -2,38 +2,38 @@
 \centering
 \scriptsize
 \setlength{\tabcolsep}{2.2pt}
-\caption{Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline configurations on the Enterprise Knowledge Corpus ($N = 10$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline ($C_0$).}
+\caption{Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline architectures on the Enterprise Knowledge Corpus ($N = 10$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline.}
 \label{tab:quality_enterprise_raw}
-\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c c c @{}}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c c c @{}}
 \toprule
-\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Refusal Acc. /}\\\textbf{FRR (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\
+\textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Refusal Acc. /}\\\textbf{FRR (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\
 \midrule
-\multicolumn{8}{l}{\textbf{Baseline ($k=0$)}} \\
-$C_{0}$ & Naive RAG Baseline & 0.833 & 0.938 & 0.915 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004} \\
+\multicolumn{7}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
+Naive RAG Baseline & 0.833 & 0.938 & 0.915 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004} \\
 \midrule
-\multicolumn{8}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-$C_{1}$ & S2B & 0.955 & 0.875 & 0.953 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
-$C_{2}$ & SR & 0.869 & 0.938 & 0.975 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
-$C_{3}$ & PC & 0.854 & 0.938 & 0.492 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
-$C_{4}$ & MC & 0.854 & 0.938 & 0.894 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+\multicolumn{7}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
+S2B & 0.955 & 0.875 & 0.953 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+SR & 0.869 & 0.938 & 0.975 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+PC & 0.854 & 0.938 & 0.492 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+MC & 0.854 & 0.938 & 0.894 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
 \midrule
-\multicolumn{8}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\
-$C_{5}$ & S2B + SR & 0.886 & 0.812 & 0.934 & 0.000 & 100.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
-$C_{6}$ & S2B + PC & 0.962 & 0.875 & 0.360 & 0.000 & 0.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
-$C_{7}$ & S2B + MC & 1.000 & 0.938 & 0.951 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
-$C_{8}$ & SR + PC & 0.844 & 0.938 & 0.353 & 0.000 & 0.0\% / 0.0\% & 0.0003\textsuperscript{ns} \\
-$C_{9}$ & SR + MC & 0.869 & 0.938 & 0.840 & 0.000 & 100.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
-$C_{10}$ & PC + MC & 0.856 & 0.938 & 0.362 & 0.000 & 0.0\% / 0.0\% & 0.0003\textsuperscript{ns} \\
+\multicolumn{7}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
+S2B + SR & 0.886 & 0.812 & 0.934 & 0.000 & 100.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
+S2B + PC & 0.962 & 0.875 & 0.360 & 0.000 & 0.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
+S2B + MC & 1.000 & 0.938 & 0.951 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+SR + PC & 0.844 & 0.938 & 0.353 & 0.000 & 0.0\% / 0.0\% & 0.0003\textsuperscript{ns} \\
+SR + MC & 0.869 & 0.938 & 0.840 & 0.000 & 100.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
+PC + MC & 0.856 & 0.938 & 0.362 & 0.000 & 0.0\% / 0.0\% & 0.0003\textsuperscript{ns} \\
 \midrule
-\multicolumn{8}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\
-$C_{11}$ & S2B + SR + PC & 0.865 & 0.812 & 0.602 & 0.000 & 0.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
-$C_{12}$ & S2B + SR + MC & 0.886 & 0.812 & 0.944 & 0.000 & 100.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
-$C_{13}$ & S2B + PC + MC & 0.962 & 0.938 & 0.376 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
-$C_{14}$ & SR + PC + MC & 0.879 & 1.000 & 0.454 & 0.000 & 0.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
-$C_{15}$ & S2B + SR + PC + MC (Full-Stack) & 0.765 & 0.833 & 0.261 & 0.000 & 0.0\% / 0.0\% & 0.0003\textsuperscript{ns} \\
+\multicolumn{7}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
+S2B + SR + PC & 0.865 & 0.812 & 0.602 & 0.000 & 0.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
+S2B + SR + MC & 0.886 & 0.812 & 0.944 & 0.000 & 100.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
+S2B + PC + MC & 0.962 & 0.938 & 0.376 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+SR + PC + MC & 0.879 & 1.000 & 0.454 & 0.000 & 0.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
+S2B + SR + PC + MC & 0.765 & 0.833 & 0.261 & 0.000 & 0.0\% / 0.0\% & 0.0003\textsuperscript{ns} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
 \parbox{\linewidth}{\footnotesize
-\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Refusal Accuracy evaluates correct abstention on unanswerable out-of-domain (OOD) queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against baseline ($C_0$) with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
+\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Refusal Accuracy evaluates correct abstention on unanswerable out-of-domain (OOD) queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
 \end{table}

@@ -2,35 +2,35 @@
 \centering
 \small
 \setlength{\tabcolsep}{3.5pt}
-\caption{Multi-objective Pareto efficiency and 3D non-domination trade-off metrics across 16 pipeline configurations on MuSiQue.}
+\caption{Multi-objective Pareto efficiency and 3D non-domination trade-off metrics across 16 pipeline architectures on MuSiQue.}
 \label{tab:pareto_musique}
-\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c r r r r c @{}}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c r r r r c @{}}
 \toprule
-\textbf{Config} & \textbf{Pipeline} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(s)}} & \textbf{QPD} & \textbf{QPS} & \makecell{\textbf{Pareto}\\\textbf{Optimal}} \\
+\textbf{Pipeline} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(s)}} & \textbf{QPD} & \textbf{QPS} & \makecell{\textbf{Pareto}\\\textbf{Optimal}} \\
 \midrule
-\multicolumn{8}{l}{\textbf{Baseline ($k=0$)}} \\
-$C_{0}$ & Naive RAG Baseline & 0.3334 & \$1.191 & 2.12 & 280 & 0.14 & No \\
+\multicolumn{7}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
+Naive RAG Baseline & 0.3334 & \$1.191 & 2.12 & 280 & 0.14 & No \\
 \midrule
-\multicolumn{8}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-$C_{1}$ & S2B & 0.4431 & \$1.208 & 1.68 & 367 & 0.16 & \textbf{Yes} \\
-$C_{2}$ & SR & 0.3942 & \$6.210 & 2.04 & 63 & 0.18 & No \\
-$C_{3}$ & PC & 0.3847 & \$0.495 & 2.02 & 778 & 0.17 & \textbf{Yes} \\
-$C_{4}$ & MC & 0.3406 & \$7.060 & 3.06 & 48 & 0.10 & No \\
+\multicolumn{7}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
+S2B & 0.4431 & \$1.208 & 1.68 & 367 & 0.16 & \textbf{Yes} \\
+SR & 0.3942 & \$6.210 & 2.04 & 63 & 0.18 & No \\
+PC & 0.3847 & \$0.495 & 2.02 & 778 & 0.17 & \textbf{Yes} \\
+MC & 0.3406 & \$7.060 & 3.06 & 48 & 0.10 & No \\
 \midrule
-\multicolumn{8}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\
-$C_{5}$ & S2B + SR & 0.3791 & \$6.221 & 2.02 & 61 & 0.19 & No \\
-$C_{6}$ & S2B + PC & 0.3014 & \$0.511 & 1.65 & 590 & 0.16 & \textbf{Yes} \\
-$C_{7}$ & S2B + MC & 0.2756 & \$6.574 & 2.79 & 42 & 0.10 & No \\
-$C_{8}$ & SR + PC & 0.4054 & \$5.514 & 1.83 & 74 & 0.18 & No \\
-$C_{9}$ & SR + MC & 0.3238 & \$11.544 & 3.12 & 28 & 0.10 & No \\
-$C_{10}$ & PC + MC & 0.3683 & \$3.157 & 3.69 & 117 & 0.09 & No \\
+\multicolumn{7}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
+S2B + SR & 0.3791 & \$6.221 & 2.02 & 61 & 0.19 & No \\
+S2B + PC & 0.3014 & \$0.511 & 1.65 & 590 & 0.16 & \textbf{Yes} \\
+S2B + MC & 0.2756 & \$6.574 & 2.79 & 42 & 0.10 & No \\
+SR + PC & 0.4054 & \$5.514 & 1.83 & 74 & 0.18 & No \\
+SR + MC & 0.3238 & \$11.544 & 3.12 & 28 & 0.10 & No \\
+PC + MC & 0.3683 & \$3.157 & 3.69 & 117 & 0.09 & No \\
 \midrule
-\multicolumn{8}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\
-$C_{11}$ & S2B + SR + PC & 0.3801 & \$5.524 & 1.90 & 69 & 0.19 & No \\
-$C_{12}$ & S2B + SR + MC & 0.3809 & \$11.514 & 2.83 & 33 & 0.13 & No \\
-$C_{13}$ & S2B + PC + MC & 0.3594 & \$3.233 & 5.07 & 111 & 0.06 & No \\
-$C_{14}$ & SR + PC + MC & 0.2430 & \$8.498 & 5.93 & 29 & 0.03 & No \\
-$C_{15}$ & S2B + SR + PC + MC (Full-Stack) & 0.3122 & \$8.181 & 4.18 & 38 & 0.06 & No \\
+\multicolumn{7}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
+S2B + SR + PC & 0.3801 & \$5.524 & 1.90 & 69 & 0.19 & No \\
+S2B + SR + MC & 0.3809 & \$11.514 & 2.83 & 33 & 0.13 & No \\
+S2B + PC + MC & 0.3594 & \$3.233 & 5.07 & 111 & 0.06 & No \\
+SR + PC + MC & 0.2430 & \$8.498 & 5.93 & 29 & 0.03 & No \\
+S2B + SR + PC + MC & 0.3122 & \$8.181 & 4.18 & 38 & 0.06 & No \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
