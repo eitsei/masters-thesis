@@ -1,23 +1,27 @@
 \begin{table}[htbp]
 \centering
-\caption{Operational pricing catalog and cloud tariffs for generative, re-ranking, and embedding services (verified as of September 2026).}
+\caption{Operational pricing catalog and cloud tariffs for generative, re-ranking, and embedding services (verified as of September 2026). Generative model tariffs reflect standard pay-as-you-go pricing for $\le 200\text{K}$ input tokens, corresponding to all evaluated multi-hop and enterprise workload requests.}
 \label{tab:pricing_catalog}
 \sffamily
 \footnotesize
-\setlength{\tabcolsep}{4pt}
+\setlength{\tabcolsep}{3pt}
+\scriptsize
 \begin{tabularx}{\linewidth}{l>{\raggedright\arraybackslash}Xrrrrc}
 \toprule
-\textbf{Model / Service} & \textbf{Pipeline Role} & \textbf{Prompt} & \textbf{Cached} & \textbf{Output} & \textbf{Auxiliary} & \textbf{Source} \\
-& & \textbf{(\$/1M)} & \textbf{(\$/1M)} & \textbf{(\$/1M)} & \textbf{Unit Rate} & \\
+\textbf{Model / Service} & \textbf{Pipeline Role} & \makecell[r]{\textbf{Prompt}\\\textbf{(\$/1M)}} & \makecell[r]{\textbf{Cached}\\\textbf{(\$/1M)}} & \makecell[r]{\textbf{Output}\\\textbf{(\$/1M)}} & \makecell[r]{\textbf{Auxiliary}\\\textbf{Unit Rate}} & \textbf{Source} \\
 \midrule
-Gemini 3.8 Flash & Primary Workhorse ($M_0, M_4$) & \$0.75 & \$0.075 & \$3.75 & -- & \citep{GoogleVertexAIPricing} \\
-Gemini 3.5 Flash-Lite & Router Classifier / Fast Tier ($M_4$) & \$0.075 & \$0.01875 & \$0.30 & -- & \citep{GoogleVertexAIPricing} \\
-Gemini 3.1 Pro & Complex Multi-Hop Tier ($M_4$) & \$1.25 & \$0.3125 & \$5.00 & -- & \citep{GoogleVertexAIPricing} \\
+Gemini 3.5 Flash & Primary Workhorse ($M_0, M_4$) & \$1.50 & \$0.15 & \$9.00 & -- & \citep{GoogleVertexAIPricing} \\
+Gemini 3.5 Flash-Lite & Router Classifier ($M_4$) & \$0.30 & \$0.03 & \$2.50 & -- & \citep{GoogleVertexAIPricing} \\
+Gemini 3.1 Pro Preview & Complex Multi-Hop ($M_4$) & \$2.00 & \$0.20 & \$12.00 & -- & \citep{GoogleVertexAIPricing} \\
 \midrule
-Vertex AI Ranking & Cross-Encoder Re-ranking ($M_2$) & -- & -- & -- & \$0.00010/doc & \citep{GoogleVertexAIRankingPricing} \\
-gemini-embedding-2 & Dense Vectorization & \$0.025 & -- & -- & -- & \citep{GoogleVertexAIPricing} \\
+Vertex AI Ranking & Cross-Encoder Re-rank ($M_2$) & -- & -- & -- & \$0.00010/doc & \citep{GoogleVertexAIRankingPricing} \\
+Embeddings for Text & Dense Vectorization & \$0.025 & -- & -- & -- & \citep{GoogleVertexAIPricing} \\
 \midrule
-Claude Sonnet 5 & Evaluation Judge (RAGAS) & \$3.00 & \$0.30 & \$15.00 & -- & \citep{AnthropicPricing} \\
+Qwen3.8-27B & Evaluation Judge (RAGAS) & \multicolumn{3}{c}{\textit{Local Execution}} & \$0.00/query & \citep{qwen2024qwen25} \\
+BGE-M3 & Evaluation Embedding & \multicolumn{3}{c}{\textit{Local Execution}} & \$0.00/query & \citep{chen2024bge} \\
 \bottomrule
 \end{tabularx}
+\vspace{0.5em}
+\parbox{\linewidth}{\footnotesize
+\textbf{Notes:} Generative model rates reflect Google Cloud Gemini Enterprise Agent Platform standard pay-as-you-go list pricing for input windows $\le 200\text{K}$ tokens. Context caching discounts ($M_3$) provide a 90\% unit rate reduction on cached prompt prefixes. Candidate re-ranking ($M_2$) is billed per scored document ($50 \times \$0.00010 = \$0.0050$/query). RAGAS quality evaluation is conducted entirely offline.}
 \end{table}
