@@ -71,15 +71,15 @@ MODEL_DIR="${MODEL_DIR:-${SCRATCH_DIR}/models/Qwen3.8-27B}"
 EMBED_DIR="${EMBED_DIR:-${SCRATCH_DIR}/models/bge-m3}"
 
 # Input runs: prioritize scratch runs if present, else repo-relative
-if [ -d "${SCRATCH_DIR}/runs/enterprise_closed" ]; then
-    DEFAULT_INPUT="${SCRATCH_DIR}/runs/enterprise_closed"
-elif [ -d "runs/enterprise_closed" ]; then
-    DEFAULT_INPUT="runs/enterprise_closed"
+if [ -d "${SCRATCH_DIR}/runs/musique_all16_final" ]; then
+    DEFAULT_INPUT="${SCRATCH_DIR}/runs/musique_all16_final"
+elif [ -d "runs/musique_all16_final" ]; then
+    DEFAULT_INPUT="runs/musique_all16_final"
 else
     DEFAULT_INPUT="${SCRATCH_DIR}/runs"
 fi
 INPUT_RUNS="${INPUT_RUNS:-$DEFAULT_INPUT}"
-OUTPUT_RUNS="${OUTPUT_RUNS:-${SCRATCH_DIR}/runs/enterprise_closed_roihu}"
+OUTPUT_RUNS="${OUTPUT_RUNS:-${SCRATCH_DIR}/runs/musique_all16_roihu}"
 WORKERS="${WORKERS:-16}"
 
 echo "Configuration:"

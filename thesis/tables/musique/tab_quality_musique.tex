@@ -6,34 +6,34 @@
 \label{tab:quality_musique}
 \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c c c c @{}}
 \toprule
-\textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Token}\\\textbf{F1 (\%)}} & \makecell{\textbf{Exact}\\\textbf{Match (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\
+\textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Exact Match /}\\\textbf{Token F1 (\%)}} & \makecell{\textbf{Refusal Acc. /}\\\textbf{FRR (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\
 \midrule
 \multicolumn{8}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
-Naive RAG Baseline & 0.400 & 0.800 & 0.733 & 0.612 & 41.5\% & 20.0\% & 0.3334 \\
+Naive RAG Baseline & 0.695 & 0.900 & 0.883 & 0.560 & 20.0\% / 41.5\% & 100.0\% / 10.0\% & 0.6747 \\
 \midrule
 \multicolumn{8}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-S2B & 0.433 & 0.800 & 0.950 & 0.569 & 33.1\% & 10.0\% & \textbf{0.4431}\textsuperscript{ns} \\
-SR & 0.450 & 0.750 & 0.850 & 0.612 & 36.7\% & 10.0\% & 0.3942\textsuperscript{ns} \\
-PC & 0.450 & 0.833 & 0.683 & 0.601 & 41.3\% & 20.0\% & 0.3847\textsuperscript{ns} \\
-MC & 0.500 & 0.889 & 0.537 & 0.369 & 28.5\% & 11.1\% & 0.3406\textsuperscript{ns} \\
+S2B & 0.642 & 0.900 & 0.867 & 0.576 & 10.0\% / 33.1\% & 100.0\% / 10.0\% & 0.6735\textsuperscript{ns} \\
+SR & 0.700 & 0.900 & 0.875 & 0.510 & 10.0\% / 36.7\% & 100.0\% / 10.0\% & 0.6626\textsuperscript{ns} \\
+PC & 0.695 & 0.900 & 0.950 & 0.513 & 20.0\% / 41.3\% & 100.0\% / 10.0\% & 0.6772\textsuperscript{ns} \\
+MC & 0.667 & 0.889 & 0.630 & 0.299 & 11.1\% / 28.5\% & 100.0\% / 44.4\% & 0.3987\textsuperscript{ns} \\
 \midrule
 \multicolumn{8}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
-S2B + SR & 0.550 & 0.900 & 0.777 & 0.503 & 32.0\% & 10.0\% & 0.3791\textsuperscript{ns} \\
-S2B + PC & 0.383 & 0.625 & 0.900 & 0.559 & 36.1\% & 10.0\% & 0.3014\textsuperscript{ns} \\
-S2B + MC & 0.483 & 0.850 & 0.700 & 0.556 & 32.8\% & 10.0\% & 0.2756\textsuperscript{ns} \\
-SR + PC & 0.450 & 0.900 & 0.900 & 0.638 & 36.6\% & 10.0\% & 0.4054\textsuperscript{ns} \\
-SR + MC & 0.350 & 0.850 & 0.500 & 0.431 & 27.6\% & 10.0\% & 0.3238\textsuperscript{ns} \\
-PC + MC & 0.383 & 1.000 & 0.650 & 0.460 & 28.3\% & 10.0\% & 0.3683\textsuperscript{ns} \\
+S2B + SR & 0.658 & 0.900 & 0.917 & 0.629 & 10.0\% / 32.0\% & 100.0\% / 10.0\% & \textbf{0.7029}\textsuperscript{ns} \\
+S2B + PC & 0.642 & 0.900 & 0.975 & 0.553 & 10.0\% / 36.1\% & 100.0\% / 10.0\% & 0.6688\textsuperscript{ns} \\
+S2B + MC & 0.642 & 0.900 & 0.725 & 0.479 & 10.0\% / 32.8\% & 100.0\% / 30.0\% & 0.5353\textsuperscript{ns} \\
+SR + PC & 0.700 & 0.900 & 0.950 & 0.559 & 10.0\% / 36.6\% & 100.0\% / 10.0\% & 0.7004\textsuperscript{ns} \\
+SR + MC & 0.700 & 0.900 & 0.650 & 0.413 & 10.0\% / 27.6\% & 100.0\% / 40.0\% & 0.4844\textsuperscript{ns} \\
+PC + MC & 0.695 & 0.900 & 0.800 & 0.407 & 10.0\% / 28.3\% & 100.0\% / 30.0\% & 0.5309\textsuperscript{ns} \\
 \midrule
 \multicolumn{8}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
-S2B + SR + PC & 0.450 & 0.500 & 0.783 & 0.552 & 37.5\% & 20.0\% & 0.3801\textsuperscript{ns} \\
-S2B + SR + MC & 0.550 & 0.550 & 0.625 & 0.462 & 24.6\% & 10.0\% & 0.3809\textsuperscript{ns} \\
-S2B + PC + MC & 0.483 & 0.800 & 0.683 & 0.452 & 36.7\% & 20.0\% & 0.3594\textsuperscript{ns} \\
-SR + PC + MC & 0.350 & 0.767 & 0.700 & 0.430 & 20.4\% & 0.0\% & 0.2430\textsuperscript{ns} \\
-S2B + SR + PC + MC & 0.450 & 0.817 & 0.750 & 0.430 & 26.1\% & 10.0\% & 0.3122\textsuperscript{ns} \\
+S2B + SR + PC & 0.658 & 0.900 & 0.917 & 0.592 & 20.0\% / 37.5\% & 100.0\% / 10.0\% & 0.6837\textsuperscript{ns} \\
+S2B + SR + MC & 0.658 & 0.900 & 0.650 & 0.392 & 10.0\% / 24.6\% & 100.0\% / 40.0\% & 0.4661\textsuperscript{ns} \\
+S2B + PC + MC & 0.642 & 0.900 & 0.725 & 0.373 & 20.0\% / 36.7\% & 100.0\% / 30.0\% & 0.4805\textsuperscript{ns} \\
+SR + PC + MC & 0.700 & 0.900 & 0.675 & 0.399 & 0.0\% / 20.4\% & 100.0\% / 40.0\% & 0.4855\textsuperscript{ns} \\
+S2B + SR + PC + MC & 0.658 & 0.900 & 0.650 & 0.409 & 10.0\% / 26.1\% & 100.0\% / 40.0\% & 0.4752\textsuperscript{ns} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
 \parbox{\linewidth}{\footnotesize
-\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Token F1 and Exact Match evaluate lexical overlap against reference answers. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Highest composite quality score is highlighted in bold. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
+\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Exact Match (EM) and Token F1 evaluate lexical overlap against reference answers. Refusal Accuracy evaluates correct abstention on unanswerable queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Highest composite quality score is highlighted in bold. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
 \end{table}

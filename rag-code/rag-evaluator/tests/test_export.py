@@ -70,6 +70,8 @@ def test_export_benchmark_summary_latex(tmp_path: Path, sample_benchmark_records
     assert "\\label{tab:benchmark_summary}" in content
     assert "per 1k q" in content
     assert "\\$0.390" in content
+    assert "EM / F1" in content
+    assert "Ref / FRR" in content
 
 
 def test_export_hop_breakdown_latex(tmp_path: Path, sample_benchmark_records):
@@ -444,6 +446,8 @@ def test_export_quality_musique_latex(tmp_path: Path, sample_benchmark_records):
     assert "Answer Relevancy" in content
     assert "Token" in content and "F1" in content
     assert "Exact" in content and "Match" in content
+    assert "Refusal Acc." in content
+    assert "FRR" in content
     assert "Composite" in content and "Quality" in content
     # Dynamic N in caption
     assert "($N = 10$)" in content

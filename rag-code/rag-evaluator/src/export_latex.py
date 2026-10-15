@@ -70,7 +70,7 @@ def export_benchmark_summary_latex(
         f"\\label{{{label}}}",
         "\\begin{tabular*}{\\linewidth}{@{\\extracolsep{\\fill}} l r r r r r r r r r r r r @{}}",
         "\\toprule",
-        "\\textbf{Pipeline} & \\textbf{$N$} & \\textbf{$P_{50}$} & \\textbf{$P_{95}$} & \\textbf{Tokens} & \\textbf{Cost (\\$)} & \\textbf{EM} & \\textbf{F1} & \\textbf{Faith} & \\textbf{AR} & \\textbf{CP} & \\textbf{CR} & \\textbf{Comp $Q$} \\\\",
+        "\\textbf{Pipeline} & \\textbf{$N$} & \\textbf{$P_{50}$} & \\textbf{$P_{95}$} & \\textbf{Tokens} & \\textbf{Cost (\\$)} & \\textbf{EM / F1} & \\textbf{Ref / FRR} & \\textbf{Faith} & \\textbf{AR} & \\textbf{CP} & \\textbf{CR} & \\textbf{Comp $Q$} \\\\",
         " & & \\scriptsize{(ms)} & \\scriptsize{(ms)} & \\scriptsize{avg} & \\scriptsize{per 1k q} & \\scriptsize{(\\%)} & \\scriptsize{(\\%)} & & & & & \\scriptsize{$[0,1]$} \\\\",
         "\\midrule",
     ]
@@ -84,6 +84,10 @@ def export_benchmark_summary_latex(
         escaped_name = pipe_name if pipe_name != name else (_escape_latex(name) if not name.startswith("$") else name)
         em_pct = s["em_mean"] * 100.0
         f1_pct = s["f1_mean"] * 100.0
+        em_f1_pct = f"{em_pct:.1f}\\% / {f1_pct:.1f}\\%"
+        ref_acc_pct = f"{s['refusal_accuracy'] * 100.0:.1f}\\%"
+        frr_pct = f"{s['false_refusal_rate'] * 100.0:.1f}\\%"
+        ref_frr_pct = f"{ref_acc_pct} / {frr_pct}"
 
         row = (
             f"{escaped_name} & "
@@ -92,8 +96,8 @@ def export_benchmark_summary_latex(
             f"{s['latency_p95']:.1f} & "
             f"{s['tokens_mean']:.0f} & "
             f"\\${s['cost_mean'] * 1000.0:.3f} & "
-            f"{em_pct:.1f}\\% & "
-            f"{f1_pct:.1f}\\% & "
+            f"{em_f1_pct} & "
+            f"{ref_frr_pct} & "
             f"{s['faithfulness_mean']:.3f} & "
             f"{s['answer_relevancy_mean']:.3f} & "
             f"{s['context_precision_mean']:.3f} & "
@@ -108,7 +112,7 @@ def export_benchmark_summary_latex(
             "\\end{tabular*}",
             "\\vspace{0.5em}",
             "\\parbox{\\linewidth}{\\footnotesize",
-            "\\textbf{Notes:} $P_{50}$ and $P_{95}$ represent median and 95th percentile end-to-end execution latencies. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. EM: Exact Match; F1: Token-level $F_1$; Faith: Faithfulness; AR: Answer Relevancy; CP: Context Precision; CR: Context Recall; Comp $Q$: Harmonic mean Composite Quality score (Eq.~238).}",
+            "\\textbf{Notes:} $P_{50}$ and $P_{95}$ represent median and 95th percentile end-to-end execution latencies. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. EM: Exact Match; F1: Token-level $F_1$; Ref: Refusal Accuracy; FRR: False Refusal Rate; Faith: Faithfulness; AR: Answer Relevancy; CP: Context Precision; CR: Context Recall; Comp $Q$: Harmonic mean Composite Quality score (Eq.~238).}",
             "\\end{table}",
             "\\end{landscape}",
             "",
@@ -1093,7 +1097,7 @@ def export_quality_musique_latex(
         f"\\label{{{label}}}",
         r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c c c c @{}}",
         r"\toprule",
-        r"\textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Token}\\\textbf{F1 (\%)}} & \makecell{\textbf{Exact}\\\textbf{Match (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\",
+        r"\textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Exact Match /}\\\textbf{Token F1 (\%)}} & \makecell{\textbf{Refusal Acc. /}\\\textbf{FRR (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\",
         r"\midrule",
     ]
 
@@ -1134,14 +1138,19 @@ def export_quality_musique_latex(
         if sig and tier > 0:
             q_str += f"\\textsuperscript{{{sig}}}"
 
+        em_f1_cell = f"{s['em_mean'] * 100.0:.1f}\\% / {s['f1_mean'] * 100.0:.1f}\\%"
+        ref_acc_str = f"{s['refusal_accuracy'] * 100.0:.1f}\\%"
+        frr_str = f"{s['false_refusal_rate'] * 100.0:.1f}\\%"
+        ref_cell = f"{ref_acc_str} / {frr_str}"
+
         row = (
             f"{pipe_name} & "
             f"{s['context_precision_mean']:.3f} & "
             f"{s['context_recall_mean']:.3f} & "
             f"{s['faithfulness_mean']:.3f} & "
             f"{s['answer_relevancy_mean']:.3f} & "
-            f"{s['f1_mean'] * 100.0:.1f}\\% & "
-            f"{s['em_mean'] * 100.0:.1f}\\% & "
+            f"{em_f1_cell} & "
+            f"{ref_cell} & "
             f"{q_str} \\\\"
         )
         latex_lines.append(row)
@@ -1152,7 +1161,7 @@ def export_quality_musique_latex(
             r"\end{tabular*}",
             r"\vspace{0.5em}",
             r"\parbox{\linewidth}{\footnotesize",
-            r"\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Token F1 and Exact Match evaluate lexical overlap against reference answers. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Highest composite quality score is highlighted in bold. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
+            r"\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Exact Match (EM) and Token F1 evaluate lexical overlap against reference answers. Refusal Accuracy evaluates correct abstention on unanswerable queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Highest composite quality score is highlighted in bold. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
             r"\end{table}",
             "",
         ]

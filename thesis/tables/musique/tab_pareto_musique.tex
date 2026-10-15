@@ -9,28 +9,28 @@
 \textbf{Pipeline} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(s)}} & \textbf{QPD} & \textbf{QPS} & \makecell{\textbf{Pareto}\\\textbf{Optimal}} \\
 \midrule
 \multicolumn{7}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
-Naive RAG Baseline & 0.3334 & \$1.191 & 2.12 & 280 & 0.14 & No \\
+Naive RAG Baseline & 0.6747 & \$1.191 & 2.12 & 567 & 0.29 & No \\
 \midrule
 \multicolumn{7}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-S2B & 0.4431 & \$1.208 & 1.68 & 367 & 0.16 & \textbf{Yes} \\
-SR & 0.3942 & \$6.210 & 2.04 & 63 & 0.18 & No \\
-PC & 0.3847 & \$0.495 & 2.02 & 778 & 0.17 & \textbf{Yes} \\
-MC & 0.3406 & \$7.060 & 3.06 & 48 & 0.10 & No \\
+S2B & 0.6735 & \$1.208 & 1.68 & 558 & 0.24 & \textbf{Yes} \\
+SR & 0.6626 & \$6.210 & 2.04 & 107 & 0.30 & No \\
+PC & 0.6772 & \$0.495 & 2.02 & 1,369 & 0.30 & \textbf{Yes} \\
+MC & 0.3987 & \$7.060 & 3.06 & 56 & 0.12 & No \\
 \midrule
 \multicolumn{7}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
-S2B + SR & 0.3791 & \$6.221 & 2.02 & 61 & 0.19 & No \\
-S2B + PC & 0.3014 & \$0.511 & 1.65 & 590 & 0.16 & \textbf{Yes} \\
-S2B + MC & 0.2756 & \$6.574 & 2.79 & 42 & 0.10 & No \\
-SR + PC & 0.4054 & \$5.514 & 1.83 & 74 & 0.18 & No \\
-SR + MC & 0.3238 & \$11.544 & 3.12 & 28 & 0.10 & No \\
-PC + MC & 0.3683 & \$3.157 & 3.69 & 117 & 0.09 & No \\
+S2B + SR & 0.7029 & \$6.221 & 2.02 & 113 & 0.36 & \textbf{Yes} \\
+S2B + PC & 0.6688 & \$0.511 & 1.65 & 1,309 & 0.36 & \textbf{Yes} \\
+S2B + MC & 0.5353 & \$6.574 & 2.79 & 81 & 0.20 & No \\
+SR + PC & 0.7004 & \$5.514 & 1.83 & 127 & 0.31 & \textbf{Yes} \\
+SR + MC & 0.4844 & \$11.544 & 3.12 & 42 & 0.15 & No \\
+PC + MC & 0.5309 & \$3.157 & 3.69 & 168 & 0.13 & No \\
 \midrule
 \multicolumn{7}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
-S2B + SR + PC & 0.3801 & \$5.524 & 1.90 & 69 & 0.19 & No \\
-S2B + SR + MC & 0.3809 & \$11.514 & 2.83 & 33 & 0.13 & No \\
-S2B + PC + MC & 0.3594 & \$3.233 & 5.07 & 111 & 0.06 & No \\
-SR + PC + MC & 0.2430 & \$8.498 & 5.93 & 29 & 0.03 & No \\
-S2B + SR + PC + MC & 0.3122 & \$8.181 & 4.18 & 38 & 0.06 & No \\
+S2B + SR + PC & 0.6837 & \$5.524 & 1.90 & 124 & 0.34 & No \\
+S2B + SR + MC & 0.4661 & \$11.514 & 2.83 & 40 & 0.16 & No \\
+S2B + PC + MC & 0.4805 & \$3.233 & 5.07 & 149 & 0.07 & No \\
+SR + PC + MC & 0.4855 & \$8.498 & 5.93 & 57 & 0.06 & No \\
+S2B + SR + PC + MC & 0.4752 & \$8.181 & 4.18 & 58 & 0.10 & No \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
