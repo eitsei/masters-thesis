@@ -209,7 +209,10 @@ def _patch_ragas_pydantic_json_parsing() -> None:
             return text.strip()
 
         async def robust_generate_multiple(self, *args, **kwargs):
-            orig_validate = self.output_model.model_validate_json
+            orig_validate = getattr(self.output_model, "_orig_model_validate_json", None)
+            if orig_validate is None:
+                orig_validate = self.output_model.model_validate_json
+                self.output_model._orig_model_validate_json = orig_validate
 
             def robust_validate(s):
                 try:
@@ -218,10 +221,7 @@ def _patch_ragas_pydantic_json_parsing() -> None:
                     return orig_validate(_clean_json_str(s))
 
             self.output_model.model_validate_json = robust_validate
-            try:
-                return await orig_generate_multiple(self, *args, **kwargs)
-            finally:
-                self.output_model.model_validate_json = orig_validate
+            return await orig_generate_multiple(self, *args, **kwargs)
 
         pp.PydanticPrompt.generate_multiple = robust_generate_multiple
         _RAGAS_JSON_PATCHED = True
@@ -580,12 +580,57 @@ def _build_vertex_maas_openai(
     return llm, embeddings
 
 
+def _build_vllm(
+    model: str | None,
+    embedding_model: str | None,
+    base_url: str | None,
+    temperature: float,
+    **kwargs: Any,
+) -> tuple[BaseChatModel, Embeddings]:
+    """Build a judge against a local OpenAI-compatible vLLM server (no network, no GCP)."""
+    llm_url = (base_url or os.getenv("VLLM_BASE_URL") or "http://127.0.0.1:8000/v1").rstrip("/")
+    emb_url = (os.getenv("VLLM_EMBEDDING_BASE_URL") or "http://127.0.0.1:8001/v1").rstrip("/")
+    judge_model = model or os.getenv("VLLM_JUDGE_MODEL") or "qwen3.8-27b"
+    emb_model = embedding_model or os.getenv("VLLM_EMBEDDING_MODEL") or "bge-m3"
+    thinking = os.getenv("JUDGE_ENABLE_THINKING", "0").strip().lower() in ("1", "true", "yes")
+
+    max_tokens = int(os.getenv("JUDGE_MAX_TOKENS", "2048"))
+    timeout = float(os.getenv("JUDGE_TIMEOUT", "180.0"))
+
+    # Extra body to control thinking mode on reasoning models (e.g. Qwen3)
+    extra_body = kwargs.pop("extra_body", {})
+    if "chat_template_kwargs" not in extra_body:
+        extra_body["chat_template_kwargs"] = {"enable_thinking": thinking}
+
+    llm = ChatOpenAI(
+        base_url=llm_url,
+        api_key="EMPTY",
+        model=judge_model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        request_timeout=timeout,
+        extra_body=extra_body,
+        **kwargs,
+    )
+    embeddings = OpenAIEmbeddings(
+        base_url=emb_url,
+        api_key="EMPTY",
+        model=emb_model,
+        check_embedding_ctx_length=False,
+    )
+    return llm, embeddings
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 _PROVIDER_ALIASES: dict[str, str] = {
     "ollama": "ollama",
+    "vllm": "vllm",
+    "local": "vllm",
+    "local-openai": "vllm",
+    "openai-compatible": "vllm",
     "gemini": "vertex-gemini",
     "google": "vertex-gemini",
     "vertex": "vertex",          # auto-detect Claude vs Gemini from model name
@@ -613,13 +658,13 @@ class JudgeFactory:
         """Create an LLM judge and associated embedding model for RAGAS.
 
         Args:
-            provider: 'claude', 'gemini', 'vertex', or 'ollama'.
+            provider: 'claude', 'gemini', 'vertex', 'ollama', or 'vllm'.
                       Defaults to ``JUDGE_PROVIDER`` env or ``'claude'``.
-            model: Judge model name (e.g. ``'claude-sonnet-5'``).
+            model: Judge model name (e.g. ``'claude-sonnet-5'`` or ``'qwen3.8-27b'``).
                    Defaults to ``JUDGE_MODEL`` env or provider default.
             embedding_model: Embedding model name.
                              Defaults to ``JUDGE_EMBEDDING_MODEL`` or provider default.
-            base_url: Base URL for Ollama (optional, auto-discovered if omitted).
+            base_url: Base URL for local vLLM or Ollama (optional).
             temperature: LLM temperature (default 0.0 for deterministic evaluation).
             **kwargs: Extra parameters passed to the model constructors.
 
@@ -636,6 +681,9 @@ class JudgeFactory:
                 f"Unsupported judge provider: '{selected}'. "
                 f"Supported: {', '.join(sorted(set(_PROVIDER_ALIASES.keys())))}"
             )
+
+        if key == "vllm":
+            return _build_vllm(model, embedding_model, base_url, temperature, **kwargs)
 
         if key == "ollama":
             return _build_ollama(model, embedding_model, base_url, temperature, **kwargs)

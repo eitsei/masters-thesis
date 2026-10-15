@@ -416,18 +416,27 @@ def _compute_single_token_f1(prediction: str, ground_truth: str) -> float:
 
 
 def compute_composite_quality(
-    context_precision: float,
-    context_recall: float,
-    faithfulness: float,
-    answer_relevancy: float,
+    context_precision: float | None,
+    context_recall: float | None,
+    faithfulness: float | None,
+    answer_relevancy: float | None,
     epsilon: float = 1e-4,
-) -> float:
+) -> float | None:
     """Computes regularized harmonic Composite Quality Score Q(q) (Thesis Eq. 238).
 
     Q(q) = 4 / (1/(CP + eps) + 1/(CR + eps) + 1/(Faith + eps) + 1/(AR + eps))
 
     Guarantees numerical stability and severely penalizes single-dimension failure modes.
+    Returns None if any required metric component is None.
     """
+    if (
+        context_precision is None
+        or context_recall is None
+        or faithfulness is None
+        or answer_relevancy is None
+    ):
+        return None
+
     cp = max(0.0, float(context_precision))
     cr = max(0.0, float(context_recall))
     faith = max(0.0, float(faithfulness))
@@ -450,22 +459,26 @@ def compute_composite_quality(
 # =====================================================================
 
 
-def compute_qpd(composite_quality: float, cost: float) -> float:
+def compute_qpd(composite_quality: float | None, cost: float) -> float | None:
     """Computes Quality per Dollar (QPD, Thesis Eq. 250).
 
     QPD = Q / Cost
     """
+    if composite_quality is None:
+        return None
     q = max(0.0, float(composite_quality))
     if cost <= 0.0:
         return float("inf") if q > 0 else 0.0
     return float(q / cost)
 
 
-def compute_qps(composite_quality: float, total_latency_ms: float) -> float:
+def compute_qps(composite_quality: float | None, total_latency_ms: float) -> float | None:
     """Computes Quality per Second (QPS, Thesis Eq. 255).
 
     QPS = Q / (T_total / 1000)
     """
+    if composite_quality is None:
+        return None
     q = max(0.0, float(composite_quality))
     if total_latency_ms <= 0.0:
         return float("inf") if q > 0 else 0.0
@@ -517,15 +530,10 @@ class RagasEvaluatorWrapper:
             reference=ground_truth,
         )
 
-        scores: dict[str, float] = {}
+        scores: dict[str, Any] = {}
+        errors: dict[str, str] = {}
 
         try:
-            from ragas.metrics.collections import (
-                answer_relevancy,
-                context_precision,
-                context_recall,
-                faithfulness,
-            )
             # Evaluate using instances
             from ragas.metrics import (
                 AnswerRelevancy,
@@ -549,15 +557,17 @@ class RagasEvaluatorWrapper:
                         pass
                 try:
                     score = m.single_turn_score(sample)
-                    val = float(score) if score is not None else 0.0
+                    val = float(score) if score is not None else None
                     scores[m.name] = val
                     if progress_callback:
                         try:
-                            progress_callback(m.name, "done", f"{val:.2f}")
+                            val_str = f"{val:.2f}" if val is not None else "None"
+                            progress_callback(m.name, "done", val_str)
                         except Exception:
                             pass
                 except Exception as exc:
-                    scores[m.name] = 0.0
+                    scores[m.name] = None
+                    errors[m.name] = str(exc)
                     if progress_callback:
                         try:
                             progress_callback(m.name, "error", str(exc)[:80])
@@ -578,12 +588,15 @@ class RagasEvaluatorWrapper:
                 except Exception:
                     pass
             scores = {
-                "faithfulness": 0.0,
-                "answer_relevancy": 0.0,
-                "context_precision": 0.0,
-                "context_recall": 0.0,
+                "faithfulness": None,
+                "answer_relevancy": None,
+                "context_precision": None,
+                "context_recall": None,
             }
+            errors["all"] = str(exc)
 
+        if errors:
+            scores["_errors"] = errors
         return scores
 
 

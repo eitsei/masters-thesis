@@ -9,28 +9,28 @@
 \textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Refusal Acc. /}\\\textbf{FRR (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\
 \midrule
 \multicolumn{7}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
-Naive RAG Baseline & 0.833 & 0.938 & 0.915 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004} \\
+Naive RAG Baseline & 0.714 & 0.875 & 0.979 & 0.737 & 100.0\% / 0.0\% & 0.7165 \\
 \midrule
 \multicolumn{7}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-S2B & 0.955 & 0.875 & 0.953 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
-SR & 0.869 & 0.938 & 0.975 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
-PC & 0.854 & 0.938 & 0.492 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
-MC & 0.854 & 0.938 & 0.894 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
+S2B & 0.875 & 0.750 & 1.000 & 0.756 & 100.0\% / 0.0\% & 0.7472\textsuperscript{ns} \\
+SR & 0.667 & 0.875 & 1.000 & 0.775 & 100.0\% / 0.0\% & 0.6515\textsuperscript{ns} \\
+PC & 0.714 & 0.875 & 0.204 & 0.812 & 0.0\% / 0.0\% & 0.4501\textsuperscript{ns} \\
+MC & 0.683 & 0.875 & 1.000 & 0.749 & 100.0\% / 0.0\% & 0.6994\textsuperscript{ns} \\
 \midrule
 \multicolumn{7}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
-S2B + SR & 0.886 & 0.812 & 0.934 & 0.000 & 100.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
-S2B + PC & 0.962 & 0.875 & 0.360 & 0.000 & 0.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
-S2B + MC & 1.000 & 0.938 & 0.951 & 0.000 & 100.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
-SR + PC & 0.844 & 0.938 & 0.353 & 0.000 & 0.0\% / 0.0\% & 0.0003\textsuperscript{ns} \\
-SR + MC & 0.869 & 0.938 & 0.840 & 0.000 & 100.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
-PC + MC & 0.856 & 0.938 & 0.362 & 0.000 & 0.0\% / 0.0\% & 0.0003\textsuperscript{ns} \\
+S2B + SR & 0.839 & 0.875 & 0.964 & 0.732 & 100.0\% / 0.0\% & \textbf{0.8136}\textsuperscript{ns} \\
+S2B + PC & 0.750 & 0.750 & 0.179 & 0.818 & 0.0\% / 0.0\% & 0.2981\textsuperscript{ns} \\
+S2B + MC & 0.875 & 0.750 & 0.983 & 0.752 & 100.0\% / 0.0\% & 0.7254\textsuperscript{ns} \\
+SR + PC & 0.667 & 0.750 & 0.429 & 0.792 & 0.0\% / 0.0\% & 0.4589\textsuperscript{ns} \\
+SR + MC & 0.656 & 0.875 & 0.846 & 0.766 & 100.0\% / 0.0\% & 0.5179\textsuperscript{ns} \\
+PC + MC & 0.714 & 0.875 & 0.363 & 0.778 & 0.0\% / 0.0\% & 0.3300\textsuperscript{ns} \\
 \midrule
 \multicolumn{7}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
-S2B + SR + PC & 0.865 & 0.812 & 0.602 & 0.000 & 0.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
-S2B + SR + MC & 0.886 & 0.812 & 0.944 & 0.000 & 100.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
-S2B + PC + MC & 0.962 & 0.938 & 0.376 & 0.000 & 0.0\% / 0.0\% & \textbf{0.0004}\textsuperscript{ns} \\
-SR + PC + MC & 0.879 & 1.000 & 0.454 & 0.000 & 0.0\% / 0.0\% & 0.0004\textsuperscript{ns} \\
-S2B + SR + PC + MC & 0.765 & 0.833 & 0.261 & 0.000 & 0.0\% / 0.0\% & 0.0003\textsuperscript{ns} \\
+S2B + SR + PC & 0.711 & 0.875 & 0.556 & 0.790 & 0.0\% / 0.0\% & 0.5186\textsuperscript{ns} \\
+S2B + SR + MC & 0.711 & 0.875 & 1.000 & 0.747 & 100.0\% / 0.0\% & 0.7294\textsuperscript{ns} \\
+S2B + PC + MC & 0.875 & 0.750 & 0.140 & 0.687 & 0.0\% / 0.0\% & 0.2493\textsuperscript{ns} \\
+SR + PC + MC & 0.656 & 0.750 & 0.285 & 0.706 & 0.0\% / 0.0\% & 0.4252\textsuperscript{ns} \\
+S2B + SR + PC + MC & 0.782 & 0.917 & 0.120 & 0.611 & 0.0\% / 0.0\% & 0.1644\textsuperscript{ns} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}

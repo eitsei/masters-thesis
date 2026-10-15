@@ -13,6 +13,9 @@
 #   # Evaluate MuSiQue 16-configuration sweep with Gemini:
 #   ./scripts/evaluate_run.sh runs/musique_all16_final --judge gemini --judge-model gemini-3.5-flash-lite --subfolder musique
 #
+#   # Evaluate Nordea 16-configuration sweep on Roihu / local vLLM:
+#   ./scripts/evaluate_run.sh runs/nordea_all16_final --judge vllm --workers 16 --no-export
+#
 #   # Evaluate Sample 5 run with in-place updates:
 #   ./scripts/evaluate_run.sh runs/sample5_m3 --judge gemini --judge-model gemini-3.5-flash-lite
 # ==============================================================================
@@ -26,11 +29,14 @@ TABLES_DIR="${TABLES_DIR:-../../thesis/tables}"
 FIGURES_DIR="${FIGURES_DIR:-../../thesis/figures}"
 
 RUN_DIR=""
-JUDGE="${JUDGE:-gemini}"
+JUDGE="${JUDGE:-${JUDGE_PROVIDER:-gemini}}"
 JUDGE_MODEL="${JUDGE_MODEL:-gemini-3.5-flash-lite}"
 SUBFOLDER=""
 DATASET_NAME=""
 RESUME="--resume"
+WORKERS="${WORKERS:-1}"
+DO_COMPARE=true
+DO_EXPORT=true
 
 # Argument parsing
 while [[ $# -gt 0 ]]; do
@@ -41,6 +47,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --judge-model|-m)
       JUDGE_MODEL="$2"
+      shift 2
+      ;;
+    --workers|-w)
+      WORKERS="$2"
       shift 2
       ;;
     --subfolder|-s)
@@ -65,6 +75,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --force|-f)
       RESUME="--force"
+      shift
+      ;;
+    --no-compare)
+      DO_COMPARE=false
+      shift
+      ;;
+    --no-export)
+      DO_EXPORT=false
       shift
       ;;
     -*)
@@ -102,6 +120,7 @@ echo "========================================================================"
 echo " Offline RAG Quality Evaluator & Report Generator"
 echo " Run Target:    $RUN_DIR"
 echo " Judge:         $JUDGE ($JUDGE_MODEL)"
+echo " Workers:       $WORKERS"
 echo " Subfolder:     $SUBFOLDER"
 echo " Tables Dir:    $TABLES_DIR"
 echo " Figures Dir:   $FIGURES_DIR"
@@ -117,6 +136,7 @@ EVAL_ARGS=(
   "--input" "$RUN_DIR"
   "--judge" "$JUDGE"
   "--judge-model" "$JUDGE_MODEL"
+  "--workers" "$WORKERS"
   "--inplace"
 )
 if [ "$RESUME" = "--force" ]; then
@@ -130,49 +150,55 @@ fi
 "$PYTHON" src/cli.py evaluate "${EVAL_ARGS[@]}"
 
 # 3. Paired Wilcoxon hypothesis tests against C0 baseline (if present)
-BASELINE=""
-if [ -d "$RUN_DIR" ]; then
-  for cand in "${RUN_DIR}"/*C0*.jsonl; do
-    if [ -f "$cand" ]; then
-      BASELINE="$cand"
-      break
-    fi
-  done
-
-  if [ -n "$BASELINE" ]; then
-    echo -e "\n========================================================================"
-    echo " Statistical Hypothesis Testing (Wilcoxon Signed-Rank Tests vs Baseline)"
-    echo " Baseline: $(basename "$BASELINE")"
-    echo "========================================================================"
-
-    for treat in "${RUN_DIR}"/run_C*.jsonl; do
-      [ -f "$treat" ] || continue
-      if [ "$treat" != "$BASELINE" ]; then
-        cfg_name="$(basename "$treat" .jsonl | sed 's/run_//' | tr '_' ' ')"
-        "$PYTHON" src/cli.py compare \
-          --baseline "$BASELINE" \
-          --treatment "$treat" \
-          --config-name "$cfg_name" || true
+if [ "$DO_COMPARE" = true ]; then
+  BASELINE=""
+  if [ -d "$RUN_DIR" ]; then
+    for cand in "${RUN_DIR}"/*C0*.jsonl; do
+      if [ -f "$cand" ]; then
+        BASELINE="$cand"
+        break
       fi
     done
+
+    if [ -n "$BASELINE" ]; then
+      echo -e "\n========================================================================"
+      echo " Statistical Hypothesis Testing (Wilcoxon Signed-Rank Tests vs Baseline)"
+      echo " Baseline: $(basename "$BASELINE")"
+      echo "========================================================================"
+
+      for treat in "${RUN_DIR}"/run_C*.jsonl; do
+        [ -f "$treat" ] || continue
+        if [ "$treat" != "$BASELINE" ]; then
+          cfg_name="$(basename "$treat" .jsonl | sed 's/run_//' | tr '_' ' ')"
+          "$PYTHON" src/cli.py compare \
+            --baseline "$BASELINE" \
+            --treatment "$treat" \
+            --config-name "$cfg_name" || true
+        fi
+      done
+    fi
   fi
 fi
 
 # 4. Consolidated LaTeX tables & publication figures export
-echo -e "\n========================================================================"
-echo " Consolidated LaTeX Tables & Publication Figures Export"
-echo "========================================================================"
+if [ "$DO_EXPORT" = true ]; then
+  echo -e "\n========================================================================"
+  echo " Consolidated LaTeX Tables & Publication Figures Export"
+  echo "========================================================================"
 
-EXPORT_ARGS=(
-  "--input" "$RUN_DIR"
-  "--tables-dir" "$TABLES_DIR"
-  "--figures-dir" "$FIGURES_DIR"
-  "--subfolder" "$SUBFOLDER"
-)
-if [ -n "$DATASET_NAME" ]; then
-  EXPORT_ARGS+=("--dataset-name" "$DATASET_NAME")
+  EXPORT_ARGS=(
+    "--input" "$RUN_DIR"
+    "--tables-dir" "$TABLES_DIR"
+    "--figures-dir" "$FIGURES_DIR"
+    "--subfolder" "$SUBFOLDER"
+  )
+  if [ -n "$DATASET_NAME" ]; then
+    EXPORT_ARGS+=("--dataset-name" "$DATASET_NAME")
+  fi
+
+  "$PYTHON" src/cli.py export-thesis "${EXPORT_ARGS[@]}" || {
+    echo "Warning: export-thesis failed or skipped (LaTeX/figures). Results JSONL remain intact." >&2
+  }
 fi
 
-"$PYTHON" src/cli.py export-thesis "${EXPORT_ARGS[@]}"
-
-echo -e "\n✓ Offline evaluation and thesis export completed successfully!"
+echo -e "\n✓ Offline evaluation completed successfully!"

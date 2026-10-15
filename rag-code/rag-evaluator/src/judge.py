@@ -16,6 +16,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Prevent RAGAS and LangChain telemetry from blocking offline / HPC runs
+os.environ.setdefault("RAGAS_DO_NOT_TRACK", "true")
+os.environ.setdefault("LANGCHAIN_TRACING_V2", "false")
+os.environ.setdefault("LANGSMITH_TRACING", "false")
+
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
 from src.judge_factory import JudgeFactory
@@ -28,8 +33,8 @@ def get_judge_components(
 ) -> Tuple[Any, Any]:
     """Initializes and returns (ragas_llm, ragas_embeddings) based on provider configuration.
 
-    Delegates to JudgeFactory to provide Vertex AI (Gemini + Claude via Model Garden)
-    or Ollama endpoints (/v1).
+    Delegates to JudgeFactory to provide Vertex AI (Gemini + Claude via Model Garden),
+    local vLLM (OpenAI-compatible server on localhost), or Ollama endpoints (/v1).
     """
     chosen_provider = (
         provider or os.getenv("JUDGE_PROVIDER", "claude")

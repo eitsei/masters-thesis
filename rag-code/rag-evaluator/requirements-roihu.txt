@@ -1,0 +1,15 @@
+# Minimal dependencies for running RAGAS offline evaluation on CSC Roihu
+# Excludes heavy GCP/Vertex and plotting packages (matplotlib, seaborn, langchain-google-vertexai)
+ragas==0.4.3
+langchain<1.0.0
+langchain-core<1.0.0
+langchain-community<0.4.0
+langchain-openai<1.0.0
+datasets>=2.19.0
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+rich>=13.0.0
+typer>=0.12.0

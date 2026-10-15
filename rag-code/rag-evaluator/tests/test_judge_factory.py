@@ -128,6 +128,56 @@ class TestJudgeFactoryCreation:
             mock_emb.assert_called_once()
             assert mock_emb.call_args.kwargs["model_name"] == "text-embedding-004"
 
+    def test_vllm_provider_configuration_defaults(self, monkeypatch):
+        monkeypatch.delenv("VLLM_BASE_URL", raising=False)
+        monkeypatch.delenv("VLLM_EMBEDDING_BASE_URL", raising=False)
+        monkeypatch.delenv("VLLM_JUDGE_MODEL", raising=False)
+        monkeypatch.delenv("VLLM_EMBEDDING_MODEL", raising=False)
+        monkeypatch.delenv("JUDGE_MODEL", raising=False)
+        monkeypatch.delenv("JUDGE_EMBEDDING_MODEL", raising=False)
+        monkeypatch.setenv("JUDGE_ENABLE_THINKING", "0")
+
+        llm, emb = JudgeFactory.create_judge(provider="vllm")
+
+        assert isinstance(llm, ChatOpenAI)
+        assert llm.model_name == "qwen3.8-27b"
+        assert llm.temperature == 0.0
+        assert "http://127.0.0.1:8000/v1" in str(llm.openai_api_base)
+        assert isinstance(emb, OpenAIEmbeddings)
+        assert emb.model == "bge-m3"
+        assert "http://127.0.0.1:8001/v1" in str(emb.openai_api_base)
+        assert llm.extra_body == {"chat_template_kwargs": {"enable_thinking": False}}
+
+    def test_vllm_provider_ignores_cloud_judge_model_env(self, monkeypatch):
+        # Simulate .env having Gemini or Claude settings
+        monkeypatch.setenv("JUDGE_MODEL", "gemini-3.5-flash-lite")
+        monkeypatch.setenv("JUDGE_EMBEDDING_MODEL", "text-embedding-004")
+        monkeypatch.delenv("VLLM_JUDGE_MODEL", raising=False)
+        monkeypatch.delenv("VLLM_EMBEDDING_MODEL", raising=False)
+
+        llm, emb = JudgeFactory.create_judge(provider="vllm")
+        assert llm.model_name == "qwen3.8-27b"
+        assert emb.model == "bge-m3"
+
+    def test_vllm_provider_thinking_enabled_flag(self, monkeypatch):
+        monkeypatch.setenv("JUDGE_ENABLE_THINKING", "1")
+        llm, _ = JudgeFactory.create_judge(provider="vllm")
+        assert llm.extra_body == {"chat_template_kwargs": {"enable_thinking": True}}
+
+    def test_vllm_provider_aliases_and_custom_env(self, monkeypatch):
+        monkeypatch.setenv("VLLM_BASE_URL", "http://10.0.0.1:8000/v1")
+        monkeypatch.setenv("VLLM_EMBEDDING_BASE_URL", "http://10.0.0.1:8001/v1")
+        monkeypatch.setenv("VLLM_JUDGE_MODEL", "custom-judge")
+        monkeypatch.setenv("VLLM_EMBEDDING_MODEL", "custom-emb")
+
+        for alias in ("local", "local-openai", "openai-compatible"):
+            llm, emb = JudgeFactory.create_judge(provider=alias)
+            assert isinstance(llm, ChatOpenAI)
+            assert llm.model_name == "custom-judge"
+            assert "http://10.0.0.1:8000/v1" in str(llm.openai_api_base)
+            assert emb.model == "custom-emb"
+            assert "http://10.0.0.1:8001/v1" in str(emb.openai_api_base)
+
     def test_unsupported_provider_raises_error(self):
         with pytest.raises(ValueError, match="Unsupported judge provider"):
             JudgeFactory.create_judge(provider="unsupported-provider")

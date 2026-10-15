@@ -30,17 +30,6 @@ from rich.table import Table
 
 from src.client import RagBenchmarkClient, RagClient
 from src.collector import BenchmarkCollector, StreamingBenchmarkCollector
-from src.export_latex import (
-    export_benchmark_summary_latex,
-    export_cost_latex,
-    export_hop_breakdown_latex,
-    export_latency_latex,
-    export_pareto_latex,
-    export_quality_enterprise_latex,
-    export_quality_musique_latex,
-    export_wilcoxon_decomposed_latex,
-    export_wilcoxon_tests_latex,
-)
 from src.judge import get_judge_components, test_judge_connection
 from src.metrics import (
     RagasEvaluatorWrapper,
@@ -58,15 +47,7 @@ from src.metrics import (
     is_sample_unanswerable,
     token_f1,
 )
-from src.plot_results import (
-    plot_cost_breakdown,
-    plot_latency_breakdown,
-    plot_pareto_frontier,
-    plot_pareto_frontier_3d,
-    plot_quality_delta_matrix,
-    plot_quality_lollipop,
-    plot_ragas_metrics_radar,
-)
+
 from src.reporter import (
     display_comparison_table,
     display_hop_breakdown_table,
@@ -321,11 +302,18 @@ def _process_item_metrics(
                 ground_truth=gt,
                 progress_callback=progress_callback,
             )
-            item["faithfulness"] = ragas_scores.get("faithfulness", 0.0)
-            item["answer_relevancy"] = ragas_scores.get("answer_relevancy", 0.0)
-            item["context_precision"] = ragas_scores.get("context_precision", 0.0)
-            item["context_recall"] = ragas_scores.get("context_recall", 0.0)
-            item["ragas_evaluated"] = True
+            faith = ragas_scores.get("faithfulness")
+            ar = ragas_scores.get("answer_relevancy")
+            cp = ragas_scores.get("context_precision")
+            cr = ragas_scores.get("context_recall")
+            item["faithfulness"] = faith
+            item["answer_relevancy"] = ar
+            item["context_precision"] = cp
+            item["context_recall"] = cr
+            all_succeeded = all(v is not None for v in (faith, ar, cp, cr))
+            item["ragas_evaluated"] = all_succeeded
+            if "_errors" in ragas_scores:
+                item["ragas_errors"] = ragas_scores["_errors"]
         else:
             # Default or preserve existing scores
             item.setdefault("faithfulness", 1.0 if em == 1.0 else f1)
@@ -335,10 +323,10 @@ def _process_item_metrics(
             item.setdefault("ragas_evaluated", False)
 
         comp_q = compute_composite_quality(
-            item["context_precision"],
-            item["context_recall"],
-            item["faithfulness"],
-            item["answer_relevancy"],
+            item.get("context_precision"),
+            item.get("context_recall"),
+            item.get("faithfulness"),
+            item.get("answer_relevancy"),
         )
         item["composite_quality"] = comp_q
         item["qpd"] = compute_qpd(comp_q, cost)
@@ -371,6 +359,27 @@ def _pacing_delay_with_spinner(
         time.sleep(seconds)
 
 
+def _resolve_judge_delay(judge: str, judge_delay: float | None = None) -> float:
+    """Determine effective pacing delay between judge requests to prevent 429 quota exhaustion.
+
+    Cloud API providers (Gemini, Claude, Vertex) default to 1.5s delay.
+    Local providers (vllm, ollama) and explicit override default to 0.0s.
+    """
+    if judge_delay is not None:
+        return max(0.0, judge_delay)
+    if judge.lower() in (
+        "gemini", "claude", "vertex", "vertexai", "llama", "meta", "maas",
+        "vertex-maas", "vertex-claude", "claude-vertex"
+    ):
+        return 1.5
+    return 0.0
+
+
+def _format_metric_val(val: float | None, precision: int = 2) -> str:
+    """Formats a floating-point metric value or returns 'None'."""
+    return f"{val:.{precision}f}" if val is not None else "None"
+
+
 def _evaluate_item_with_feedback(
     item: dict[str, Any],
     ragas_evaluator: RagasEvaluatorWrapper | None,
@@ -381,8 +390,9 @@ def _evaluate_item_with_feedback(
     console: Console = console,
     resume: bool = True,
     force: bool = False,
+    show_spinner: bool = True,
 ) -> dict[str, Any]:
-    """Evaluates a single item with active spinner and metric-by-metric progress feedback."""
+    """Evaluates a single item with active spinner (or plain print in worker mode) and metric-by-metric progress feedback."""
     if not ragas_evaluator or ragas_evaluator.llm is None:
         processed = _process_item_metrics(item, ragas_evaluator=None, pricing_tier=pricing_tier)
         em = processed.get("exact_match", 0.0)
@@ -402,7 +412,7 @@ def _evaluate_item_with_feedback(
         ar_score = item.get("answer_relevancy")
         cp_score = item.get("context_precision")
         cr_score = item.get("context_recall")
-        q_comp = item.get("composite_quality", 0.0)
+        q_comp = item.get("composite_quality")
         tot_ms = item.get("total_latency_ms", 0.0)
         cost = item.get("cost_usd", 0.0)
         if f_score is None:
@@ -416,43 +426,67 @@ def _evaluate_item_with_feedback(
                 f"{ref_status} | Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
             )
         else:
+            q_str = _format_metric_val(q_comp, 3)
+            f_str = _format_metric_val(f_score, 2)
+            ar_str = _format_metric_val(ar_score, 2)
+            cp_str = _format_metric_val(cp_score, 2)
+            cr_str = _format_metric_val(cr_score, 2)
             console.print(
                 f"  [dim green]✓[/dim green] [{item_idx}/{total_items}] Resumed: "
-                f"Faith=[green]{f_score:.2f}[/green] | Rel=[green]{ar_score:.2f}[/green] | "
-                f"Prec=[green]{cp_score:.2f}[/green] | Rec=[green]{cr_score:.2f}[/green] | "
-                f"Q=[yellow]{q_comp:.3f}[/yellow] | Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
+                f"Faith=[green]{f_str}[/green] | Rel=[green]{ar_str}[/green] | "
+                f"Prec=[green]{cp_str}[/green] | Rec=[green]{cr_str}[/green] | "
+                f"Q=[yellow]{q_str}[/yellow] | Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
             )
         return item
 
-    with console.status(
-        f"[bold magenta][{item_idx}/{total_items}][/bold magenta] Judge [{judge}]: Preparing evaluation...",
-        spinner="dots",
-    ) as status:
-        def _on_progress(metric_name: str, phase: str, detail: str = "") -> None:
-            clean = METRIC_DISPLAY_NAMES.get(metric_name.lower(), metric_name)
-            if phase == "start":
-                status.update(
-                    f"[bold magenta][{item_idx}/{total_items}][/bold magenta] Judge [{judge}]: Evaluating [cyan]{clean}[/cyan] ({detail})..."
-                )
-            elif phase == "done":
-                status.update(
-                    f"[bold magenta][{item_idx}/{total_items}][/bold magenta] Judge [{judge}]: Finished [cyan]{clean}[/cyan] (score: {detail})"
-                )
-            elif phase == "delay":
-                status.update(
-                    f"[dim yellow][{item_idx}/{total_items}][/dim yellow] Judge [{judge}]: Inter-metric pause ({detail})..."
-                )
-            elif phase == "error":
-                status.update(
-                    f"[bold red][{item_idx}/{total_items}][/bold red] Judge [{judge}]: Error on [cyan]{clean}[/cyan] ({detail})"
-                )
+    if show_spinner:
+        with console.status(
+            f"[bold magenta][{item_idx}/{total_items}][/bold magenta] Judge [{judge}]: Preparing evaluation...",
+            spinner="dots",
+        ) as status:
+            def _on_progress(metric_name: str, phase: str, detail: str = "") -> None:
+                clean = METRIC_DISPLAY_NAMES.get(metric_name.lower(), metric_name)
+                if phase == "start":
+                    status.update(
+                        f"[bold magenta][{item_idx}/{total_items}][/bold magenta] Judge [{judge}]: Evaluating [cyan]{clean}[/cyan] ({detail})..."
+                    )
+                elif phase == "done":
+                    status.update(
+                        f"[bold magenta][{item_idx}/{total_items}][/bold magenta] Judge [{judge}]: Finished [cyan]{clean}[/cyan] (score: {detail})"
+                    )
+                elif phase == "delay":
+                    status.update(
+                        f"[dim yellow][{item_idx}/{total_items}][/dim yellow] Judge [{judge}]: Inter-metric pause ({detail})..."
+                    )
+                elif phase == "error":
+                    status.update(
+                        f"[bold red][{item_idx}/{total_items}][/bold red] Judge [{judge}]: Error on [cyan]{clean}[/cyan] ({detail})"
+                    )
 
+            processed = _process_item_metrics(
+                item,
+                ragas_evaluator=ragas_evaluator,
+                pricing_tier=pricing_tier,
+                progress_callback=_on_progress,
+            )
+    else:
         processed = _process_item_metrics(
             item,
             ragas_evaluator=ragas_evaluator,
             pricing_tier=pricing_tier,
-            progress_callback=_on_progress,
+            progress_callback=None,
         )
+
+    # Record provenance
+    if judge:
+        processed["judge_provider"] = judge
+    if ragas_evaluator and ragas_evaluator.llm:
+        raw = getattr(ragas_evaluator.llm, "langchain_llm", ragas_evaluator.llm)
+        m_name = getattr(raw, "model_name", getattr(raw, "model", None))
+        if m_name:
+            processed["judge_model"] = m_name
+    if os.getenv("JUDGE_ENABLE_THINKING"):
+        processed["judge_thinking"] = os.getenv("JUDGE_ENABLE_THINKING", "0").strip().lower() in ("1", "true", "yes")
 
     f_score = processed.get("faithfulness")
     ar_score = processed.get("answer_relevancy")
@@ -474,11 +508,16 @@ def _evaluate_item_with_feedback(
         )
     else:
         ref_warn = " [bold red][False Refusal][/bold red]" if processed.get("is_refusal") else ""
+        q_str = _format_metric_val(q_comp, 3)
+        f_str = _format_metric_val(f_score, 2)
+        ar_str = _format_metric_val(ar_score, 2)
+        cp_str = _format_metric_val(cp_score, 2)
+        cr_str = _format_metric_val(cr_score, 2)
         console.print(
             f"  [bold green]✓[/bold green] [{item_idx}/{total_items}] Evaluated: "
-            f"Faith=[green]{f_score:.2f}[/green] | Rel=[green]{ar_score:.2f}[/green] | "
-            f"Prec=[green]{cp_score:.2f}[/green] | Rec=[green]{cr_score:.2f}[/green] | "
-            f"Q=[yellow]{q_comp:.3f}[/yellow]{ref_warn} | Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
+            f"Faith=[green]{f_str}[/green] | Rel=[green]{ar_str}[/green] | "
+            f"Prec=[green]{cp_str}[/green] | Rec=[green]{cr_str}[/green] | "
+            f"Q=[yellow]{q_str}[/yellow]{ref_warn} | Latency=[dim]{tot_ms:.0f}ms[/dim] | Cost=[cyan]${cost:.5f}[/cyan]"
         )
     return processed
 
@@ -541,8 +580,8 @@ def run(
     sample: bool = typer.Option(False, "--sample", "-s", help="Use canonical 100-question sample (Thesis §4.2.1)"),
     modules: str = typer.Option("", "--modules", "-m", help="Comma-separated optimization modules (e.g. M1,M2 or S2B,SR)"),
     table_name: Optional[str] = typer.Option(None, "--table-name", help="Vector store table name override"),
-    judge: str = typer.Option("none", "--judge", "-j", help="Judge provider (claude, gemini, vertex, ollama, none)"),
-    judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
+    judge: str = typer.Option("none", "--judge", "-j", envvar="JUDGE_PROVIDER", help="Judge provider (claude, gemini, vertex, ollama, vllm, none)"),
+    judge_model: Optional[str] = typer.Option(None, "--judge-model", envvar="JUDGE_MODEL", help="Judge model identifier"),
     warmup: int = typer.Option(2, "--warmup", "-w", help="Number of unmeasured warm-up queries to eliminate JVM JIT / TLS jitter"),
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable verbose debug logging"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Path to save evaluation results JSONL"),
@@ -551,7 +590,7 @@ def run(
     judge_delay: Optional[float] = typer.Option(
         None,
         "--judge-delay",
-        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Claude/Gemini, 0s for Ollama)",
+        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Claude/Gemini, 0s for vLLM/Ollama)",
     ),
     timeout: float = typer.Option(300.0, "--timeout", help="Timeout in seconds for RAG service requests (default: 300s)"),
     skip_cache_check: bool = typer.Option(False, "--skip-cache-check", help="Skip pre-flight prompt cache verification"),
@@ -663,13 +702,7 @@ def run(
         return
 
     # Determine effective pacing delay between judge requests to prevent 429 quota exhaustion
-    effective_delay: float
-    if judge_delay is not None:
-        effective_delay = max(0.0, judge_delay)
-    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai", "llama", "meta", "maas", "vertex-maas", "vertex-claude", "claude-vertex"):
-        effective_delay = 1.5
-    else:
-        effective_delay = 0.0
+    effective_delay: float = _resolve_judge_delay(judge, judge_delay)
 
     # Initialize RAGAS judge if requested
     ragas_evaluator = None
@@ -718,8 +751,8 @@ def run(
 
 @app.command("test-judge")
 def test_judge(
-    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, gemini, vertex, ollama, none"),
-    judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
+    judge: str = typer.Option("claude", "--judge", "-j", envvar="JUDGE_PROVIDER", help="Judge provider: claude, gemini, vertex, ollama, vllm, none"),
+    judge_model: Optional[str] = typer.Option(None, "--judge-model", envvar="JUDGE_MODEL", help="Judge model identifier"),
 ) -> None:
     """Tests connectivity, responsiveness, and latency of the configured evaluation judge."""
     with console.status(
@@ -866,18 +899,19 @@ def test_cache(
 @app.command()
 def evaluate(
     input_file: Path = typer.Option(..., "--input", "-i", help="Input JSONL file or directory containing run JSONL files"),
-    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, gemini, vertex, ollama, none"),
-    judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSONL path for evaluated results (ignored if input is directory or --inplace is set)"),
+    judge: str = typer.Option("claude", "--judge", "-j", envvar="JUDGE_PROVIDER", help="Judge provider: claude, gemini, vertex, ollama, vllm, none"),
+    judge_model: Optional[str] = typer.Option(None, "--judge-model", envvar="JUDGE_MODEL", help="Judge model identifier"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSONL path (or target directory if input is directory; ignored if --inplace is set)"),
     inplace: bool = typer.Option(False, "--inplace", help="Update input file(s) in place with evaluated metrics"),
     resume: bool = typer.Option(True, "--resume/--no-resume", help="Skip samples that already have non-surrogate RAGAS scores (default: True)"),
     force: bool = typer.Option(False, "--force", "-f", help="Force re-evaluation of all samples even if already evaluated"),
     judge_delay: Optional[float] = typer.Option(
         None,
         "--judge-delay",
-        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Claude/Gemini, 0s for Ollama)",
+        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Claude/Gemini, 0s for vLLM/Ollama)",
     ),
     pricing_tier: str = typer.Option("gemini-3.8-flash", "--pricing-tier", help="Default pricing tier for operational cost calculations"),
+    workers: int = typer.Option(1, "--workers", "-w", help="Number of concurrent worker threads for parallel evaluation (default: 1)"),
 ) -> None:
     """Computes EM, F1, RAGAS metrics, and Composite Q on previously gathered run records."""
     target_path = Path(input_file)
@@ -898,12 +932,8 @@ def evaluate(
     else:
         raise typer.BadParameter(f"Input path not found: {input_file}")
 
-    effective_delay: float
-    if judge_delay is not None:
-        effective_delay = max(0.0, judge_delay)
-    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai", "llama", "meta", "maas", "vertex-maas", "vertex-claude", "claude-vertex"):
-        effective_delay = 1.5
-    else:
+    effective_delay: float = _resolve_judge_delay(judge, judge_delay)
+    if workers > 1:
         effective_delay = 0.0
 
     ragas_evaluator = None
@@ -918,6 +948,8 @@ def evaluate(
         console.print(f"[bold green]✓[/bold green] Judge [magenta]{judge}[/magenta] initialized.")
         if effective_delay > 0:
             console.print(f"[dim]Pacing judge requests ({effective_delay:.1f}s delay) to avoid 429 rate limit errors...[/dim]")
+        if workers > 1:
+            console.print(f"[bold cyan]Parallel evaluation enabled with {workers} worker threads.[/bold cyan]")
 
     all_evaluated_summary: dict[str, list[dict[str, Any]]] = {}
 
@@ -952,27 +984,63 @@ def evaluate(
         if start_idx == 0 and tmp_path.exists():
             tmp_path.unlink()
 
-        for idx in range(start_idx, len(records)):
-            item = records[idx]
-            processed = _evaluate_item_with_feedback(
-                item=item,
-                ragas_evaluator=ragas_evaluator,
-                judge=judge,
-                item_idx=idx + 1,
-                total_items=len(records),
-                pricing_tier=pricing_tier,
-                console=console,
-                resume=resume,
-                force=force,
-            )
-            evaluated_records.append(processed)
+        items_to_process = list(enumerate(records))[start_idx:]
+        if workers > 1 and ragas_evaluator is not None and len(items_to_process) > 0:
+            import threading
+            from concurrent.futures import ThreadPoolExecutor
 
-            # Incremental checkpointing per item to safeguard against interrupts
-            with tmp_path.open("a", encoding="utf-8") as f_tmp:
-                f_tmp.write(json.dumps(processed) + "\n")
+            thread_local = threading.local()
 
-            if ragas_evaluator and effective_delay > 0 and (idx + 1) < len(records):
-                _pacing_delay_with_spinner(effective_delay, current_idx=idx + 1, total_items=len(records), console=console)
+            def _get_worker_evaluator():
+                if not hasattr(thread_local, "evaluator"):
+                    w_llm, w_emb = get_judge_components(provider=judge, model=judge_model)
+                    thread_local.evaluator = RagasEvaluatorWrapper(llm=w_llm, embeddings=w_emb, delay_seconds=0.0)
+                return thread_local.evaluator
+
+            def _worker_task(idx_and_item):
+                idx, itm = idx_and_item
+                evaluator = _get_worker_evaluator()
+                return _evaluate_item_with_feedback(
+                    item=itm,
+                    ragas_evaluator=evaluator,
+                    judge=judge,
+                    item_idx=idx + 1,
+                    total_items=len(records),
+                    pricing_tier=pricing_tier,
+                    console=console,
+                    resume=resume,
+                    force=force,
+                    show_spinner=False,
+                )
+
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                for processed in executor.map(_worker_task, items_to_process):
+                    evaluated_records.append(processed)
+                    with tmp_path.open("a", encoding="utf-8") as f_tmp:
+                        f_tmp.write(json.dumps(processed) + "\n")
+        else:
+            for idx in range(start_idx, len(records)):
+                item = records[idx]
+                processed = _evaluate_item_with_feedback(
+                    item=item,
+                    ragas_evaluator=ragas_evaluator,
+                    judge=judge,
+                    item_idx=idx + 1,
+                    total_items=len(records),
+                    pricing_tier=pricing_tier,
+                    console=console,
+                    resume=resume,
+                    force=force,
+                    show_spinner=True,
+                )
+                evaluated_records.append(processed)
+
+                # Incremental checkpointing per item to safeguard against interrupts
+                with tmp_path.open("a", encoding="utf-8") as f_tmp:
+                    f_tmp.write(json.dumps(processed) + "\n")
+
+                if ragas_evaluator and effective_delay > 0 and (idx + 1) < len(records):
+                    _pacing_delay_with_spinner(effective_delay, current_idx=idx + 1, total_items=len(records), console=console)
 
         # File completed: atomically replace destination with checkpoint
         if tmp_path.exists():
@@ -1009,6 +1077,7 @@ def compare(
     display_comparison_table(comps, console=console)
 
     if output_latex:
+        from src.export_latex import export_wilcoxon_tests_latex
         if output_latex.is_dir() or output_latex.suffix != ".tex":
             output_latex = output_latex / "wilcoxon_tests.tex"
         tex_content = export_wilcoxon_tests_latex(comps, output_latex)
@@ -1230,6 +1299,27 @@ def export_thesis(
 
     console.print(f"Exporting thesis artifacts for [bold]{len(run_dict)}[/bold] configurations (Dataset: [yellow]{dataset_name or 'Default'}[/yellow])...")
 
+    from src.export_latex import (
+        export_benchmark_summary_latex,
+        export_cost_latex,
+        export_hop_breakdown_latex,
+        export_latency_latex,
+        export_pareto_latex,
+        export_quality_enterprise_latex,
+        export_quality_musique_latex,
+        export_wilcoxon_decomposed_latex,
+        export_wilcoxon_tests_latex,
+    )
+    from src.plot_results import (
+        plot_cost_breakdown,
+        plot_latency_breakdown,
+        plot_pareto_frontier,
+        plot_pareto_frontier_3d,
+        plot_quality_delta_matrix,
+        plot_quality_lollipop,
+        plot_ragas_metrics_radar,
+    )
+
     # 1. Export LaTeX Tables
     t_summary = export_benchmark_summary_latex(run_dict, tables_dir / "benchmark_summary.tex")
     console.print(f"  [green]✓[/green] Table: [cyan]{tables_dir / 'benchmark_summary.tex'}[/cyan]")
@@ -1418,8 +1508,8 @@ def query_cmd(
     query_text: str = typer.Argument(..., help="Query or question to ask the RAG pipeline"),
     table_name: str = typer.Option("vector_store_nordea", "--table-name", "-t", help="Target vector store table"),
     modules: str = typer.Option("", "--modules", "-m", help="Comma-separated optimization modules"),
-    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, gemini, vertex, ollama, none"),
-    judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
+    judge: str = typer.Option("claude", "--judge", "-j", envvar="JUDGE_PROVIDER", help="Judge provider: claude, gemini, vertex, ollama, vllm, none"),
+    judge_model: Optional[str] = typer.Option(None, "--judge-model", envvar="JUDGE_MODEL", help="Judge model identifier"),
     ground_truth: Optional[str] = typer.Option(None, "--ground-truth", "-g", help="Optional reference answer"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Optional path to save evaluation result JSONL"),
     url: Optional[str] = typer.Option(None, "--url", help="RAG service URL"),
@@ -1514,15 +1604,15 @@ def run_questions(
     table_name: str = typer.Option("vector_store_nordea", "--table-name", "-t", help="Target vector store table"),
     modules: str = typer.Option("", "--modules", "-m", help="Comma-separated optimization modules"),
     limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of questions to evaluate"),
-    judge: str = typer.Option("claude", "--judge", "-j", help="Judge provider: claude, gemini, vertex, ollama, none"),
-    judge_model: Optional[str] = typer.Option(None, "--judge-model", help="Judge model identifier"),
+    judge: str = typer.Option("claude", "--judge", "-j", envvar="JUDGE_PROVIDER", help="Judge provider: claude, gemini, vertex, ollama, vllm, none"),
+    judge_model: Optional[str] = typer.Option(None, "--judge-model", envvar="JUDGE_MODEL", help="Judge model identifier"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSONL path for evaluated results"),
     url: Optional[str] = typer.Option(None, "--url", help="RAG service URL"),
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable verbose debug logging"),
     judge_delay: Optional[float] = typer.Option(
         None,
         "--judge-delay",
-        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Claude/Gemini, 0s for Ollama)",
+        help="Pacing delay in seconds between judge calls to prevent 429 rate limits (default: 1.5s for cloud judges like Claude/Gemini, 0s for vLLM/Ollama)",
     ),
     timeout: float = typer.Option(300.0, "--timeout", help="Timeout in seconds for RAG service requests (default: 300s)"),
     skip_cache_check: bool = typer.Option(False, "--skip-cache-check", help="Skip pre-flight prompt cache verification"),
@@ -1558,13 +1648,7 @@ def run_questions(
             console=console,
         )
 
-    effective_delay: float
-    if judge_delay is not None:
-        effective_delay = max(0.0, judge_delay)
-    elif judge.lower() in ("gemini", "claude", "vertex", "vertexai", "llama", "meta", "maas", "vertex-maas", "vertex-claude", "claude-vertex"):
-        effective_delay = 1.5
-    else:
-        effective_delay = 0.0
+    effective_delay: float = _resolve_judge_delay(judge, judge_delay)
 
     # Initialize judge if requested
     ragas_evaluator = None

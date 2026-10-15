@@ -67,57 +67,40 @@
   - Ajoskripteissä (esim. `run_musique_all16.sh`) oletus on `LIMIT="${LIMIT:-10}"`.
   - *Muistutus:* Varmista täysissä koeajoissa aina `LIMIT=100`.
 
----
+## Diplomityön korjaukset ja tarkistettavat kohdat
 
-## N=10 Testiajojen löydökset ja kriittiset korjaukset (1.10.2026)
+### Luku 4: Metodologia ja arkkitehtuuri
+- [ ] **MuSiQue & Small-to-Big ($M_1$) parent-ikkunat (Luku 4.3 / 4.4):** Siirrä tai kopioi selitys siitä, miten MuSiQuen 1024 tokenin parent-ikkunat muodostetaan (yhdistämällä saman Wikipedia-artikkelin otsikon alla olevat kappaleet) luvusta 4.6 (*Threats to Validity*, s. 36) jo lukuun 4.3 ($M_1$, s. 28) tai 4.4 (s. 29). Selvennä samalla lyhyesti, miten 128 tokenin child-chunk eroaa baselinesta, kun MuSiQuen kappaleet ovat luonnostaan ~100–150 tokenia.
+- [ ] **Enterprise Closed & Small-to-Big ($M_1$) hierarkia (Luku 4.3 / Liite A):** Täsmennä, miten 1024 tokenin parent-ikkuna muodostetaan *Enterprise Closed* -korpuksessa (haetaanko parent-konteksti alkuperäisestä kokonaisesta Markdown-dokumentista vai valituista candidate passageista).
+- [ ] **Kysymysten vaikeustasot vs. $M_4$ reititys (Luku 4.3 / 4.4):** 
+  - Mainitse luvussa 4.3/4.4, että vaikka MuSiQue sisältää vain 2-hop, 3/4-hop ja unanswerable -kysymyksiä (ei 1-hop-kysymyksiä), zero-shot-reititin voi silti luokitella kysymyksiä 1-hop-tasolle (Flash-Lite).
+  - Täsmennä Enterprise-datasetin osalta (40 % single-hop, 40 % multi-hop, 20 % OOD), miten reitittimen 2-hop vs. 3/4-hop -jako suhtautuu multi-hop-kysymyksiin.
+- [ ] **Terminologian yhtenäistäminen ($M_4$):** Yhtenäistä termien *Model Cascading (MC)* ja *Hybrid Model Routing ($M_4$)* käyttö (Taulukko 2 vs. Taulukko 4 ja luku 4.3). Tee selväksi, että työssä cascading/routing viittaa luokittelijapohjaiseen etukäteisreititykseen (*pre-generation routing*).
+- [ ] **Yhtälö 14 (Reitittimen kustannus, s. 31):** Täsmennä tekstissä, että $N_{\text{route}}(q) \cdot P_{\text{route}}$ huomioi sekä reititinmallin (Flash-Lite) syöte- että tulostetokenien hinnoittelun (tai merkitse se muodossa $C_{\text{route}}(q)$).
+- [ ] **Yhtälöt 23 ja 24 (QPD ja QPS, s. 34):** Muuta yhtälöt konfiguraatiotason (pipeline-level) mittareiksi käyttäen aggregoituja arvoja ($\bar{Q}$, $\text{Cost}_{1\text{k}}$ ja $T_{\text{total}, P_{50}}$), jotta ne vastaavat Taulukoiden 11, 12 ja C4 laskentatapaa ja alaviitteitä.
+- [ ] **Yhtälö 20 (Composite Quality $Q(q)$, s. 33):** Mainitse tekstissä eksplisiittisesti, että taulukoissa raportoitava konfiguraatiotason $Q$ on kysymyskohtaisten harmonisten keskiarvojen $Q(q)$ aritmeettinen keskiarvo $\bar{Q}$.
+- [ ] **Yhtälö 12 ($T_{\text{embed}}(q)$ vs. $T_{\text{ret}}(q)$, s. 30):** Koska $T_{\text{embed}}$ mitataan yhdessä $T_{\text{ret}}$-vaiheen kanssa eikä sitä erotella kuvioissa 1, 2 ja C1, yhdistä ne yhtälössä 12 tai mainitse suoraan, että kuvioiden ja taulukoiden $T_{\text{ret}}$ sisältää $T_{\text{embed}}$-osuuden.
+- [ ] **Taulukko 3 (s. 27):** Poista ylimääräinen sulkumerkki `)` riviltä RQ3 sarakkeesta *Null Hypothesis ($H_0$)*.
+- [ ] **Merkintä $M_0$ vs. $C_0$ (s. 27–28):** Vaihda baselinen merkintä luvussa 4.3 ja Taulukossa 4 muotoon $C_0$ (tai perustele $M_0$), jotta se on linjassa luvun 4.1 ja Taulukon 2 kanssa.
 
-### Evaluointi- ja metriikkakorjaukset (`rag-evaluator`)
-- [x] **M3-kustannuslaskennan tuplalaskutusbugi (`cli.py` rivi 244):**
-  - Kutsussa on kovakoodattu `prompt_is_uncached=True`. Koska `promptTokens` sisältää jo `cachedTokens`-määrän, staattinen prefiksi laskutetaan kahteen kertaan (100 % perushinta + 10 % välimuistimaksu), ja M3 näyttää virheellisesti kalliimmalta kuin C0.
-  - *Korjaus:* Vaihda `prompt_is_uncached=False`, jolloin todellinen ~69 % kustannussäästö toteutuu oikein.
-- [x] **Composite Quality (CompQ) -suodatusvirhe (`reporter.py` rivi 194):**
-  - Ehto `valid_comp_qs = [q for q in comp_qs if q > 0.001]` luulee arvoa ~0.000399 roskadataksi ja suodattaa aiheettomat kieltäytymiset (False Refusal) pois CompQ-keskiarvosta. Tämän vuoksi esim. C7:n CompQ oli harhaanjohtavasti 0.928, vaikka Faithfulness oli vain 0.625.
-  - *Korjaus:* Poista `q > 0.001` -suodatin, jotta epäonnistumiset huomioidaan rehellisesti laatumittareissa.
-- [x] **Mallikatalogin hinnoittelutarkennus (`metrics.py`):**
-  - `PRICING_CATALOG` ei sisällä avainta `gemini-3.5-flash`. Apumetodin osamerkkijonohaku antaa sille tällä hetkellä Flash-Liten puolitetun hinnan.
-  - *Korjaus:* Lisää eksplisiittinen `gemini-3.5-flash`-hinta katalogiin.
+### Luvut 1–3, alkuosa ja lähdeluettelo
+- [ ] **Päivämäärät ja placeholderit (s. 3–5):** Päivitä tiivistelmien (s. 3–4) ja Prefacen (s. 5) päivämäärät (`30 June 2025` -> `2026`) sekä korvaa Prefacen templaattinimet.
+- [ ] **Glossary & Abbreviations (s. 11–12):** Lisää puuttuvat keskeiset lyhenteet: `S2B`, `SR`, `PC`, `MC`, `E2E`, `QPD`, `QPS`, `FRR`, `OOD`, `ICC`, `DCC`, `MRL`, `HNSW`, `KV`, `EM`, `BLEU`, `ROUGE`, `NDCG`, `SLA`.
+- [ ] **Luku 1 – Prompt Caching -kuvaus (s. 13):** Muokkaa sivun 13 kuvausta prompt cachingista vastaamaan työssä käytettyä *Prefix / Context KV Cachingia* (joka nopeuttaa ja halventaa LLM:n prefill-vaihetta) eikä *semantic response cachingia* (joka ohittaa haun ja generoinnin kokonaan).
+- [ ] **Luku 2 – Lyöntivirheet (s. 17–18):**
+  - s. 17: Poista tautologia `subsequently, after which` -> jätä vain `after which` tai `subsequently`.
+  - s. 18: Lisää välilyönti `ifthe` -> `if the`.
+- [ ] **Luku 3 – Muotoilu- ja lyöntivirheet (s. 19–20):**
+  - s. 19: Poista piste yhtälön (3) perästä, jotta lause jatkuu oikein sanalla `maps`.
+  - s. 20: Korjaa sulkeen jälkeinen välilyönti `( 56%)` -> `(~56%)` tai `(56%)`.
+  - s. 20: Lisää välilyönti ennen viitettä `summaries[37]` -> `summaries [37]`.
+- [ ] **References – BibTeX-korjaukset (s. 54–59):**
+  - Viite `[1]`: Korjaa URL `https:///hai.stanford.edu/...` -> `https://hai.stanford.edu/...`.
+  - Viite `[19]`: Poista ylimääräinen piste etunimen perästä (`Numa. Dhamani.`).
+  - Suojaa akronyymit aaltosulkeilla `{}` BibTeXissä (esim. `{RAG}`, `{LLM}`, `{LLMs}`, `{NLP}`, `{GPU}`, `{GPUs}`, `{Q&A}`, `{KV}`, `{BC}`, `{AI}`, `{Spring AI}`, `{FrugalGPT}`, `{RankRAG}`, `{RAGRouter}`, `{Stop-RAG}`, `{Bridge-RAG}`, `{InfoGain-RAG}`, `{InstructRAG}`, `{RAGCache}`, `{TurboRAG}`, `{CacheBlend}`) viitteissä `[2, 4, 6, 7, 9, 11, 25, 27, 35, 36, 37, 39, 41, 43, 44, 45, 46, 47, 48]`.
 
-### Taustajärjestelmän ja suorituksen korjaukset (`rag-benchmark`)
-- [x] **Implisiittisen välimuistin poiskytkentä GCP-projektitasolla (M3-eristys & Internal Validity):**
-  - Gemini 3.x -mallit käyttävät oletuksena automaattista implisiittistä prefix-välimuistia (kynnys: 4 096 tai 6 144 tokenia). Jotta peruskonfiguraatiot (C0, C4 jne.) eivät saa automaattisia alennuksia ja M3:n eksplisiittisen CachedContentin vaikutus voidaan mitata täysin puhtaana, implisiittinen välimuisti on kytketty pois päältä GCP-projektin asetuksista (`disableCache: true`).
-  - Verifiointi ja automaattinen suojaus: varmistettu savutesteillä ja lisätty automaattinen pre-flight -varmistus `rag-evaluator`-ajuriin (`cli.py test-cache` ja `_verify_cache_preflight`), joka estää ajon mikäli ei-M3-ajossa cacheReadInputTokens > 0 tai M3-ajossa cacheReadInputTokens == 0.
-- [x] **M4 Quota 429 / Pro preview RPM Rate Limit (MuSiQue C4 N=9):**
-  - Peräkkäiset Pro-mallin kyselyt ylittivät 5 RPM -kiintiön.
-  - *Korjaus:* Lisätty `RagQueryService`-luokkaan automaattinen retry-backoff 429- ja kiintiövirheille. Vain onnistunut generointi kirjataan latenssiin ja metriikoihin.
-- [x] **M3 Context Cachen 300 s (5 min) TTL -latenssipiikit:**
-  - LLM-as-a-judge -arvioinnin kestäessä kyselyiden välissä, 5 minuutin TTL ehti vanheta kesken ajon, mikä pakotti luomaan uuden välimuistin synkronisesti (kesti 46–70 s ja aiheutti P95-latenssipiikit).
-  - *Korjaus:* Nostettu välimuistin oletus-TTL 3600 sekuntiin (60 minuuttiin / 1 tunti) tiedostoissa `application.yml` ja `PromptCacheProperties.java`. Tämä takaa kaikkien mallikohtaisten välimuistien (Lite, Flash, Pro) säilymisen koko mittausajon ajan.
-
-
-### Tutkielman taulukkovienti ja Luvun 5 taulukkoviittaukset (`05_results.tex`)
-- [x] **Luvun 5 `tab_*`-taulukoiden vienti ja päivitys (`export-thesis` vs `05_results.tex`):**
-  - **Ongelma:** [`05_results.tex`](file:///home/eitsei/dippa/thesis/chapters/05_results.tex) viittaa `\input`-komennoilla vanhoihin taulukoihin:
-    - `tables/musique/tab_latency_musique.tex` (24.9.)
-    - `tables/musique/tab_cost_musique.tex` (24.9., Taulukko 7, jossa `Cached Prompt Tokens = 0.0`)
-    - `tables/musique/tab_quality_musique.tex` (24.9.)
-    - `tables/musique/tab_pareto_musique.tex` (24.9.)
-    - `tables/enterprise_closed/tab_latency_enterprise.tex` (28.9.)
-    - `tables/enterprise_closed/tab_cost_enterprise.tex` (28.9.)
-    - `tables/enterprise_closed/tab_pareto_enterprise.tex` (28.9.)
-  - Evaluointityökalun [`src/cli.py export-thesis`](file:///home/eitsei/dippa/rag-code/rag-evaluator/src/cli.py#L756) ei tällä hetkellä generoi noita `tab_*`-taulukoita (se luo vain `benchmark_summary.tex`, `hop_breakdown.tex`, `wilcoxon_*.tex` ja `tab_quality_enterprise.tex`).
-  - **Korjaus:**
-    - Lisää `src/export_latex.py`- ja `src/cli.py`-moduuleihin automaattinen vienti Luvun 5 taulukoille (`tab_latency_*`, `tab_cost_*`, `tab_quality_*`, `tab_pareto_*`) suoraan ajetusta JSONL-tuloshakemistosta, tai päivitä `05_results.tex` käyttämään `export-thesis`:n tuottamia dekomponoituja taulukoita (`wilcoxon_rq1_latency`, `wilcoxon_rq2_cost` jne.).
-    - Aja taulukkovienti uudelleen tuoreimmille `musique_all16_final` ja `enterprise_closed` -ajoille, jotta Taulukkoon 7 päivittyy oikea ~7 153 tokenin välimuistiosuma.
-- [x] **Kuvien ja taulukoiden aikaleimaristiriita Luvussa 5:**
-  - `figures/musique/*` ja `figures/enterprise_closed/*` on generoitu 1.10. uusimmista ajoista, kun taas taulukot `tab_*` ovat peräisin 24.–28.9. Tämän vuoksi samaa konfiguraatiota esittävä taulukko ja viereinen kuvaaja näyttävät eri lukuja (esim. Taulukko 7 vs Kuva 5.3). Taulukot ja kuvat tulee generoida aina synkronoidusti samasta hyväksytystä testiajosta.
-- [x] **Kovakoodattu "($N = 100$)" taulukko-otsikoissa (`tab_quality_*` ja `export_latex.py` rivi 673):**
-  - Otsikossa lukee `($N = 100$)`, vaikka data on $N = 10$ testiajosta (josta seuraa esim. Exact Match 11.1 % ja FRR 12.5 %).
-  - *Korjaus:* Tee otsikon $N$-arvosta dynaaminen (`N = {len(records)}`) `export_latex.py`:ssä tai varmista että $N=100$ -otsikkoa käytetään vasta kun lopullinen täysi aineisto on ajettu.
-- [x] **Kovakoodattu MuSiQue-teksti Enterprise-taulukon otsikossa (`hop_breakdown.tex` / `export_latex.py` rivi 120):**
-  - `export_hop_breakdown_latex`-funktiossa kuvateksti on kovakoodattu: `"Benchmark evaluation performance stratified by MuSiQue reasoning depth tiers."`, jolloin Enterprise-kansioihin vietäessä otsikko väittää aineistoa virheellisesti MuSiQueksi.
-  - *Korjaus:* Tee otsikosta aineistoparametrin mukaan mukautuva (`f"Benchmark evaluation performance stratified by {dataset_name} reasoning depth tiers."`).
-- [x] **Tuplaleimat (`\label`) kuvaympäristöissä (`05_results.tex` ja `0C_appendix.tex`):**
-  - Rinnakkaiset `\label{fig:quality_lollipop_*}` ja `\label{fig:quality_radar_*}` samassa `figure`-lohkossa (riveillä 67–68 ja 80–81 Luvussa 5 sekä 27–28 Liitteessä C) voivat aiheuttaa LaTeX-viittausvirheitä ja varoituksia.
-  - *Korjaus:* Yhtenäistä tekstiviittaukset käyttämään ensisijaista lollipop-leimaa ja poista vanhentuneet radar-leimat.
-- [x] **Päivitä taulukko-ohjeistus (`thesis/tables/README.md`):**
-  - Päivitä dokumentaatio vastaamaan nykyistä rakennetta (`enterprise/`, `enterprise_closed/`, `musique/` ja Luvun 5 `tab_*`-tiedostot vanhan `nordea/`-rakenteen sijaan). 
+### Mittausputki ja visualisointiskriptit (tarkistettava ennen täysiä ajoja)
+- [ ] **Taulukko C2 (s. 65) – PC-konfiguraatioiden token-sarakkeet:** Tarkista skriptistä, miksi Taulukossa C2 kaikilla `PC`-konfiguraatioilla *Cached Prompt Tok* on `0` ja *Uncached Prompt Tok* on vain ~20–34 tokenia.
+- [ ] **Kuviot 3, 4 ja C2 vs. Taulukot 7, 8 ja C2 (PC-kustannukset):** Korjaa pylväskuvioiden (`Cost Breakdown`) piirtoskripti `Context Cache (C_cache)` -kustannuksen osalta. Nyt Kuviossa 3 `PC`-konfiguraation hinta on `$1.568`, kun se Taulukossa 7 on `$0.495`.
+- [ ] **Liite C (Taulukko C3 ja Kuvio C3, s. 66–67) – Answer Relevancy = 0.000:** Varmista, miksi `Answer Relevancy` on palauttanut `0.000` kaikille konfiguraatioille Enterprise Raw -testiajossa (joka nollaa samalla Composite Qualityn $Q \approx 0.0004$ sekä QPD/QPS-arvot Taulukossa C4).
+- [ ] **Taulukko 11 (s. 47) – QPS-laskenta:** Tarkista skriptistä, miksi Taulukon 11 QPS-sarake ei täsmää suoraan kaavaan `Q / T_total P50` (esim. S2B: `0.4431 / 1.68 = 0.26`, mutta taulukossa lukee `0.16`).
