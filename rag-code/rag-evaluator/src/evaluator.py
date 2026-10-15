@@ -113,7 +113,7 @@ class RagEvaluator:
         llm: BaseChatModel | None = None,
         embeddings: Embeddings | None = None,
         metrics: Sequence[Metric] | None = None,
-        judge_provider: str = "ollama",
+        judge_provider: str = "vllm",
     ) -> None:
         if llm is None or embeddings is None:
             factory_llm, factory_emb = JudgeFactory.create_judge(provider=judge_provider)
@@ -510,7 +510,7 @@ class RagEvaluator:
 def evaluate_run(
     jsonl_path: str | Path,
     output_dir: str | Path | None = None,
-    judge_provider: str = "ollama",
+    judge_provider: str = "vllm",
     llm: BaseChatModel | None = None,
     embeddings: Embeddings | None = None,
     metrics: Sequence[Metric] | None = None,

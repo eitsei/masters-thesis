@@ -10,14 +10,14 @@
 \toprule
 \textbf{Model / Service} & \textbf{Pipeline Role} & \makecell[r]{\textbf{Prompt}\\\textbf{(\$/1M)}} & \makecell[r]{\textbf{Cached}\\\textbf{(\$/1M)}} & \makecell[r]{\textbf{Output}\\\textbf{(\$/1M)}} & \makecell[r]{\textbf{Auxiliary}\\\textbf{Unit Rate}} & \textbf{Source} \\
 \midrule
-Gemini 3.5 Flash & Primary Workhorse ($M_0, M_4$) & \$1.50 & \$0.15 & \$9.00 & -- & \citep{GoogleVertexAIPricing} \\
+Gemini 3.5 Flash & Primary Workhorse ($C_0, M_4$) & \$1.50 & \$0.15 & \$9.00 & -- & \citep{GoogleVertexAIPricing} \\
 Gemini 3.5 Flash-Lite & Router Classifier ($M_4$) & \$0.30 & \$0.03 & \$2.50 & -- & \citep{GoogleVertexAIPricing} \\
 Gemini 3.1 Pro Preview & Complex Multi-Hop ($M_4$) & \$2.00 & \$0.20 & \$12.00 & -- & \citep{GoogleVertexAIPricing} \\
 \midrule
 Vertex AI Ranking & Cross-Encoder Re-rank ($M_2$) & -- & -- & -- & \$0.00010/doc & \citep{GoogleVertexAIRankingPricing} \\
 Embeddings for Text & Dense Vectorization & \$0.025 & -- & -- & -- & \citep{GoogleVertexAIPricing} \\
 \midrule
-Qwen3.8-27B & Evaluation Judge (RAGAS) & \multicolumn{3}{c}{\textit{Local Execution}} & \$0.00/query & \citep{qwen2024qwen25} \\
+Qwen3.8-27B & Evaluation Judge (RAGAS) & \multicolumn{3}{c}{\textit{Local Execution}} & \$0.00/query & \citep{yang2025qwen3} \\
 BGE-M3 & Evaluation Embedding & \multicolumn{3}{c}{\textit{Local Execution}} & \$0.00/query & \citep{chen2024bge} \\
 \bottomrule
 \end{tabularx}

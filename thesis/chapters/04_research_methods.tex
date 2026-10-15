@@ -4,7 +4,7 @@ Section~\ref{subsec:eval_metrics} specifies the quantitative evaluation metrics 
 \subsection{Research Methodology}
 \label{subsec:res_methodology}
 
-The empirical research is conducted using quantitative benchmarking following a two-stage experimental strategy. In the first stage, each optimization module is evaluated in isolation against the naive RAG baseline ($C_0$) to quantify its individual performance characteristics. In the second stage, combinatorial configurations—spanning pairwise pairings, multi-module triplets, and the fully integrated full-stack pipeline—are systematically tested against the baseline to identify the Pareto frontier and investigate systemic trade-offs between combined techniques. The complete experimental design matrix is presented in Table~\ref{tab:combination_matrix}. This evaluation framework directly addresses the research questions formulated in Table~\ref{tab:research_questions}. To ensure statistical reliability, two unmeasured warm-up queries precede the evaluation of the benchmark suite. Each configuration in the $2^4 = 16$ experimental matrix is evaluated across the 100 benchmark queries per dataset (yielding a sample size of $N = 100$ paired observations per dataset, or $N = 200$ across both corpora), resulting in 3,200 total measured pipeline invocations across the experimental matrix.
+The empirical research is conducted using quantitative benchmarking following a two-stage experimental strategy. In the first stage, each optimization module is evaluated in isolation against the naive RAG baseline ($C_0$) to quantify its individual performance characteristics. In the second stage, combinatorial configurations---spanning pairwise pairings, multi-module triplets, and the fully integrated full-stack pipeline---are systematically tested against the baseline to identify the Pareto frontier and investigate systemic trade-offs between combined techniques. The complete experimental design matrix is presented in Table~\ref{tab:combination_matrix}. This evaluation framework directly addresses the research questions formulated in Table~\ref{tab:research_questions}. To ensure statistical reliability, two unmeasured warm-up queries precede the evaluation of the benchmark suite. Each configuration in the $2^4 = 16$ experimental matrix is evaluated across the 100 benchmark queries per dataset (yielding a sample size of $N = 100$ paired observations per dataset, or $N = 200$ across both corpora), resulting in 3,200 total measured pipeline invocations across the experimental matrix.
 
 \begin{table}[!htbp]
 \centering
@@ -67,7 +67,7 @@ Tests are conducted independently across each evaluation metric using a two-tail
 \addlinespace
 \textbf{RQ2} & Cost (USD / tokens) & $\tilde{\mu}_{\Delta \text{Cost}} = 0$  & $\tilde{\mu}_{\Delta \text{Cost}} \neq 0$  \\
 \addlinespace
-\textbf{RQ3} & Quality (RAGAS) & $\tilde{\mu}_{\Delta \text{Quality}} = 0$ ) & $\tilde{\mu}_{\Delta \text{Quality}} \neq 0$ \\
+\textbf{RQ3} & Quality (RAGAS) & $\tilde{\mu}_{\Delta \text{Quality}} = 0$ & $\tilde{\mu}_{\Delta \text{Quality}} \neq 0$ \\
 \bottomrule
 \end{tabularx}
 
@@ -97,7 +97,7 @@ Each optimization method encompasses a broad architectural design space. For exa
     \toprule
     \textbf{Module} & \textbf{Optimization Strategy} & \textbf{Variables and Configuration}\\
     \midrule
-    \textbf{$M_0$} & Naive RAG (Baseline)
+    \textbf{$C_0$} & Naive RAG (Baseline)
       & Chunk size: $\le 512$ tokens, retrieval: top-$k = 5$.
       \\
     \addlinespace
@@ -120,14 +120,14 @@ Each optimization method encompasses a broad architectural design space. For exa
     \end{tabularx}
     \end{table}
 
-\paragraph{Naive Baseline Configuration ($M_0$).}
+\paragraph{Naive Baseline Configuration ($C_0$).}
 Due to the structure of the evaluation datasets, a maximum chunk size of 512 tokens is adopted without sliding window overlap. Specifically, the MuSiQue corpus naturally consists of pre-segmented Wikipedia paragraphs (typically 100--150 tokens) that are ingested without additional splitting, whereas the Enterprise corpus is partitioned into logical document sections capped at 512 tokens. In addition, dense vector retrieval of $\text{top-}k = 5$ is chosen as the baseline configuration, reflecting standard experimental benchmarks in recent literature~\citep{smigielski2026chunking, lewis2020rag}.
 
 \paragraph{Small-to-Big Retrieval ($M_1$).}
 Child chunks of 128 tokens expanding into 1024-token parent context windows are selected based on empirical configurations in recent hierarchical RAG studies~\citep{demourajunior2026adaptive, li2026bridgerag, lumer2025rethinking}. Furthermore, when multiple retrieved child chunks originate from the same parent document, parent-ID deduplication is applied to retain the highest-ranked occurrence, preventing redundant token consumption and context duplication.
 
 \paragraph{Two-Stage Semantic Re-ranking ($M_2$).}
-The candidate retrieval pool for $M_2$ is generated using dense vector embeddings from \texttt{gemini-embedding-2} and re-ranked using the GCP Vertex AI Ranking API with the \texttt{semantic-\allowbreak{}ranker-\allowbreak{}default-\allowbreak{}004} cross-encoder model. The candidate pool size depends on the active pipeline composition: in isolated configurations ($C_2$), first-stage vector search retrieves a candidate pool of 50 baseline chunks to match the $M_0$ baseline granularity. In combined configurations ($C_5, C_{11}, C_{12}, C_{15}$), the first-stage vector search retrieves 50 child chunks of 128 tokens each, which are re-ranked directly by \texttt{semantic-\allowbreak{}ranker-\allowbreak{}default-\allowbreak{}004} before the top-5 winning chunks are expanded to their 1024-token parent context windows.
+The candidate retrieval pool for $M_2$ is generated using dense vector embeddings from \texttt{gemini-embedding-2} and re-ranked using the GCP Vertex AI Ranking API with the \texttt{semantic-\allowbreak{}ranker-\allowbreak{}default-\allowbreak{}004} cross-encoder model. The candidate pool size depends on the active pipeline composition: in isolated configurations ($C_2$), first-stage vector search retrieves a candidate pool of 50 baseline chunks to match the $C_0$ baseline granularity. In combined configurations ($C_5, C_{11}, C_{12}, C_{15}$), the first-stage vector search retrieves 50 child chunks of 128 tokens each, which are re-ranked directly by \texttt{semantic-\allowbreak{}ranker-\allowbreak{}default-\allowbreak{}004} before the top-5 winning chunks are expanded to their 1024-token parent context windows.
 
 \paragraph{Prompt Caching ($M_3$).}
 A minimum threshold of 4\,096 tokens is selected to satisfy the operational boundary of Google Cloud Vertex AI Context Caching for static system instructions and pre-indexed knowledge corpora. To exceed this operational threshold naturally without synthetic padding, a static system prompt incorporating an in-context learning (ICL) library of eight extensive few-shot reasoning demonstrations ($\approx 5{,}100$ tokens) is prepended to the context. Conversely, dynamically retrieved top-$k$ document chunks and incoming user queries are decoupled from the cached prefix and processed as dynamic input tokens during generation. To eliminate cold-start latency associated with initial cache allocation, two unmeasured pre-warming invocations precede each caching-enabled experimental run. Furthermore, implicit caching is disabled across all configurations, and active caches are explicitly cleared between distinct experimental runs to prevent cross-configuration state leakage.
@@ -147,7 +147,7 @@ The enterprise dataset is evaluated in two distinct configurations. The main res
 \subsection{Evaluation Setup and Metrics}
 \label{subsec:eval_metrics}
 
-The empirical evaluation of system performance, operational expenditure, and response quality is conducted using the industry-standard RAGAS evaluation suite~\citep{es2024ragas} combined with enterprise-grade application telemetry. Within the RAGAS framework, the open-weights language model Qwen3.8-27B is deployed locally via vLLM as an automated LLM-as-a-judge at zero temperature ($T=0.0$) with greedy decoding to ensure deterministic evaluation scoring, while dense semantic similarity for Answer Relevancy is computed locally using the BGE-M3 embedding model~\citep{chen2024bge}. The following subsections formally establish the measurement instrumentation and mathematical formulations for each research question.
+The empirical evaluation of system performance, operational expenditure, and response quality is conducted using the industry-standard RAGAS evaluation suite~\citep{es2024ragas} combined with enterprise-grade application telemetry. Within the RAGAS framework, the open-weights language model Qwen3.8-27B~\citep{yang2025qwen3} is deployed locally via vLLM as an automated LLM-as-a-judge at zero temperature ($T=0.0$) with greedy decoding to ensure deterministic evaluation scoring, while dense semantic similarity for Answer Relevancy is computed locally using the BGE-M3 embedding model~\citep{chen2024bge}. The following subsections formally establish the measurement instrumentation and mathematical formulations for each research question.
 
 \subsubsection{Latency Profiles and Computational Overhead}
 \label{sec:latency}
@@ -162,7 +162,7 @@ T_{\text{total}}(q) ={} & T_{\text{embed}}(q) + T_{\text{route}}(q) + T_{\text{r
 \end{split}
 \end{equation}
 
-where $T_{\text{embed}}$ denotes query vectorization duration (measured jointly with $T_{\text{ret}}$), $T_{\text{route}}$ is the model cascading routing overhead, $T_{\text{ret}}$ is the first-stage HNSW vector search latency, $T_{\text{rerank}}$ is the cross-encoder semantic re-ranking duration, $T_{\text{expand}}$ is the parent-document metadata resolution time, $T_{\text{cache}}$ is the context cache lookup and validation latency, $T_{\text{prefill}}$ is the generator prefill duration, and $T_{\text{stream}}$ is the streaming token generation duration. For pipeline configurations where specific optimization modules are inactive, their corresponding latency terms evaluate to zero. Under this formulation, user-perceived Time to First Token is defined as:
+where $T_{\text{embed}}$ denotes query vectorization duration, $T_{\text{route}}$ is the model cascading routing overhead, $T_{\text{ret}}$ is the first-stage HNSW vector search latency (which includes $T_{\text{embed}}$ in all reported tables and figures), $T_{\text{rerank}}$ is the cross-encoder semantic re-ranking duration, $T_{\text{expand}}$ is the parent-document metadata resolution time, $T_{\text{cache}}$ is the context cache lookup and validation latency, $T_{\text{prefill}}$ is the generator prefill duration, and $T_{\text{stream}}$ is the streaming token generation duration. For pipeline configurations where specific optimization modules are inactive, their corresponding latency terms evaluate to zero. Under this formulation, user-perceived Time to First Token is defined as:
 
 \begin{equation}
 \label{eq:ttft}
@@ -186,7 +186,7 @@ Operational expenditure constitutes a critical bottleneck for enterprise RAG ado
 \end{equation}
 
 
-where $m(q) \in \{\text{Flash-Lite}, \text{Flash}, \text{Pro}\}$ represents the active generative model tier selected for query $q$, $N_{\text{embed}}$ is the number of query tokens vectorized at unit rate $P_{\text{embed}}$, and $N_{\text{uncached}}$ and $N_{\text{cached}}$ represent uncached and cached prompt tokens billed at tier-specific rates $P_{\text{prompt}}^{(m(q))}$ and $P_{\text{cached}}^{(m(q))}$, reflecting model-specific caching discount rates detailed in Table~\ref{tab:pricing_catalog}. In Module $M_3$, the static prefix tokens are billed at the discounted rate $P_{\text{cached}}^{(m(q))}$, whereas dynamically retrieved chunks and runtime query tokens are accounted for under standard prompt pricing $P_{\text{prompt}}^{(m(q))}$. Furthermore, $N_{\text{comp}}$ denotes the generated completion tokens billed at rate $P_{\text{comp}}^{(m(q))}$, $N_{\text{rerank}}$ represents the count of candidate passages evaluated by the cross-encoder at per-document rate $P_{\text{rerank}}$, and $N_{\text{route}}$ denotes tokens consumed by the classifier during model routing ($M_4$) at rate $P_{\text{route}}$. Fixed persistent infrastructure expenses, including time-based context cache storage fees, are invariant across configurations and negligible over the evaluation duration, and are therefore excluded from per-query operational cost calculations. The complete unit tariff schedule, encompassing all evaluated generative model tiers, cross-encoder ranking services, and embedding models alongside official vendor documentation references and acquisition timestamps (September 2026), is detailed in Appendix~\ref{sec:appendix_pricing} (Table~\ref{tab:pricing_catalog}).
+where $m(q) \in \{\text{Flash-Lite}, \text{Flash}, \text{Pro}\}$ represents the active generative model tier selected for query $q$, $N_{\text{embed}}$ is the number of query tokens vectorized at unit rate $P_{\text{embed}}$, and $N_{\text{uncached}}$ and $N_{\text{cached}}$ represent uncached and cached prompt tokens billed at tier-specific rates $P_{\text{prompt}}^{(m(q))}$ and $P_{\text{cached}}^{(m(q))}$, reflecting model-specific caching discount rates detailed in Table~\ref{tab:pricing_catalog}. In Module $M_3$, the static prefix tokens are billed at the discounted rate $P_{\text{cached}}^{(m(q))}$, whereas dynamically retrieved chunks and runtime query tokens are accounted for under standard prompt pricing $P_{\text{prompt}}^{(m(q))}$. Furthermore, $N_{\text{comp}}$ denotes the generated completion tokens billed at rate $P_{\text{comp}}^{(m(q))}$, $N_{\text{rerank}}$ represents the count of candidate passages evaluated by the cross-encoder at per-document rate $P_{\text{rerank}}$, and $N_{\text{route}}(q) \cdot P_{\text{route}}$ accounts for the classification cost during model routing ($M_4$), covering both input and output token pricing of the router model. Fixed persistent infrastructure expenses, including time-based context cache storage fees, are invariant across configurations and negligible over the evaluation duration, and are therefore excluded from per-query operational cost calculations. The complete unit tariff schedule, encompassing all evaluated generative model tiers, cross-encoder ranking services, and embedding models alongside official vendor documentation references and acquisition timestamps (September 2026), is detailed in Appendix~\ref{sec:appendix_pricing} (Table~\ref{tab:pricing_catalog}).
 
 Because individual execution expenditures in highly optimized or cached architectures are fractional (frequently falling below $\$0.001$ per request), presenting single-query costs directly introduces significant rounding truncation in empirical summaries. Consequently, operational expenditures in benchmark summary tables and Pareto frontier analyses are normalized and reported per 1,000 queries:
 
@@ -202,7 +202,7 @@ providing an intuitive, standard enterprise pricing metric that transparently re
 
 Latency reduction and operational cost minimization are viable only if the response quality of the RAG pipeline satisfies end-user requirements. RAG pipelines exhibit two primary failure modes: retrieval failure and generation failure. Retrieval failure is defined as the inability to retrieve relevant context passages or the inclusion of irrelevant noise, whereas generation failure occurs when, despite retrieving relevant context, the generator produces an inaccurate response or hallucinated claims. 
 
-To evaluate quality across both stages of the pipeline, the RAGAS~\citep{es2024ragas} framework provides dedicated metrics, formulated in Equations~\ref{eq:context_precision}--\ref{eq:answer_relevance}. While RAGAS is subject to the stochastic nature of LLM evaluation judges (discussed in Section~\ref{subsec:threats_to_validity}), objective, deterministic token-level lexical overlap metrics—specifically token $F_1$ and Exact Match ($EM$)—are additionally computed against gold standard reference answers. Finally, a composite quality score is calculated to synthesize overall pipeline performance for the Pareto trade-off analysis in Section~\ref{sec:pareto}.
+To evaluate quality across both stages of the pipeline, the RAGAS~\citep{es2024ragas} framework provides dedicated metrics, formulated in Equations~\ref{eq:context_precision}--\ref{eq:answer_relevance}. While RAGAS is subject to the stochastic nature of LLM evaluation judges (discussed in Section~\ref{subsec:threats_to_validity}), objective, deterministic token-level lexical overlap metrics---specifically token $F_1$ and Exact Match ($EM$)---are additionally computed against gold standard reference answers. Finally, a composite quality score is calculated to synthesize overall pipeline performance for the Pareto trade-off analysis in Section~\ref{sec:pareto}.
 
 The evaluated RAGAS quality metrics are defined as follows:
 
@@ -252,7 +252,7 @@ where $N$ denotes the number of synthetic questions generated from the model's r
 Q(q) = \frac{4}{\frac{1}{\text{CP}(q) + \epsilon} + \frac{1}{\text{CR}(q) + \epsilon} + \frac{1}{\text{Faith}(q) + \epsilon} + \frac{1}{\text{AR}(q) + \epsilon}}
 \end{equation}
 
-where $\text{CP}(q)$, $\text{CR}(q)$, $\text{Faith}(q)$, and $\text{AR}(q)$ denote Context Precision, Context Recall, Faithfulness, and Answer Relevancy for query $q$, respectively, and $\epsilon = 10^{-4}$ is a minimal smoothing parameter introduced to guarantee numerical stability and penalize catastrophic failures in any single quality dimension.
+where $\text{CP}(q)$, $\text{CR}(q)$, $\text{Faith}(q)$, and $\text{AR}(q)$ denote Context Precision, Context Recall, Faithfulness, and Answer Relevancy for query $q$, respectively, and $\epsilon = 10^{-4}$ is a minimal smoothing parameter introduced to guarantee numerical stability and penalize catastrophic failures in any single quality dimension. At the pipeline level, the Composite Quality score reported in evaluation tables and Pareto figures represents the arithmetic mean across all answerable queries, denoted as $\bar{Q} = \frac{1}{|Q_{\text{ans}}|} \sum_{q \in Q_{\text{ans}}} Q(q)$.
 
 In addition to the standard RAGAS dimensions, Refusal Accuracy and False Refusal Rate (FRR) are evaluated to quantify the capability of each pipeline to handle non-answerable and out-of-domain queries. This dual-metric formulation addresses an inherent limitation of reference-free RAG evaluation suites~\citep{es2024ragas}: when a pipeline correctly abstains from answering an unanswerable query by emitting the standardized refusal string, generation-level RAGAS metrics (particularly Faithfulness and Answer Relevancy) falsely score zero due to the absence of affirmative factual claims. To preserve evaluation integrity, RAGAS quality metrics ($CP$, $CR$, $\text{Faith}$, and $AR$) as well as the Composite Quality score $Q(q)$ (Equation~\ref{eq:composite_quality}) are computed exclusively over the answerable query partition $Q_{\text{ans}}$, while abstention behavior is evaluated using Equations~\ref{eq:refusal_accuracy} and~\ref{eq:false_refusal_rate}.
 
@@ -281,15 +281,15 @@ To identify the Pareto frontier and quantify the trade-offs between response qua
 
 \begin{equation}
 \label{eq:qpd}
-\text{QPD}(q) = \frac{Q(q)}{\text{Cost}(q)}
+\text{QPD} = \frac{\bar{Q}}{\text{Cost}_{1\text{k}} / 1000}
 \end{equation}
 
 \begin{equation}
 \label{eq:qps}
-\text{QPS}(q) = \frac{Q(q)}{T_{\text{total}}(q) / 1000}
+\text{QPS} = \frac{\bar{Q}}{T_{\text{total}, P_{50}}}
 \end{equation}
 
-where $Q(q)$ is the composite quality score from Equation~\ref{eq:composite_quality}, $\text{Cost}(q)$ is the total monetary execution cost in USD from Equation~\ref{eq:costs}, and $T_{\text{total}}(q) / 1000$ represents end-to-end execution latency converted from milliseconds to seconds from Equation~\ref{eq:latency}. Together, these ratios allow systematic identification of configurations that maximize generative quality while minimizing operational latency and cost overhead.
+where $\bar{Q}$ is the configuration-level composite quality score, $\text{Cost}_{1\text{k}}$ is the operational cost per 1,000 queries in USD from Equation~\ref{eq:cost_1k}, and $T_{\text{total}, P_{50}}$ is the median end-to-end execution latency in seconds. Together, these ratios allow systematic identification of configurations that maximize generative quality while minimizing operational latency and cost overhead.
 
 \subsection{Threats to Validity}
 \label{subsec:threats_to_validity}

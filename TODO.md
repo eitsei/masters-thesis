@@ -14,9 +14,8 @@
     - `rag.models.google-genai.pro: gemini-3.1-pro-preview` $\to$ gradussa `gemini-3.1-pro`
     - `text.model: gemini-embedding-001` $\to$ gradussa `gemini-embedding-2` (768 d MRL)
   - *Toimenpide:* Päivitä oletusarvot tiedostoon [`rag-code/rag-benchmark/src/main/resources/application.yml`](rag-code/rag-benchmark/src/main/resources/application.yml) tai varmista ympäristömuuttujat (`GOOGLE_GENAI_CHAT_MODEL`, `GOOGLE_GENAI_PRO_MODEL`, `GOOGLE_GENAI_EMBEDDING_MODEL`) ennen ajoja.
-- [ ] **RAGAS LLM-tuomarin asetus tuotantoajoihin (`rag-evaluator`):**
-  - Koodissa on täysi Claude Sonnet 5 -tuki Vertex AI Model Gardenissa (`judge_factory.py`), mutta `.env`- ja `evaluator.py`-tiedostojen oletuksena on kehitysaikainen `gemini-3.5-flash-lite` / `ollama`.
-  - *Toimenpide:* Varmista, että virallisissa testiajoissa ajetaan parametreilla `--judge claude --judge-model claude-sonnet-5` (tai `JUDGE_PROVIDER=claude`, `JUDGE_MODEL=claude-sonnet-5`).
+- [x] **RAGAS LLM-tuomarin asetus tuotantoajoihin (`rag-evaluator`):**
+  - Evaluointituomariksi vahvistettu paikallinen `vllm` (`qwen3.8-27b` + `bge-m3`), joka ei kuluta pilvikrediittejä. `judge_factory.py` siivottu tukemaan oletuksena `vllm`-tuomaria (sekä vaihtoehtona `vertex-gemini`). Claude-, Ollama- ja Vertex MaaS -koodit poistettu tarpeettomina.
 - [ ] **Täyden otoskoon varmistus ajoskripteissä (`LIMIT=100`):**
   - Skripteissä [`run_musique_all16.sh`](rag-code/rag-evaluator/scripts/run_musique_all16.sh) ja [`run_nordea_closed_all16.sh`](rag-code/rag-evaluator/scripts/run_nordea_closed_all16.sh) oletusarvo on `LIMIT="${LIMIT:-10}"` (pilot-testaus).
   - *Toimenpide:* Aseta oletukseksi `LIMIT=100` tai aja komennolla `LIMIT=100 ./scripts/run_...` täyden 3 200 kutsun matriisin ($16 \times 100 \times 2$) tuottamiseksi.
@@ -51,7 +50,7 @@
   - Varmista, että kumppaniin viitataan yhtenäisellä termistöllä kaikkialla tutkielmassa ja liitteissä.
 - [ ] **Viimeistele tekstit ja kieliasu:**
   - Tarkista väliviivat (`--`), ajatusviivat (`---`) ja termistö. Keskustele vielä Laurin kanssa läpi.
-  - Päivitä Judge-malli teksteihin ja varmista krediitit.
+  - [x] Päivitä Judge-malli teksteihin ja varmista krediitit: Evaluointituomariksi vahvistettu tutkielman mukainen Qwen3.8-27B (vLLM local), joka ei kuluta GCP-krediittejä. Tutkielmatekstiä ei muuteta (käyttää jo valmiiksi Qwen3.8-27B:tä). Judge-koodi siivottu tukemaan vLLM:ää oletuksena.
 
 ### Taustajärjestelmä (`rag-benchmark`)
 - [x] **Generointimallin lämpötila (Temperature):**
@@ -76,25 +75,25 @@
   - Mainitse luvussa 4.3/4.4, että vaikka MuSiQue sisältää vain 2-hop, 3/4-hop ja unanswerable -kysymyksiä (ei 1-hop-kysymyksiä), zero-shot-reititin voi silti luokitella kysymyksiä 1-hop-tasolle (Flash-Lite).
   - Täsmennä Enterprise-datasetin osalta (40 % single-hop, 40 % multi-hop, 20 % OOD), miten reitittimen 2-hop vs. 3/4-hop -jako suhtautuu multi-hop-kysymyksiin.
 - [ ] **Terminologian yhtenäistäminen ($M_4$):** Yhtenäistä termien *Model Cascading (MC)* ja *Hybrid Model Routing ($M_4$)* käyttö (Taulukko 2 vs. Taulukko 4 ja luku 4.3). Tee selväksi, että työssä cascading/routing viittaa luokittelijapohjaiseen etukäteisreititykseen (*pre-generation routing*).
-- [ ] **Yhtälö 14 (Reitittimen kustannus, s. 31):** Täsmennä tekstissä, että $N_{\text{route}}(q) \cdot P_{\text{route}}$ huomioi sekä reititinmallin (Flash-Lite) syöte- että tulostetokenien hinnoittelun (tai merkitse se muodossa $C_{\text{route}}(q)$).
-- [ ] **Yhtälöt 23 ja 24 (QPD ja QPS, s. 34):** Muuta yhtälöt konfiguraatiotason (pipeline-level) mittareiksi käyttäen aggregoituja arvoja ($\bar{Q}$, $\text{Cost}_{1\text{k}}$ ja $T_{\text{total}, P_{50}}$), jotta ne vastaavat Taulukoiden 11, 12 ja C4 laskentatapaa ja alaviitteitä.
-- [ ] **Yhtälö 20 (Composite Quality $Q(q)$, s. 33):** Mainitse tekstissä eksplisiittisesti, että taulukoissa raportoitava konfiguraatiotason $Q$ on kysymyskohtaisten harmonisten keskiarvojen $Q(q)$ aritmeettinen keskiarvo $\bar{Q}$.
-- [ ] **Yhtälö 12 ($T_{\text{embed}}(q)$ vs. $T_{\text{ret}}(q)$, s. 30):** Koska $T_{\text{embed}}$ mitataan yhdessä $T_{\text{ret}}$-vaiheen kanssa eikä sitä erotella kuvioissa 1, 2 ja C1, yhdistä ne yhtälössä 12 tai mainitse suoraan, että kuvioiden ja taulukoiden $T_{\text{ret}}$ sisältää $T_{\text{embed}}$-osuuden.
-- [ ] **Taulukko 3 (s. 27):** Poista ylimääräinen sulkumerkki `)` riviltä RQ3 sarakkeesta *Null Hypothesis ($H_0$)*.
-- [ ] **Merkintä $M_0$ vs. $C_0$ (s. 27–28):** Vaihda baselinen merkintä luvussa 4.3 ja Taulukossa 4 muotoon $C_0$ (tai perustele $M_0$), jotta se on linjassa luvun 4.1 ja Taulukon 2 kanssa.
+- [x] **Yhtälö 14 (Reitittimen kustannus, s. 31):** Täsmennä tekstissä, että $N_{\text{route}}(q) \cdot P_{\text{route}}$ huomioi sekä reititinmallin (Flash-Lite) syöte- että tulostetokenien hinnoittelun (tai merkitse se muodossa $C_{\text{route}}(q)$).
+- [x] **Yhtälöt 23 ja 24 (QPD ja QPS, s. 34):** Muuta yhtälöt konfiguraatiotason (pipeline-level) mittareiksi käyttäen aggregoituja arvoja ($\bar{Q}$, $\text{Cost}_{1\text{k}}$ ja $T_{\text{total}, P_{50}}$), jotta ne vastaavat Taulukoiden 11, 12 ja C4 laskentatapaa ja alaviitteitä.
+- [x] **Yhtälö 20 (Composite Quality $Q(q)$, s. 33):** Mainitse tekstissä eksplisiittisesti, että taulukoissa raportoitava konfiguraatiotason $Q$ on kysymyskohtaisten harmonisten keskiarvojen $Q(q)$ aritmeettinen keskiarvo $\bar{Q}$.
+- [x] **Yhtälö 12 ($T_{\text{embed}}(q)$ vs. $T_{\text{ret}}(q)$, s. 30):** Koska $T_{\text{embed}}$ mitataan yhdessä $T_{\text{ret}}$-vaiheen kanssa eikä sitä erotella kuvioissa 1, 2 ja C1, yhdistä ne yhtälössä 12 tai mainitse suoraan, että kuvioiden ja taulukoiden $T_{\text{ret}}$ sisältää $T_{\text{embed}}$-osuuden.
+- [x] **Taulukko 3 (s. 27):** Poista ylimääräinen sulkumerkki `)` riviltä RQ3 sarakkeesta *Null Hypothesis ($H_0$)*.
+- [x] **Merkintä $M_0$ vs. $C_0$ (s. 27–28):** Vaihda baselinen merkintä luvussa 4.3 ja Taulukossa 4 muotoon $C_0$ (tai perustele $M_0$), jotta se on linjassa luvun 4.1 ja Taulukon 2 kanssa.
 
 ### Luvut 1–3, alkuosa ja lähdeluettelo
-- [ ] **Päivämäärät ja placeholderit (s. 3–5):** Päivitä tiivistelmien (s. 3–4) ja Prefacen (s. 5) päivämäärät (`30 June 2025` -> `2026`) sekä korvaa Prefacen templaattinimet.
-- [ ] **Glossary & Abbreviations (s. 11–12):** Lisää puuttuvat keskeiset lyhenteet: `S2B`, `SR`, `PC`, `MC`, `E2E`, `QPD`, `QPS`, `FRR`, `OOD`, `ICC`, `DCC`, `MRL`, `HNSW`, `KV`, `EM`, `BLEU`, `ROUGE`, `NDCG`, `SLA`.
+- [x] **Päivämäärät ja placeholderit (s. 3–5):** Päivitä tiivistelmien (s. 3–4) ja Prefacen (s. 5) päivämäärät (`30 June 2025` -> `2026`) sekä korvaa Prefacen templaattinimet.
+- [x] **Glossary & Abbreviations (s. 11–12):** Lisää puuttuvat keskeiset lyhenteet: `S2B`, `SR`, `PC`, `MC`, `E2E`, `QPD`, `QPS`, `FRR`, `OOD`, `ICC`, `DCC`, `MRL`, `HNSW`, `KV`, `EM`, `BLEU`, `ROUGE`, `NDCG`, `SLA`.
 - [ ] **Luku 1 – Prompt Caching -kuvaus (s. 13):** Muokkaa sivun 13 kuvausta prompt cachingista vastaamaan työssä käytettyä *Prefix / Context KV Cachingia* (joka nopeuttaa ja halventaa LLM:n prefill-vaihetta) eikä *semantic response cachingia* (joka ohittaa haun ja generoinnin kokonaan).
-- [ ] **Luku 2 – Lyöntivirheet (s. 17–18):**
+- [x] **Luku 2 – Lyöntivirheet (s. 17–18):**
   - s. 17: Poista tautologia `subsequently, after which` -> jätä vain `after which` tai `subsequently`.
   - s. 18: Lisää välilyönti `ifthe` -> `if the`.
-- [ ] **Luku 3 – Muotoilu- ja lyöntivirheet (s. 19–20):**
+- [x] **Luku 3 – Muotoilu- ja lyöntivirheet (s. 19–20):**
   - s. 19: Poista piste yhtälön (3) perästä, jotta lause jatkuu oikein sanalla `maps`.
   - s. 20: Korjaa sulkeen jälkeinen välilyönti `( 56%)` -> `(~56%)` tai `(56%)`.
   - s. 20: Lisää välilyönti ennen viitettä `summaries[37]` -> `summaries [37]`.
-- [ ] **References – BibTeX-korjaukset (s. 54–59):**
+- [x] **References – BibTeX-korjaukset (s. 54–59):**
   - Viite `[1]`: Korjaa URL `https:///hai.stanford.edu/...` -> `https://hai.stanford.edu/...`.
   - Viite `[19]`: Poista ylimääräinen piste etunimen perästä (`Numa. Dhamani.`).
   - Suojaa akronyymit aaltosulkeilla `{}` BibTeXissä (esim. `{RAG}`, `{LLM}`, `{LLMs}`, `{NLP}`, `{GPU}`, `{GPUs}`, `{Q&A}`, `{KV}`, `{BC}`, `{AI}`, `{Spring AI}`, `{FrugalGPT}`, `{RankRAG}`, `{RAGRouter}`, `{Stop-RAG}`, `{Bridge-RAG}`, `{InfoGain-RAG}`, `{InstructRAG}`, `{RAGCache}`, `{TurboRAG}`, `{CacheBlend}`) viitteissä `[2, 4, 6, 7, 9, 11, 25, 27, 35, 36, 37, 39, 41, 43, 44, 45, 46, 47, 48]`.

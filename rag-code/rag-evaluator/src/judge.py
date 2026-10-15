@@ -33,11 +33,11 @@ def get_judge_components(
 ) -> Tuple[Any, Any]:
     """Initializes and returns (ragas_llm, ragas_embeddings) based on provider configuration.
 
-    Delegates to JudgeFactory to provide Vertex AI (Gemini + Claude via Model Garden),
-    local vLLM (OpenAI-compatible server on localhost), or Ollama endpoints (/v1).
+    Delegates to JudgeFactory to provide local vLLM (Qwen + BGE)
+    or Vertex AI (Gemini).
     """
     chosen_provider = (
-        provider or os.getenv("JUDGE_PROVIDER", "claude")
+        provider or os.getenv("JUDGE_PROVIDER", "vllm")
     ).strip().lower()
 
     if chosen_provider in ("none", "off", "disabled"):
@@ -99,7 +99,7 @@ def test_judge_connection(
 
         return {
             "status": "success",
-            "provider": provider or os.getenv("JUDGE_PROVIDER", "claude"),
+            "provider": provider or os.getenv("JUDGE_PROVIDER", "vllm"),
             "model": model_name,
             "response": response_text.strip(),
             "init_latency_ms": init_ms,
@@ -111,7 +111,7 @@ def test_judge_connection(
         llm_ms = (time.perf_counter() - t_llm) * 1000
         return {
             "status": "error",
-            "provider": provider or os.getenv("JUDGE_PROVIDER", "claude"),
+            "provider": provider or os.getenv("JUDGE_PROVIDER", "vllm"),
             "error": str(e),
             "init_latency_ms": init_ms,
             "llm_latency_ms": llm_ms,
