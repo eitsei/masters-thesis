@@ -1410,7 +1410,8 @@ def plot_cost_breakdown(
                 cached_read_tok = 0.0
                 cache_write_tok = 0.0
 
-            c_prompt = ((p_tok + cache_write_tok) * record_tier.prompt_price_per_million) / 1_000_000.0
+            uncached_p_tok = max(0.0, p_tok - cached_read_tok) if has_m3 else p_tok
+            c_prompt = ((uncached_p_tok + cache_write_tok) * record_tier.prompt_price_per_million) / 1_000_000.0
             c_cache = (cached_read_tok * record_tier.cached_price_per_million) / 1_000_000.0
             c_comp = (comp_tok * record_tier.comp_price_per_million) / 1_000_000.0
 

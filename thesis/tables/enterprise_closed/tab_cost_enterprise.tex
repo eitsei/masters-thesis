@@ -9,28 +9,28 @@
 \textbf{Pipeline} & \makecell{\textbf{Uncached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Cached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Output}\\\textbf{Tokens}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$\Delta$ Cost}\\\scriptsize{(\%)}} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
-Naive RAG Baseline & 4,036 & 4,488 & 100 & \$1.339 & -- \\
+Naive RAG Baseline & 8,524 & 0 & 100 & \$13.689 & -- \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-S2B & 8,728 & 612 & 105 & \$1.464 & +9.4\%\textsuperscript{ns} \\
-SR & 6,941 & 1,836 & 82 & \$6.366 & +375.4\%\textsuperscript{*} \\
-PC & 1,369 & 7,153 & 99 & \$0.640 & -52.2\%\textsuperscript{*} \\
-MC & 6,484 & 2,040 & 79 & \$1.081 & -19.3\%\textsuperscript{ns} \\
+S2B & 9,340 & 0 & 105 & \$14.957 & +9.3\%\textsuperscript{ns} \\
+SR & 8,777 & 0 & 82 & \$18.901 & +38.1\%\textsuperscript{*} \\
+PC & 1,369 & 7,153 & 99 & \$5.088 & -62.8\%\textsuperscript{ns} \\
+MC & 8,524 & 0 & 79 & \$9.410 & -31.3\%\textsuperscript{ns} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
-S2B + SR & 7,241 & 1,837 & 121 & \$6.435 & +380.6\%\textsuperscript{*} \\
-S2B + PC & 2,185 & 7,153 & 100 & \$0.763 & -43.0\%\textsuperscript{ns} \\
-S2B + MC & 7,879 & 612 & 58 & \$2.014 & +50.4\%\textsuperscript{ns} \\
-SR + PC & 1,622 & 7,153 & 93 & \$5.782 & +331.8\%\textsuperscript{*} \\
-SR + MC & 8,165 & 612 & 59 & \$7.017 & +424.0\%\textsuperscript{*} \\
-PC + MC & 1,369 & 7,153 & 76 & \$1.901 & +42.0\%\textsuperscript{ns} \\
+S2B + SR & 9,077 & 0 & 121 & \$19.708 & +44.0\%\textsuperscript{*} \\
+S2B + PC & 2,185 & 7,153 & 100 & \$6.322 & -53.8\%\textsuperscript{ns} \\
+S2B + MC & 8,492 & 0 & 58 & \$10.339 & -24.5\%\textsuperscript{ns} \\
+SR + PC & 1,622 & 7,153 & 93 & \$11.489 & -16.1\%\textsuperscript{ns} \\
+SR + MC & 8,777 & 0 & 59 & \$14.898 & +8.8\%\textsuperscript{ns} \\
+PC + MC & 1,369 & 7,153 & 76 & \$5.914 & -56.8\%\textsuperscript{ns} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
-S2B + SR + PC & 1,922 & 7,153 & 84 & \$5.714 & +326.8\%\textsuperscript{*} \\
-S2B + SR + MC & 7,445 & 1,632 & 75 & \$7.178 & +436.1\%\textsuperscript{*} \\
-S2B + PC + MC & 1,865 & 7,153 & 66 & \$0.654 & -51.2\%\textsuperscript{ns} \\
-SR + PC + MC & 1,625 & 7,153 & 62 & \$7.099 & +430.1\%\textsuperscript{*} \\
-S2B + SR + PC + MC & 1,922 & 7,153 & 81 & \$5.789 & +332.4\%\textsuperscript{*} \\
+S2B + SR + PC & 1,922 & 7,153 & 84 & \$10.782 & -21.2\%\textsuperscript{ns} \\
+S2B + SR + MC & 9,077 & 0 & 75 & \$16.288 & +19.0\%\textsuperscript{ns} \\
+S2B + PC + MC & 1,865 & 7,153 & 66 & \$4.368 & -68.1\%\textsuperscript{ns} \\
+SR + PC + MC & 1,625 & 7,153 & 62 & \$12.097 & -11.6\%\textsuperscript{ns} \\
+S2B + SR + PC + MC & 1,922 & 7,153 & 81 & \$10.891 & -20.4\%\textsuperscript{ns} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}

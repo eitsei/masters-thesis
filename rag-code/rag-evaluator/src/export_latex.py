@@ -978,6 +978,7 @@ def export_cost_latex(
             continue
         recs = run_dict[name]
         cid_tex, pipe_name, tier = _resolve_config_info(name)
+        has_m3 = "PC" in pipe_name or "M3" in name.upper()
         tier_group = 3 if tier >= 3 else tier
         if tier_group != current_tier:
             current_tier = tier_group
@@ -999,7 +1000,7 @@ def export_cost_latex(
         for r in recs:
             tu = r.get("tokenUsage") if isinstance(r.get("tokenUsage"), dict) else {}
             p_tok = float(tu.get("promptTokens") or tu.get("prompt_tokens") or r.get("prompt_tokens") or 0.0)
-            c_tok = float(tu.get("cachedTokens") or tu.get("cached_tokens") or r.get("cached_tokens") or 0.0)
+            c_tok = float(tu.get("cachedTokens") or tu.get("cached_tokens") or r.get("cached_tokens") or 0.0) if has_m3 else 0.0
             o_tok = float(tu.get("completionTokens") or tu.get("completion_tokens") or r.get("completion_tokens") or 0.0)
             u_tok = max(0.0, p_tok - c_tok) if c_tok > 0 else p_tok
             uncached_list.append(u_tok)

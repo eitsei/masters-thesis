@@ -9,28 +9,28 @@
 \textbf{Pipeline} & \makecell{\textbf{Uncached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Cached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Output}\\\textbf{Tokens}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$\Delta$ Cost}\\\scriptsize{(\%)}} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
-Naive RAG Baseline & 5,646 & 812 & 218 & \$5.662 & -- \\
+Naive RAG Baseline & 6,458 & 0 & 218 & \$5.662 & -- \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
 S2B & 7,525 & 0 & 190 & \$6.355 & +12.2\%\textsuperscript{ns} \\
 SR & 5,852 & 0 & 168 & \$10.020 & +77.0\%\textsuperscript{*} \\
 PC & 33 & 0 & 584 & \$6.817 & +20.4\%\textsuperscript{*} \\
-MC & 6,458 & 0 & 163 & \$3.887 & -31.3\%\textsuperscript{ns} \\
+MC & 6,458 & 0 & 163 & \$5.321 & -6.0\%\textsuperscript{ns} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
 S2B + SR & 7,895 & 0 & 226 & \$11.771 & +107.9\%\textsuperscript{*} \\
 S2B + PC & 28 & 0 & 428 & \$7.027 & +24.1\%\textsuperscript{ns} \\
-S2B + MC & 7,525 & 0 & 173 & \$5.005 & -11.6\%\textsuperscript{ns} \\
+S2B + MC & 7,525 & 0 & 173 & \$6.338 & +11.9\%\textsuperscript{ns} \\
 SR + PC & 26 & 0 & 380 & \$11.073 & +95.6\%\textsuperscript{*} \\
-SR + MC & 5,457 & 392 & 141 & \$8.436 & +49.0\%\textsuperscript{ns} \\
-PC + MC & 24 & 0 & 323 & \$4.488 & -20.7\%\textsuperscript{ns} \\
+SR + MC & 5,849 & 0 & 141 & \$9.827 & +73.6\%\textsuperscript{*} \\
+PC + MC & 24 & 0 & 323 & \$6.035 & +6.6\%\textsuperscript{ns} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
 S2B + SR + PC & 23 & 0 & 396 & \$12.181 & +115.1\%\textsuperscript{*} \\
-S2B + SR + MC & 7,081 & 814 & 160 & \$9.638 & +70.2\%\textsuperscript{ns} \\
-S2B + PC + MC & 28 & 0 & 463 & \$5.070 & -10.5\%\textsuperscript{ns} \\
-SR + PC + MC & 26 & 0 & 477 & \$9.698 & +71.3\%\textsuperscript{ns} \\
-S2B + SR + PC + MC & 23 & 0 & 440 & \$8.605 & +52.0\%\textsuperscript{ns} \\
+S2B + SR + MC & 7,895 & 0 & 160 & \$11.277 & +99.2\%\textsuperscript{*} \\
+S2B + PC + MC & 28 & 0 & 463 & \$6.988 & +23.4\%\textsuperscript{ns} \\
+SR + PC + MC & 26 & 0 & 477 & \$10.472 & +84.9\%\textsuperscript{*} \\
+S2B + SR + PC + MC & 23 & 0 & 440 & \$10.150 & +79.3\%\textsuperscript{ns} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}

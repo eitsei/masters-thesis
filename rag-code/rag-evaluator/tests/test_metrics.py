@@ -204,23 +204,23 @@ def test_compute_cost_cache_write():
 
 def test_compute_cost_routing_split():
     # Routing classifier always uses gemini-3.5-flash-lite:
-    # prompt: $0.075 / 1M tokens
-    # completion: $0.30 / 1M tokens
+    # prompt: $0.30 / 1M tokens
+    # completion: $2.50 / 1M tokens
     cost_routing_only = compute_cost(
         prompt_tokens=0,
         completion_tokens=0,
-        routing_prompt_tokens=200_000,    # 200k * 0.075 / 1M = 0.015
-        routing_completion_tokens=50_000,  # 50k * 0.30 / 1M = 0.015
+        routing_prompt_tokens=200_000,    # 200k * 0.30 / 1M = 0.060
+        routing_completion_tokens=50_000,  # 50k * 2.50 / 1M = 0.125
         tier="gemini-3.8-flash",
     )
-    assert math.isclose(cost_routing_only, 0.030, rel_tol=1e-9)
+    assert math.isclose(cost_routing_only, 0.185, rel_tol=1e-9)
 
     # Combined with generation tokens on main tier (gemini-3.8-flash):
     # 10,000 prompt @ $0.75/1M = $0.0075
     # 2,000 comp @ $3.75/1M = $0.0075
-    # 1,000 router prompt @ $0.075/1M = $0.000075
-    # 100 router comp @ $0.30/1M = $0.000030
-    # Total = 0.0075 + 0.0075 + 0.000075 + 0.000030 = 0.015105
+    # 1,000 router prompt @ $0.30/1M = $0.00030
+    # 100 router comp @ $2.50/1M = $0.00025
+    # Total = 0.0075 + 0.0075 + 0.00030 + 0.00025 = 0.01555
     cost_combined = compute_cost(
         prompt_tokens=10000,
         completion_tokens=2000,
@@ -228,7 +228,7 @@ def test_compute_cost_routing_split():
         routing_completion_tokens=100,
         tier="gemini-3.8-flash",
     )
-    assert math.isclose(cost_combined, 0.015105, rel_tol=1e-9)
+    assert math.isclose(cost_combined, 0.01555, rel_tol=1e-9)
 
 
 def test_get_pricing_tier_gemini_35_flash_vs_lite():
@@ -237,20 +237,20 @@ def test_get_pricing_tier_gemini_35_flash_vs_lite():
     tier_lite = get_pricing_tier("gemini-3.5-flash-lite")
 
     assert tier_flash.name == "gemini-3.5-flash"
-    assert tier_flash.prompt_price_per_million == 0.15
-    assert tier_flash.comp_price_per_million == 0.60
-    assert tier_flash.cached_price_per_million == 0.0375
+    assert tier_flash.prompt_price_per_million == 1.50
+    assert tier_flash.comp_price_per_million == 9.00
+    assert tier_flash.cached_price_per_million == 0.15
 
     assert tier_lite.name == "gemini-3.5-flash-lite"
-    assert tier_lite.prompt_price_per_million == 0.075
-    assert tier_lite.comp_price_per_million == 0.30
-    assert tier_lite.cached_price_per_million == 0.01875
+    assert tier_lite.prompt_price_per_million == 0.30
+    assert tier_lite.comp_price_per_million == 2.50
+    assert tier_lite.cached_price_per_million == 0.03
 
     # Prefixed and fuzzy variants must resolve without collision
-    assert get_pricing_tier("models/gemini-3.5-flash").prompt_price_per_million == 0.15
-    assert get_pricing_tier("models/gemini-3.5-flash-lite").prompt_price_per_million == 0.075
-    assert get_pricing_tier("3.5-flash").prompt_price_per_million == 0.15
-    assert get_pricing_tier("3.5-flash-lite").prompt_price_per_million == 0.075
+    assert get_pricing_tier("models/gemini-3.5-flash").prompt_price_per_million == 1.50
+    assert get_pricing_tier("models/gemini-3.5-flash-lite").prompt_price_per_million == 0.30
+    assert get_pricing_tier("3.5-flash").prompt_price_per_million == 1.50
+    assert get_pricing_tier("3.5-flash-lite").prompt_price_per_million == 0.30
 
 
 # =====================================================================

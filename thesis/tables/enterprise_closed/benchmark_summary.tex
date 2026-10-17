@@ -8,29 +8,29 @@
 \label{tab:benchmark_summary}
 \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l r r r r r r r r r r r r @{}}
 \toprule
-\textbf{Pipeline} & \textbf{$N$} & \textbf{$P_{50}$} & \textbf{$P_{95}$} & \textbf{Tokens} & \textbf{Cost (\$)} & \textbf{EM} & \textbf{F1} & \textbf{Faith} & \textbf{AR} & \textbf{CP} & \textbf{CR} & \textbf{Comp $Q$} \\
+\textbf{Pipeline} & \textbf{$N$} & \textbf{$P_{50}$} & \textbf{$P_{95}$} & \textbf{Tokens} & \textbf{Cost (\$)} & \textbf{EM / F1} & \textbf{Ref / FRR} & \textbf{Faith} & \textbf{AR} & \textbf{CP} & \textbf{CR} & \textbf{Comp $Q$} \\
  & & \scriptsize{(ms)} & \scriptsize{(ms)} & \scriptsize{avg} & \scriptsize{per 1k q} & \scriptsize{(\%)} & \scriptsize{(\%)} & & & & & \scriptsize{$[0,1]$} \\
 \midrule
-Naive RAG Baseline & 10 & 1932.5 & 8123.9 & 8624 & \$1.339 & 20.0\% & 54.2\% & 0.854 & 0.642 & 0.712 & 0.875 & \textbf{0.5951} \\
-S2B & 10 & 1855.5 & 20167.5 & 9445 & \$1.464 & 20.0\% & 42.2\% & 0.611 & 0.479 & 0.722 & 0.812 & \textbf{0.4991} \\
-SR & 10 & 2379.5 & 19946.9 & 8859 & \$6.366 & 20.0\% & 57.7\% & 0.719 & 0.570 & 0.718 & 1.000 & \textbf{0.5298} \\
-PC & 10 & 3050.0 & 15803.5 & 8620 & \$0.640 & 20.0\% & 48.4\% & 0.750 & 0.519 & 0.712 & 0.875 & \textbf{0.4991} \\
-MC & 10 & 2247.5 & 10511.3 & 8757 & \$1.081 & 20.0\% & 64.4\% & 1.000 & 0.769 & 0.681 & 0.875 & \textbf{0.7105} \\
-S2B + SR & 10 & 3590.0 & 36934.3 & 9199 & \$6.435 & 20.0\% & 52.5\% & 0.857 & 0.653 & 0.567 & 0.875 & \textbf{0.5683} \\
-S2B + PC & 10 & 2113.0 & 7011.8 & 9438 & \$0.763 & 20.0\% & 54.6\% & 0.875 & 0.671 & 0.748 & 0.812 & \textbf{0.6387} \\
-S2B + MC & 10 & 3212.0 & 80290.4 & 8704 & \$2.014 & 20.0\% & 51.4\% & 0.625 & 0.497 & 0.748 & 0.812 & \textbf{0.5494} \\
-SR + PC & 10 & 17418.0 & 100143.3 & 8868 & \$5.782 & 20.0\% & 59.3\% & 0.750 & 0.570 & 0.718 & 0.938 & \textbf{0.5391} \\
-SR + MC & 10 & 2982.5 & 38043.8 & 8990 & \$7.017 & 20.0\% & 52.9\% & 0.594 & 0.476 & 0.718 & 1.000 & \textbf{0.6080} \\
-PC + MC & 10 & 8272.5 & 24781.8 & 8752 & \$1.901 & 20.0\% & 62.7\% & 0.969 & 0.757 & 0.640 & 0.875 & \textbf{0.6305} \\
-S2B + SR + PC & 10 & 2907.5 & 13234.9 & 9159 & \$5.714 & 20.0\% & 52.0\% & 0.875 & 0.632 & 0.583 & 0.875 & \textbf{0.6068} \\
-S2B + SR + MC & 10 & 3697.0 & 31503.6 & 9306 & \$7.178 & 20.0\% & 48.6\% & 0.750 & 0.568 & 0.569 & 0.875 & \textbf{0.5068} \\
-S2B + PC + MC & 8 & 6797.0 & 107289.1 & 8346 & \$0.654 & 12.5\% & 37.9\% & 0.696 & 0.559 & 0.712 & 0.786 & \textbf{0.4699} \\
-SR + PC + MC & 9 & 4050.0 & 118309.8 & 8993 & \$7.099 & 22.2\% & 49.8\% & 0.571 & 0.450 & 0.702 & 0.929 & \textbf{0.4913} \\
-S2B + SR + PC + MC & 10 & 9346.5 & 54607.5 & 9310 & \$5.789 & 20.0\% & 53.0\% & 0.875 & 0.635 & 0.569 & 0.875 & \textbf{0.6094} \\
+Naive RAG Baseline & 10 & 1932.5 & 8123.9 & 8624 & \$13.689 & 20.0\% / 54.2\% & 100.0\% / 12.5\% & 0.854 & 0.642 & 0.712 & 0.875 & \textbf{0.5951} \\
+S2B & 10 & 1855.5 & 20167.5 & 9445 & \$14.957 & 20.0\% / 42.2\% & 100.0\% / 37.5\% & 0.611 & 0.479 & 0.722 & 0.812 & \textbf{0.4991} \\
+SR & 10 & 2379.5 & 19946.9 & 8859 & \$18.901 & 20.0\% / 57.7\% & 100.0\% / 25.0\% & 0.719 & 0.570 & 0.718 & 1.000 & \textbf{0.5298} \\
+PC & 10 & 3050.0 & 15803.5 & 8620 & \$5.088 & 20.0\% / 48.4\% & 100.0\% / 25.0\% & 0.750 & 0.519 & 0.712 & 0.875 & \textbf{0.4991} \\
+MC & 10 & 2247.5 & 10511.3 & 8757 & \$9.410 & 20.0\% / 64.4\% & 100.0\% / 0.0\% & 1.000 & 0.769 & 0.681 & 0.875 & \textbf{0.7105} \\
+S2B + SR & 10 & 3590.0 & 36934.3 & 9199 & \$19.708 & 20.0\% / 52.5\% & 100.0\% / 12.5\% & 0.857 & 0.653 & 0.567 & 0.875 & \textbf{0.5683} \\
+S2B + PC & 10 & 2113.0 & 7011.8 & 9438 & \$6.322 & 20.0\% / 54.6\% & 100.0\% / 12.5\% & 0.875 & 0.671 & 0.748 & 0.812 & \textbf{0.6387} \\
+S2B + MC & 10 & 3212.0 & 80290.4 & 8704 & \$10.339 & 20.0\% / 51.4\% & 100.0\% / 37.5\% & 0.625 & 0.497 & 0.748 & 0.812 & \textbf{0.5494} \\
+SR + PC & 10 & 17418.0 & 100143.3 & 8868 & \$11.489 & 20.0\% / 59.3\% & 100.0\% / 25.0\% & 0.750 & 0.570 & 0.718 & 0.938 & \textbf{0.5391} \\
+SR + MC & 10 & 2982.5 & 38043.8 & 8990 & \$14.898 & 20.0\% / 52.9\% & 100.0\% / 37.5\% & 0.594 & 0.476 & 0.718 & 1.000 & \textbf{0.6080} \\
+PC + MC & 10 & 8272.5 & 24781.8 & 8752 & \$5.914 & 20.0\% / 62.7\% & 100.0\% / 0.0\% & 0.969 & 0.757 & 0.640 & 0.875 & \textbf{0.6305} \\
+S2B + SR + PC & 10 & 2907.5 & 13234.9 & 9159 & \$10.782 & 20.0\% / 52.0\% & 100.0\% / 12.5\% & 0.875 & 0.632 & 0.583 & 0.875 & \textbf{0.6068} \\
+S2B + SR + MC & 10 & 3697.0 & 31503.6 & 9306 & \$16.288 & 20.0\% / 48.6\% & 100.0\% / 25.0\% & 0.750 & 0.568 & 0.569 & 0.875 & \textbf{0.5068} \\
+S2B + PC + MC & 8 & 6797.0 & 107289.1 & 8346 & \$4.368 & 12.5\% / 37.9\% & 100.0\% / 28.6\% & 0.696 & 0.559 & 0.712 & 0.786 & \textbf{0.4699} \\
+SR + PC + MC & 9 & 4050.0 & 118309.8 & 8993 & \$12.097 & 22.2\% / 49.8\% & 100.0\% / 42.9\% & 0.571 & 0.450 & 0.702 & 0.929 & \textbf{0.4913} \\
+S2B + SR + PC + MC & 10 & 9346.5 & 54607.5 & 9310 & \$10.891 & 20.0\% / 53.0\% & 100.0\% / 12.5\% & 0.875 & 0.635 & 0.569 & 0.875 & \textbf{0.6094} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
 \parbox{\linewidth}{\footnotesize
-\textbf{Notes:} $P_{50}$ and $P_{95}$ represent median and 95th percentile end-to-end execution latencies. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. EM: Exact Match; F1: Token-level $F_1$; Faith: Faithfulness; AR: Answer Relevancy; CP: Context Precision; CR: Context Recall; Comp $Q$: Harmonic mean Composite Quality score (Eq.~238).}
+\textbf{Notes:} $P_{50}$ and $P_{95}$ represent median and 95th percentile end-to-end execution latencies. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. EM: Exact Match; F1: Token-level $F_1$; Ref: Refusal Accuracy; FRR: False Refusal Rate; Faith: Faithfulness; AR: Answer Relevancy; CP: Context Precision; CR: Context Recall; Comp $Q$: Harmonic mean Composite Quality score (Eq.~238).}
 \end{table}
 \end{landscape}

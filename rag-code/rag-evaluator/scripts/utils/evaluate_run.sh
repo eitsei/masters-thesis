@@ -4,24 +4,21 @@
 # Evaluates previously collected JSONL runs without requiring Spring Boot.
 #
 # Usage:
-#   ./scripts/evaluate_run.sh <RUN_DIR> [OPTIONS]
+#   ./scripts/utils/evaluate_run.sh <RUN_DIR> [OPTIONS]
 #
 # Examples:
-#   # Evaluate Nordea 16-configuration sweep with Llama:
-#   ./scripts/evaluate_run.sh runs/nordea_all16_final --judge llama --judge-model meta/llama-4-scout-17b-16e-instruct-maas --subfolder enterprise
+#   # Evaluate MuSiQue 16-configuration sweep with local vLLM:
+#   ./scripts/utils/evaluate_run.sh runs/raw/musique --judge vllm --workers 16 --subfolder musique
 #
-#   # Evaluate MuSiQue 16-configuration sweep with Gemini:
-#   ./scripts/evaluate_run.sh runs/musique_all16_final --judge gemini --judge-model gemini-3.5-flash-lite --subfolder musique
+#   # Evaluate Enterprise Closed 16-configuration sweep with local vLLM:
+#   ./scripts/utils/evaluate_run.sh runs/raw/enterprise_closed --judge vllm --workers 16 --subfolder enterprise_closed
 #
-#   # Evaluate Nordea 16-configuration sweep on Roihu / local vLLM:
-#   ./scripts/evaluate_run.sh runs/nordea_all16_final --judge vllm --workers 16 --no-export
-#
-#   # Evaluate Sample 5 run with in-place updates:
-#   ./scripts/evaluate_run.sh runs/sample5_m3 --judge gemini --judge-model gemini-3.5-flash-lite
+#   # Evaluate Enterprise Raw 16-configuration sweep with local vLLM:
+#   ./scripts/utils/evaluate_run.sh runs/raw/enterprise_raw --judge vllm --workers 16 --subfolder enterprise
 # ==============================================================================
 set -euo pipefail
 
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$PROJECT_DIR"
 
 PYTHON="${PYTHON:-venv/bin/python}"
@@ -29,8 +26,8 @@ TABLES_DIR="${TABLES_DIR:-../../thesis/tables}"
 FIGURES_DIR="${FIGURES_DIR:-../../thesis/figures}"
 
 RUN_DIR=""
-JUDGE="${JUDGE:-${JUDGE_PROVIDER:-gemini}}"
-JUDGE_MODEL="${JUDGE_MODEL:-gemini-3.5-flash-lite}"
+JUDGE="${JUDGE:-${JUDGE_PROVIDER:-vllm}}"
+JUDGE_MODEL="${JUDGE_MODEL:-qwen3.8-27b}"
 SUBFOLDER=""
 DATASET_NAME=""
 RESUME="--resume"

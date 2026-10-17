@@ -200,8 +200,9 @@ def summarize_run_records(records: Sequence[Mapping[str, Any]]) -> dict[str, flo
         mean_comp_q = 0.0
 
     mean_lat = lat_stats["mean"]
+    lat_p50 = lat_stats["p50"]
     qpd = compute_qpd(mean_comp_q, mean_cost)
-    qps = compute_qps(mean_comp_q, mean_lat)
+    qps = compute_qps(mean_comp_q, lat_p50)
 
     return {
         "count": float(len(records)),

@@ -128,18 +128,18 @@ PRICING_CATALOG: dict[str, PricingTier] = {
     # Gemini 3.5 Flash standard tier
     "gemini-3.5-flash": PricingTier(
         name="gemini-3.5-flash",
-        prompt_price_per_million=0.15,
-        comp_price_per_million=0.60,
-        cached_price_per_million=0.0375,
+        prompt_price_per_million=1.50,
+        comp_price_per_million=9.00,
+        cached_price_per_million=0.15,
         rerank_price_per_doc=0.0001,
         embed_price_per_million=0.025,
     ),
     # Gemini 3.5 Flash-Lite (Low-latency / tier-1 router)
     "gemini-3.5-flash-lite": PricingTier(
         name="gemini-3.5-flash-lite",
-        prompt_price_per_million=0.075,
-        comp_price_per_million=0.30,
-        cached_price_per_million=0.01875,
+        prompt_price_per_million=0.30,
+        comp_price_per_million=2.50,
+        cached_price_per_million=0.03,
         rerank_price_per_doc=0.0001,
         embed_price_per_million=0.025,
     ),
@@ -167,17 +167,17 @@ PRICING_CATALOG: dict[str, PricingTier] = {
     # Gemini 3.1 Pro (High-capacity multi-hop tier)
     "gemini-3.1-pro": PricingTier(
         name="gemini-3.1-pro",
-        prompt_price_per_million=1.25,
-        comp_price_per_million=5.00,
-        cached_price_per_million=0.3125,
+        prompt_price_per_million=2.00,
+        comp_price_per_million=12.00,
+        cached_price_per_million=0.20,
         rerank_price_per_doc=0.0001,
         embed_price_per_million=0.025,
     ),
     "gemini-3.1-pro-preview": PricingTier(
         name="gemini-3.1-pro",
-        prompt_price_per_million=1.25,
-        comp_price_per_million=5.00,
-        cached_price_per_million=0.3125,
+        prompt_price_per_million=2.00,
+        comp_price_per_million=12.00,
+        cached_price_per_million=0.20,
         rerank_price_per_doc=0.0001,
         embed_price_per_million=0.025,
     ),
@@ -227,15 +227,15 @@ PRICING_CATALOG: dict[str, PricingTier] = {
 }
 
 
-def get_pricing_tier(tier: PricingTier | str | None = "gemini-3.8-flash") -> PricingTier:
+def get_pricing_tier(tier: PricingTier | str | None = "gemini-3.5-flash") -> PricingTier:
     """Resolves a pricing tier name or object to a PricingTier instance."""
     if tier is None:
-        return PRICING_CATALOG["gemini-3.8-flash"]
+        return PRICING_CATALOG["gemini-3.5-flash"]
     if isinstance(tier, PricingTier):
         return tier
     tier_key = str(tier).strip().lower()
     if not tier_key:
-        return PRICING_CATALOG["gemini-3.8-flash"]
+        return PRICING_CATALOG["gemini-3.5-flash"]
     if tier_key in PRICING_CATALOG:
         return PRICING_CATALOG[tier_key]
 
@@ -263,7 +263,7 @@ def get_pricing_tier(tier: PricingTier | str | None = "gemini-3.8-flash") -> Pri
             return PRICING_CATALOG[k]
 
     # Fallback to default
-    return PRICING_CATALOG["gemini-3.8-flash"]
+    return PRICING_CATALOG["gemini-3.5-flash"]
 
 
 def compute_cost(
@@ -276,7 +276,7 @@ def compute_cost(
     routing_tokens: int = 0,
     rerank_docs: int = 0,
     embed_tokens: int = 0,
-    tier: PricingTier | str | None = "gemini-3.8-flash",
+    tier: PricingTier | str | None = "gemini-3.5-flash",
     prompt_is_uncached: bool = True,
 ) -> float:
     """Computes query operational execution cost (Thesis Eq. 178 / 181).

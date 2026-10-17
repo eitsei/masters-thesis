@@ -1,1 +1,0 @@
-run_nordea_all16.sh

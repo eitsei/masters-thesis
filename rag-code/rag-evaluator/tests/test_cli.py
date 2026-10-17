@@ -533,13 +533,13 @@ def test_process_item_metrics_model_routing_attribution():
     assert res["total_tokens"] == 610
 
     # Pricing calculation check:
-    # generation tier: gemini-3.5-flash-lite (prompt $0.075/1M, comp $0.30/1M, embed $0.025/1M)
-    # 500 prompt * 0.075/1M = 0.0000375
-    # 30 comp * 0.30/1M = 0.000009
+    # generation tier: gemini-3.5-flash-lite (prompt $0.30/1M, comp $2.50/1M, embed $0.025/1M)
+    # 500 prompt * 0.30/1M = 0.000150
+    # 30 comp * 2.50/1M = 0.000075
     # 3 embed * 0.025/1M = 0.000000075
-    # routing overhead: 80 * 0.075/1M = 0.000006
-    # expected total = 0.0000375 + 0.000009 + 0.000000075 + 0.000006 = 0.000052575
-    assert res["cost_usd"] == pytest.approx(0.000052575, rel=1e-5)
+    # routing overhead: 80 * 0.30/1M = 0.000024
+    # expected total = 0.000150 + 0.000075 + 0.000000075 + 0.000024 = 0.000249075
+    assert res["cost_usd"] == pytest.approx(0.000249075, rel=1e-5)
 
     # Also verify fallback total_tokens when API totalTokens is omitted: prompt + comp + route
     m4_item_no_tot = dict(m4_item)

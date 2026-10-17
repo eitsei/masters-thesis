@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Slurm Batch Evaluation Job for CSC Roihu (NVIDIA GH200 Grace Hopper 96GB)
-# Runs dual vLLM instances (BGE-M3 Embeddings + Qwen3.8-27B Judge) sequentially on 1 GPU
-# and executes parallel RAGAS evaluation on offline benchmark JSONL runs.
+# Dataset: MuSiQue Academic Multi-Hop QA (16 configurations, N=100)
+#
+# Runs dual vLLM instances (BGE-M3 Embeddings + Qwen3.8-27B Judge) sequentially on 1 GPU,
+# executes parallel RAGAS evaluation on offline JSONL runs, and generates publication tables/figures.
 # ==============================================================================
-#SBATCH --job-name=ragas-eval
+#SBATCH --job-name=eval-musique
 #SBATCH --account=project_2021509
 #SBATCH --partition=gpumedium
 #SBATCH --nodes=1
@@ -12,9 +14,9 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
 #SBATCH --gres=gpu:gh200:1
-#SBATCH --time=02:00:00
-#SBATCH --output=logs/eval_%j.out
-#SBATCH --error=logs/eval_%j.err
+#SBATCH --time=04:00:00
+#SBATCH --output=logs/eval_musique_%j.out
+#SBATCH --error=logs/eval_musique_%j.err
 
 # 1. Environment & Module Setup (run before set -e so CSC profile scripts initialize safely)
 export CSC_ENV_INIT_NON_INTERACTIVE=yes
@@ -23,16 +25,25 @@ module load python-vllm/0.29.0
 
 set -euo pipefail
 
-# 2. Project Directory Setup (SLURM_SUBMIT_DIR points to submit directory)
-PROJECT_DIR="${SLURM_SUBMIT_DIR:-/scratch/project_2021509/asunmaa/rag-evaluator}"
+# 2. Project Directory Setup
+if [ -d "${SLURM_SUBMIT_DIR:-}/src" ]; then
+    PROJECT_DIR="$SLURM_SUBMIT_DIR"
+elif [ -d "$(pwd)/src" ]; then
+    PROJECT_DIR="$(pwd)"
+elif [ -d "$(dirname "${BASH_SOURCE[0]}")/../../src" ]; then
+    PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+else
+    PROJECT_DIR="/scratch/project_2021509/asunmaa/rag-evaluator"
+fi
 cd "$PROJECT_DIR"
 mkdir -p logs
 
 echo "========================================================================"
-echo " Starting Roihu RAGAS Evaluation Job (Slurm Job ID: ${SLURM_JOB_ID:-manual})"
-echo " Host: $(hostname)"
-echo " Date: $(date)"
+echo " Starting Roihu RAGAS Evaluation Job: MuSiQue (Job ID: ${SLURM_JOB_ID:-manual})"
+echo " Host:        $(hostname)"
+echo " Date:        $(date)"
 echo " Working Dir: $(pwd)"
+echo " Walltime:    4 hours (--time=04:00:00)"
 echo "========================================================================"
 
 # Prevent telemetry, offline stalls, and ignore conflicting user site-packages (~/.local)
@@ -71,7 +82,11 @@ MODEL_DIR="${MODEL_DIR:-${SCRATCH_DIR}/models/Qwen3.8-27B}"
 EMBED_DIR="${EMBED_DIR:-${SCRATCH_DIR}/models/bge-m3}"
 
 # Input runs: prioritize scratch runs if present, else repo-relative
-if [ -d "${SCRATCH_DIR}/runs/musique_all16_final" ]; then
+if [ -d "${SCRATCH_DIR}/runs/raw/musique" ]; then
+    DEFAULT_INPUT="${SCRATCH_DIR}/runs/raw/musique"
+elif [ -d "runs/raw/musique" ]; then
+    DEFAULT_INPUT="runs/raw/musique"
+elif [ -d "${SCRATCH_DIR}/runs/musique_all16_final" ]; then
     DEFAULT_INPUT="${SCRATCH_DIR}/runs/musique_all16_final"
 elif [ -d "runs/musique_all16_final" ]; then
     DEFAULT_INPUT="runs/musique_all16_final"
@@ -79,8 +94,9 @@ else
     DEFAULT_INPUT="${SCRATCH_DIR}/runs"
 fi
 INPUT_RUNS="${INPUT_RUNS:-$DEFAULT_INPUT}"
-OUTPUT_RUNS="${OUTPUT_RUNS:-${SCRATCH_DIR}/runs/musique_all16_roihu}"
+OUTPUT_RUNS="${OUTPUT_RUNS:-${SCRATCH_DIR}/runs/evaluated/musique}"
 WORKERS="${WORKERS:-16}"
+SUBFOLDER="musique"
 
 echo "Configuration:"
 echo "  HF_HOME:     $HF_HOME"
@@ -89,6 +105,7 @@ echo "  EMBED_DIR:   $EMBED_DIR"
 echo "  INPUT_RUNS:  $INPUT_RUNS"
 echo "  OUTPUT_RUNS: $OUTPUT_RUNS"
 echo "  WORKERS:     $WORKERS"
+echo "  SUBFOLDER:   $SUBFOLDER"
 
 export VLLM_BASE_URL="http://127.0.0.1:8000/v1"
 export VLLM_EMBEDDING_BASE_URL="http://127.0.0.1:8001/v1"
@@ -203,7 +220,7 @@ echo -e "\n>>> Testing Judge Connectivity via CLI..."
 python src/cli.py test-judge --judge vllm
 
 # 6. Execute Evaluation
-echo -e "\n>>> Running parallel RAGAS evaluation (workers: ${WORKERS})..."
+echo -e "\n>>> Running parallel RAGAS evaluation on MuSiQue (workers: ${WORKERS})..."
 mkdir -p "$OUTPUT_RUNS"
 python src/cli.py evaluate \
     --input "$INPUT_RUNS" \
@@ -212,6 +229,13 @@ python src/cli.py evaluate \
     --workers "$WORKERS" \
     --resume
 
+# 7. Generate Publication Tables & Figures
+echo -e "\n>>> Generating LaTeX Tables and Publication Figures for MuSiQue..."
+python src/cli.py export-thesis \
+    --input "$OUTPUT_RUNS" \
+    --subfolder "$SUBFOLDER"
+
 echo -e "\n========================================================================"
-echo " Evaluation finished successfully at $(date)"
+echo " MuSiQue evaluation and thesis export completed successfully at $(date)"
+echo " Evaluated runs: $OUTPUT_RUNS"
 echo "========================================================================"

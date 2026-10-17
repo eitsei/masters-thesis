@@ -1,128 +1,136 @@
-# Benchmark Runner Scripts (`rag-code/rag-evaluator/scripts`)
+# RAG Benchmark & Evaluation Scripts (`rag-code/rag-evaluator/scripts`)
 
-This directory contains executable shell scripts for launching automated benchmark evaluation runs, statistical Wilcoxon signed-rank tests, and publication-ready LaTeX table/figure exports.
+This directory contains executable scripts for running RAG pipeline sweeps, evaluating outputs with LLM-as-a-judge (RAGAS), and exporting publication-ready LaTeX tables and figures for the Master's thesis.
 
-## Execution Modes (Decoupled Workflow)
-
-All benchmark runners support separated query execution and quality evaluation via stage flags. This allows fast query collection against the Spring Boot backend without waiting for the LLM judge, followed by offline RAGAS quality evaluation and thesis report generation:
-
-```
-┌─────────────────────────────────┐
-│ Stage 1: Queries Only           │  ./scripts/run_nordea_all16.sh --queries-only
-│ (Fast: latency, tokens, chunks) │  (Sets --judge none, saves run_C*.jsonl)
-└────────────────┬────────────────┘
-                 ▼
-┌─────────────────────────────────┐
-│ Stage 2: Offline Evaluation     │  ./scripts/run_nordea_all16.sh --eval-only
-│ (RAGAS: Faithfulness, Relevance)│  OR: ./scripts/evaluate_run.sh runs/nordea_all16
-└────────────────┬────────────────┘  (Updates run_C*.jsonl in-place, checkpointed)
-                 ▼
-┌─────────────────────────────────┐
-│ Stage 3: Reporting & Exports    │  ./scripts/run_nordea_all16.sh --report-only
-│ (Wilcoxon tests, LaTeX tables)  │  (Generates Wilcoxon terminal & LaTeX tables)
-└─────────────────────────────────┘
-```
-
-| Flag | Description |
-| :--- | :--- |
-| `--queries-only` / `--queries` | Rapidly executes benchmark queries against the Spring Boot service with `--judge none`. Records response latency, token consumption, and retrieved chunks to `run_C*.jsonl` without blocking on the LLM judge. |
-| `--eval-only` / `--eval` | Evaluates previously collected runs in `RUN_DIR` offline using the configured LLM judge (RAGAS Faithfulness & Relevance), updating records in-place with per-item checkpointing. Runs Wilcoxon tests and exports LaTeX tables/figures. |
-| `--report-only` / `--report` | Re-generates statistical Wilcoxon comparisons and LaTeX publication tables/figures from existing JSONL run files without executing queries or calling the judge. |
-| `--all` *(default)* | Executes end-to-end: queries Spring Boot, evaluates quality with the judge online, runs Wilcoxon tests, and exports LaTeX tables and figures. **(100% backward compatible)** |
+The benchmarking workflow is decoupled into a **two-stage architecture**:
+1. **Stage 1 (Local Query Execution):** Run queries against the local Spring Boot service (`http://localhost:8080`) over GCP APIs. Evaluates latency, TTFT, token usage, and responses with `--judge none` (no LLM judge overhead).
+2. **Stage 2 (CSC Roihu GPU Evaluation & Export):** Submit Slurm batch jobs (`sbatch`) to CSC Roihu (NVIDIA GH200 96GB GPU) to evaluate RAGAS Faithfulness & Answer Relevance with Qwen3.8-27B and BGE-M3, followed by automatic Wilcoxon signed-rank tests and LaTeX table/figure exports.
 
 ---
 
-## Available Scripts
+## 📁 Directory Structure
 
-| Script | Configurations Included | Output Run Directory | Thesis Export Subfolder |
+```
+scripts/
+├── benchmarks/              # Stage 1: Local query runners (Spring Boot backend)
+│   ├── run_musique_all16.sh
+│   ├── run_enterprise_closed_all16.sh
+│   └── run_enterprise_raw_all16.sh
+│
+├── roihu/                   # Stage 2: CSC Roihu Slurm GPU evaluation jobs
+│   ├── eval_musique.sbatch
+│   ├── eval_enterprise_closed.sbatch
+│   └── eval_enterprise_raw.sbatch
+│
+└── utils/                   # Utilities & offline evaluation
+    └── evaluate_run.sh
+```
+
+---
+
+## 🚀 Stage 1: Local Query Runners (`scripts/benchmarks/`)
+
+These scripts execute the full $2^4 = 16$ factorial pipeline matrix ($C_0$ to $C_{15}$) against the Spring Boot application running locally at `http://localhost:8080`.
+
+- **Judge Mode:** Suppressed (`--judge none`). Zero judge token cost, zero judge rate-limiting.
+- **Cache Management:** Automatically flushes remote/local caches between configurations and pre-warms context caches before prompt-caching configurations ($M_3$).
+- **Output:** Raw JSONL files saved in `runs/raw/<dataset>/` containing question metadata, response text, chunk references, TTFT, and latency breakdowns.
+
+| Script | Dataset ($N=100$) | Vector Table | Output Run Directory |
 | :--- | :--- | :--- | :--- |
-| [`evaluate_run.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/evaluate_run.sh) | **Standalone Evaluator** (Offline RAGAS evaluation, Wilcoxon tests, and LaTeX export for any run directory) | Specified via argument | Configurable (`--subfolder`) |
-| [`run_nordea_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_nordea_all16.sh) | **$C_0$ through $C_{15}$** (Full 16-condition factorial matrix on Nordea production data) | `runs/nordea_all16` | `thesis/tables/nordea_all16`<br>`thesis/figures/nordea_all16` |
-| [`run_musique_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_musique_all16.sh) | **$C_0$ through $C_{15}$** (Full 16-condition factorial matrix on MuSiQue dataset) | `runs/musique_all16` | `thesis/tables/musique_all16`<br>`thesis/figures/musique_all16` |
-| [`run_nordea_closed_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_nordea_closed_all16.sh) | **$C_0$ through $C_{15}$** (Full 16-condition factorial matrix on closed-corpus Nordea data) | `runs/nordea_closed_all16` | `thesis/tables/nordea_closed_all16`<br>`thesis/figures/nordea_closed_all16` |
-| [`run_sample5_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_sample5_all16.sh) | **$C_0$ through $C_{15}$** (5-sample probe of full 16-condition factorial matrix) | `runs/sample5_all16` | `thesis/tables/sample5_all16`<br>`thesis/figures/sample5_all16` |
-| [`run_sample10_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_sample10_all16.sh) | **$C_0$ through $C_{15}$** (10-sample probe of full 16-condition factorial matrix) | `runs/sample10_all16` | `thesis/tables/sample10_all16`<br>`thesis/figures/sample10_all16` |
-| [`run_nordea_m3_combos.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_nordea_m3_combos.sh) | **$C_0, C_1, C_2, C_3, C_5, C_6, C_8, C_{11}$** (All 8 combinations of M1, M2, M3 on Nordea data) | `runs/nordea_m3_combos` | `thesis/tables/nordea_m3_combos`<br>`thesis/figures/nordea_m3_combos` |
-| [`run_sample5_m3_combos.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_sample5_m3_combos.sh) | **$C_0, C_1, C_2, C_3, C_5, C_6, C_8, C_{11}$** (All 8 combinations of M1, M2, M3 on MuSiQue) | `runs/sample5_m3_combos` | `thesis/tables/sample5_m3_combos`<br>`thesis/figures/sample5_m3_combos` |
-| [`run_sample5_m3.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_sample5_m3.sh) | **$C_0, C_1, C_2, C_3, C_5$** (Baseline, S2B, Re-rank, Cache, S2B+Re-rank) | `runs/sample5_m3` | `thesis/tables/sample5_m3`<br>`thesis/figures/sample5_m3` |
-| [`run_sample5_m1_m2.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_sample5_m1_m2.sh) | **$C_0, C_1, C_2, C_5$** (Baseline, S2B, Re-rank, S2B+Re-rank) | `runs/sample5` | `thesis/tables/sample5`<br>`thesis/figures/sample5` |
-| [`run_sample5_m4.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_sample5_m4.sh) | **$C_0, C_4$** (Baseline vs Model Routing M4) | `runs/sample5_m4` | `thesis/tables/sample5_m4`<br>`thesis/figures/sample5_m4` |
-| [`run_nordea_closed_1_M3_M4.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_nordea_closed_1_M3_M4.sh) | **$C_0, C_{12}$** (Baseline vs Prompt Caching + Model Routing M3+M4 on Closed Nordea) | `runs/nordea_closed_1_M3_M4` | `thesis/tables/nordea_closed_1_M3_M4`<br>`thesis/figures/nordea_closed_1_M3_M4` |
-| [`run_nordea_closed_1_M3.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_nordea_closed_1_M3.sh) | **$C_0, C_3$** (Baseline vs Prompt Caching M3 on Closed Nordea) | `runs/nordea_closed_1_M3` | `thesis/tables/nordea_closed_1_M3`<br>`thesis/figures/nordea_closed_1_M3` |
-| [`run_nordea_closed_1.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_nordea_closed_1.sh) | **$C_0, C_1$** (Baseline vs Small-to-Big M1 on Closed Nordea) | `runs/nordea_closed_1` | `thesis/tables/nordea_closed_1`<br>`thesis/figures/nordea_closed_1` |
-| [`run_musique_1_M3_M4.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_musique_1_M3_M4.sh) | **$C_0, C_{12}$** (Baseline vs Prompt Caching + Model Routing M3+M4 on MuSiQue) | `runs/musique_1_M3_M4` | `thesis/tables/musique_1_M3_M4`<br>`thesis/figures/musique_1_M3_M4` |
-| [`generate_nordea_testset.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/generate_nordea_testset.sh) | **Test Set Generator** (Generates 100-question benchmark with 40% single-hop, 40% multi-hop, 20% OOD) | `data/nordea/nordea_benchmark_100.jsonl` | N/A (Test set generation) |
-| [`run_baseline_claude.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/run_baseline_claude.sh) | **$C_0$** (Baseline connectivity test with Claude Sonnet 5 judge) | `runs/baseline_claude` | N/A (Smoke/connection test) |
+| [`run_musique_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/benchmarks/run_musique_all16.sh) | `data/musique/musique_100_final.jsonl` | `vector_store_musique` | `runs/raw/musique` |
+| [`run_enterprise_closed_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/benchmarks/run_enterprise_closed_all16.sh) | `data/nordea/nordea_100_final.jsonl` | `vector_store_nordea_closed` | `runs/raw/enterprise_closed` |
+| [`run_enterprise_raw_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/benchmarks/run_enterprise_raw_all16.sh) | `data/nordea/nordea_100_final.jsonl` | `vector_store_nordea` | `runs/raw/enterprise_raw` |
 
----
-
-## Workflow Examples
-
-### 1. Two-Step Run (Separate Query & Evaluation)
-
-First, execute the queries against the backend service quickly without calling the judge LLM:
+### Running Local Benchmarks
 ```bash
-./scripts/run_nordea_all16.sh --queries-only
-```
-After the query collection completes, evaluate the saved run directory offline:
-```bash
-# Option A: using the runner script
-./scripts/run_nordea_all16.sh --eval-only
+# Make sure Spring Boot backend is running:
+# (cd ../rag-benchmark && ./gradlew bootRun)
 
-# Option B: using the standalone evaluator script
-./scripts/evaluate_run.sh runs/nordea_all16 --judge gemini --judge-model gemini-3.5-flash-lite --subfolder nordea_all16
+# 1. Run MuSiQue benchmark
+./scripts/benchmarks/run_musique_all16.sh
+
+# 2. Run Enterprise Closed benchmark
+./scripts/benchmarks/run_enterprise_closed_all16.sh
+
+# 3. Run Enterprise Raw benchmark
+./scripts/benchmarks/run_enterprise_raw_all16.sh
 ```
 
-### 2. Standalone Evaluator (`evaluate_run.sh`)
-
-[`evaluate_run.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/evaluate_run.sh) evaluates any existing directory containing `run_C*.jsonl` files, executes Wilcoxon tests vs `run_C0_baseline.jsonl`, and exports LaTeX tables and figures:
-
+#### Environment Variable Overrides
+All runner scripts accept standard environment variables:
 ```bash
-# Evaluate an existing run directory:
-./scripts/evaluate_run.sh runs/my_experiment
+# Run with smaller limit for quick sanity check:
+LIMIT=5 ./scripts/benchmarks/run_musique_all16.sh
 
-# Specify custom judge and model:
-./scripts/evaluate_run.sh runs/my_experiment --judge claude --judge-model claude-sonnet-5
-
-# Skip Wilcoxon comparisons or export:
-./scripts/evaluate_run.sh runs/my_experiment --no-compare --no-export
-```
-
-### 3. Fault-Tolerant Resumption
-
-The evaluation engine features per-item atomic checkpointing (`.tmp`). If an evaluation run is interrupted (e.g., quota limit, network disconnect, or process termination), re-running the same command automatically resumes from the last completed question without re-evaluating or incurring extra API costs:
-
-```bash
-# Automatically resumes incomplete evaluations:
-./scripts/run_nordea_all16.sh --eval-only
-
-# To force re-evaluation of all items (ignoring existing scores):
-python src/cli.py evaluate --input runs/nordea_all16 --judge gemini --force
+# Override target backend URL:
+RAG_APP_URL="http://localhost:8080" ./scripts/benchmarks/run_enterprise_closed_all16.sh
 ```
 
 ---
 
-## Environment Variable Overrides
+## ⚡ Stage 2: CSC Roihu GPU Batch Jobs (`scripts/roihu/`)
 
-All scripts support configuration overrides without modifying the script file:
+These Slurm batch scripts are executed on the **CSC Roihu supercomputer** (`gpumedium` partition, 1x NVIDIA GH200 96GB GPU, `#SBATCH --time=04:00:00`).
 
-| Variable | Default Value | Description |
-| :--- | :--- | :--- |
-| `RAG_APP_URL` | `http://localhost:8080` | URL of Spring Boot benchmark service |
-| `LIMIT` | `5` (or `100` in full runs) | Number of benchmark questions to evaluate |
-| `TABLE_NAME` | `vector_store_musique` / `vector_store_nordea` | Target vector database table |
-| `JUDGE` | `gemini` / `claude` | Evaluation judge provider (`gemini`, `claude`, `vertex`, `ollama`, `none`) |
-| `JUDGE_MODEL` | `gemini-3.5-flash-lite` / `claude-sonnet-5` | Evaluation judge LLM identifier |
-| `WARMUP` | `0` (or `2` in full runs) | Number of unmeasured warm-up queries |
-| `RUN_DIR` | e.g. `runs/nordea_all16` | Directory where raw JSONL files are stored |
-| `SUBFOLDER` | e.g. `nordea_all16` | Subfolder in `thesis/tables` & `thesis/figures` |
+- **Architecture:** Sequentially initializes two co-located vLLM servers on the GH200 GPU:
+  1. `BAAI/bge-m3` on port 8001 (GPU memory utilization ~0.08) for embeddings.
+  2. `Qwen/Qwen3.8-27B` on port 8000 (GPU memory utilization ~0.82) for judge generation.
+- **RAGAS Evaluation:** Evaluates 16 runs in parallel across 16 worker threads with per-item checkpointing (`--resume`).
+- **Thesis Export:** Automatically runs Wilcoxon signed-rank tests and exports LaTeX tables and vector figures into `thesis/tables/<dataset>` and `thesis/figures/<dataset>`.
 
-### Examples:
+| Batch Script | Evaluates Input | Output Evaluated Runs | Thesis Export Subfolder |
+| :--- | :--- | :--- | :--- |
+| [`eval_musique.sbatch`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/roihu/eval_musique.sbatch) | `runs/raw/musique` | `runs/evaluated/musique` | `thesis/tables/musique`<br>`thesis/figures/musique` |
+| [`eval_enterprise_closed.sbatch`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/roihu/eval_enterprise_closed.sbatch) | `runs/raw/enterprise_closed` | `runs/evaluated/enterprise_closed` | `thesis/tables/enterprise_closed`<br>`thesis/figures/enterprise_closed` |
+| [`eval_enterprise_raw.sbatch`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/roihu/eval_enterprise_raw.sbatch) | `runs/raw/enterprise_raw` | `runs/evaluated/enterprise_raw` | `thesis/tables/enterprise`<br>`thesis/figures/enterprise` |
+
+### Submitting Slurm Jobs on Roihu
+```bash
+# Submit MuSiQue evaluation
+sbatch scripts/roihu/eval_musique.sbatch
+
+# Submit Enterprise Closed evaluation
+sbatch scripts/roihu/eval_enterprise_closed.sbatch
+
+# Submit Enterprise Raw evaluation
+sbatch scripts/roihu/eval_enterprise_raw.sbatch
+```
+
+Jobs can be monitored with:
+```bash
+squeue --me
+tail -f logs/eval_musique_<job_id>.out
+```
+
+---
+
+## 🛠️ Standalone Offline Evaluation Utility (`scripts/utils/`)
+
+[`evaluate_run.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/utils/evaluate_run.sh) allows evaluating any existing directory of `run_C*.jsonl` files offline (either locally or on a server), executing Wilcoxon comparisons vs $C_0$ baseline, and exporting LaTeX tables and figures without submitting Slurm jobs.
 
 ```bash
-# Run queries only against deployed Cloud Run service with 100 questions:
-RAG_APP_URL="https://rag-service-xyz.run.app" LIMIT=100 ./scripts/run_nordea_all16.sh --queries-only
+# Evaluate using local vLLM judge:
+./scripts/utils/evaluate_run.sh runs/raw/musique --judge vllm --workers 16 --subfolder musique
 
-# Evaluate quality offline using Claude Sonnet 5 as judge:
-JUDGE=claude JUDGE_MODEL=claude-sonnet-5 ./scripts/run_nordea_all16.sh --eval-only
+# Evaluate using Gemini judge API:
+./scripts/utils/evaluate_run.sh runs/raw/enterprise_closed --judge gemini --judge-model gemini-3.5-flash-lite --subfolder enterprise_closed
+
+# Export tables/figures only without re-evaluating:
+./scripts/utils/evaluate_run.sh runs/evaluated/musique --no-eval --subfolder musique
+```
+
+---
+
+## 📦 Dataset Generation (Reference)
+
+All evaluation datasets (`musique_100_final.jsonl`, `nordea_100_final.jsonl`, etc.) are pre-generated, verified, and committed under `data/`.
+
+If you ever need to regenerate datasets from raw source materials, run the CLI commands directly rather than through shell wrappers:
+```bash
+# Regenerate Nordea synthetic testset:
+python src/cli.py generate-nordea-testset --docs-dir ../rag-benchmark/data/nordea --output data/nordea/nordea_benchmark_100.jsonl --limit 100
+
+# Rebuild combined Nordea-MuSiQue evaluation set:
+python src/cli.py build-nordea-musique-dataset --nordea data/nordea/nordea_100_final.jsonl --musique data/musique/musique_100_final.jsonl --output data/combined/
 ```

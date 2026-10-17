@@ -123,14 +123,14 @@ def test_plot_cost_breakdown(tmp_path: Path):
     assert result_path.exists()
     assert result_path.stat().st_size > 500
 
-    # Verify that Pro pricing tier ($1.25/$5.00) is applied rather than default Flash ($0.75/$3.75)
+    # Verify that Pro pricing tier ($2.00/$12.00) is applied rather than default Flash ($0.75/$3.75)
     prompt_keys = [k for k in plotted_bars if "prompt" in k.lower()]
     assert len(prompt_keys) == 1
-    assert plotted_bars[prompt_keys[0]][0] == pytest.approx(1.25, rel=1e-5)
+    assert plotted_bars[prompt_keys[0]][0] == pytest.approx(2.00, rel=1e-5)
 
     comp_keys = [k for k in plotted_bars if "generation" in k.lower() or "comp" in k.lower()]
     assert len(comp_keys) == 1
-    assert plotted_bars[comp_keys[0]][0] == pytest.approx(0.50, rel=1e-5)
+    assert plotted_bars[comp_keys[0]][0] == pytest.approx(1.20, rel=1e-5)
 
 
 def test_categorize_radar_tiers():
