@@ -140,6 +140,36 @@ class MusiqueDatasetReaderTest {
             assertThat(q.answer()).isEqualTo(MusiqueDatasetReader.CANONICAL_REFUSAL_EN);
             assertThat(q.answerAliases()).contains("does not contain sufficient information to answer this query");
         }
+
+        // Verify zero overlap in base IDs between answerable and unanswerable questions
+        java.util.Set<String> answerableBaseIds = sample.stream()
+                .filter(MusiqueQuestion::answerable)
+                .map(MusiqueQuestion::id)
+                .collect(Collectors.toSet());
+        java.util.Set<String> unanswerableBaseIds = unanswerable.stream()
+                .map(q -> q.id().replace("_unans", ""))
+                .collect(Collectors.toSet());
+        assertThat(answerableBaseIds).doesNotContainAnyElementsOf(unanswerableBaseIds);
+
+        // Verify that for every unanswerable question, none of its removed supporting bridge titles
+        // leak into the shared vector store via other questions in the 100-question sample
+        java.util.Set<String> allIngestedTitles = sample.stream()
+                .flatMap(q -> q.paragraphs().stream())
+                .map(MusiqueParagraph::title)
+                .collect(Collectors.toSet());
+
+        for (MusiqueQuestion u : unanswerable) {
+            String baseId = u.id().replace("_unans", "");
+            MusiqueQuestion pairedAns = reader.findById(baseId).orElseThrow();
+            java.util.Set<String> uTitles = u.paragraphs().stream()
+                    .map(MusiqueParagraph::title)
+                    .collect(Collectors.toSet());
+            List<String> removedBridges = pairedAns.getSupportingTitles().stream()
+                    .filter(title -> !uTitles.contains(title))
+                    .toList();
+            assertThat(removedBridges).isNotEmpty();
+            assertThat(allIngestedTitles).doesNotContainAnyElementsOf(removedBridges);
+        }
     }
 
     @Test

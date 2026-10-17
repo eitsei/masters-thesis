@@ -158,6 +158,22 @@ public class MusiqueDatasetReader {
         sample.addAll(ans4Pool.stream().limit(count4).toList());
 
         if (countUnanswerable > 0 && !unanswerableQuestions.isEmpty()) {
+            Map<String, MusiqueQuestion> ansById = answerableQuestions.stream()
+                    .collect(Collectors.toMap(MusiqueQuestion::id, q -> q, (a, b) -> a));
+
+            java.util.Set<String> selectedBaseIds = sample.stream()
+                    .map(MusiqueQuestion::id)
+                    .collect(Collectors.toCollection(java.util.HashSet::new));
+
+            java.util.Set<String> ingestedTitles = sample.stream()
+                    .filter(q -> q.paragraphs() != null)
+                    .flatMap(q -> q.paragraphs().stream())
+                    .map(MusiqueParagraph::title)
+                    .filter(t -> t != null && !t.isBlank())
+                    .collect(Collectors.toCollection(java.util.HashSet::new));
+
+            java.util.Set<String> forbiddenBridgeTitles = new java.util.HashSet<>();
+
             Map<Integer, List<MusiqueQuestion>> unansByHop = unanswerableQuestions.stream()
                     .collect(Collectors.groupingBy(MusiqueQuestion::hopCount));
 
@@ -174,12 +190,68 @@ public class MusiqueDatasetReader {
             int unans3 = (int) Math.round(countUnanswerable * 0.30);
             int unans4 = countUnanswerable - unans2 - unans3;
 
-            sample.addAll(unans2Pool.stream().limit(unans2).toList());
-            sample.addAll(unans3Pool.stream().limit(unans3).toList());
-            sample.addAll(unans4Pool.stream().limit(unans4).toList());
+            sample.addAll(selectCleanUnanswerable(unans2Pool, unans2, ansById, selectedBaseIds, ingestedTitles, forbiddenBridgeTitles));
+            sample.addAll(selectCleanUnanswerable(unans3Pool, unans3, ansById, selectedBaseIds, ingestedTitles, forbiddenBridgeTitles));
+            sample.addAll(selectCleanUnanswerable(unans4Pool, unans4, ansById, selectedBaseIds, ingestedTitles, forbiddenBridgeTitles));
         }
 
         return Collections.unmodifiableList(sample);
+    }
+
+    private List<MusiqueQuestion> selectCleanUnanswerable(
+            List<MusiqueQuestion> pool,
+            int targetCount,
+            Map<String, MusiqueQuestion> ansById,
+            java.util.Set<String> selectedBaseIds,
+            java.util.Set<String> ingestedTitles,
+            java.util.Set<String> forbiddenBridgeTitles) {
+        if (targetCount <= 0 || pool.isEmpty()) {
+            return List.of();
+        }
+        List<MusiqueQuestion> selected = new ArrayList<>(targetCount);
+        for (MusiqueQuestion candidate : pool) {
+            if (selected.size() >= targetCount) {
+                break;
+            }
+            String baseId = stripUnansSuffix(candidate.id());
+            if (selectedBaseIds.contains(baseId)) {
+                continue;
+            }
+            java.util.Set<String> candidateTitles = candidate.paragraphs() == null
+                    ? java.util.Set.of()
+                    : candidate.paragraphs().stream()
+                            .map(MusiqueParagraph::title)
+                            .filter(t -> t != null && !t.isBlank())
+                            .collect(Collectors.toSet());
+
+            if (candidateTitles.stream().anyMatch(forbiddenBridgeTitles::contains)) {
+                continue;
+            }
+
+            MusiqueQuestion pairedAns = ansById.get(baseId);
+            java.util.Set<String> removedBridges = java.util.Set.of();
+            if (pairedAns != null) {
+                removedBridges = pairedAns.getSupportingTitles().stream()
+                        .filter(t -> t != null && !t.isBlank() && !candidateTitles.contains(t))
+                        .collect(Collectors.toSet());
+                if (removedBridges.isEmpty() || removedBridges.stream().anyMatch(ingestedTitles::contains)) {
+                    continue;
+                }
+            }
+
+            selected.add(candidate);
+            selectedBaseIds.add(baseId);
+            ingestedTitles.addAll(candidateTitles);
+            forbiddenBridgeTitles.addAll(removedBridges);
+        }
+        return selected;
+    }
+
+    private static String stripUnansSuffix(String id) {
+        if (id != null && id.endsWith("_unans")) {
+            return id.substring(0, id.length() - "_unans".length());
+        }
+        return id != null ? id : "";
     }
 
     /**

@@ -36,6 +36,8 @@ class RagPromptRendererTest {
         assertThat(fullPrompt)
                 .contains(renderer.getSystemInstruction())
                 .contains("Context:\nHelsinki is the capital.")
+                .contains("[LANGUAGE MANDATE / KIELIPAKKO:")
+                .contains("Vastaa samalla kielellä kuin kysymys")
                 .contains("Question: Capital of Finland?\nAnswer:");
     }
 
@@ -46,6 +48,8 @@ class RagPromptRendererTest {
 
         assertThat(payload)
                 .contains("Context:\nDynamic context text.")
+                .contains("[LANGUAGE MANDATE / KIELIPAKKO:")
+                .contains("Vastaa samalla kielellä kuin kysymys")
                 .contains("Question: Dynamic question?\nAnswer:");
     }
 
