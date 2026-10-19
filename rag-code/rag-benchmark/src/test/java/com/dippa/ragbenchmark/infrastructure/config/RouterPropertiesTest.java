@@ -13,7 +13,7 @@ class RouterPropertiesTest {
 
         assertThat(properties.provider()).isEqualTo(RouterProperties.Provider.NOOP);
         assertThat(properties.classifierModel()).isEqualTo("gemini-3.5-flash-lite");
-        assertThat(properties.fallbackModel()).isEqualTo("gemini-3.8-flash");
+        assertThat(properties.fallbackModel()).isEqualTo("gemini-3.5-flash");
         assertThat(properties.temperature()).isEqualTo(0.0);
         assertThat(properties.timeoutMs()).isEqualTo(5000);
     }
@@ -40,7 +40,7 @@ class RouterPropertiesTest {
 
         assertThat(properties.provider()).isEqualTo(RouterProperties.Provider.NOOP);
         assertThat(properties.classifierModel()).isEqualTo("gemini-3.5-flash-lite");
-        assertThat(properties.fallbackModel()).isEqualTo("gemini-3.8-flash");
+        assertThat(properties.fallbackModel()).isEqualTo("gemini-3.5-flash");
         assertThat(properties.temperature()).isEqualTo(0.0);
         assertThat(properties.timeoutMs()).isEqualTo(5000);
     }

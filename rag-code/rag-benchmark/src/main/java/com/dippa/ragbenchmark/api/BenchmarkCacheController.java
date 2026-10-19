@@ -153,6 +153,6 @@ public class BenchmarkCacheController {
                 return defaultModels;
             }
         }
-        return List.of("gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-pro");
+        return List.of("gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-pro-preview");
     }
 }

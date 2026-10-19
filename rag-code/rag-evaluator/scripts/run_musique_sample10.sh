@@ -5,6 +5,7 @@
 # Evaluates key optimization configurations against vector_store_musique using
 # data/musique/musique_10_sample.jsonl (stratified across 2/3/4-hop & unanswerable):
 #   - C0:  Naive RAG Baseline
+#   - C1:  Small-to-Big Retrieval (M1)
 #   - C3:  Prompt Caching (M3)
 #   - C4:  Model Routing (M4)
 #   - C10: Prompt Caching + Model Routing (M3+M4)
@@ -24,7 +25,7 @@
 #   -j, --judge <PROVIDER>  Judge provider: none, gemini, claude, vllm (default: none)
 #   -m, --judge-model <MDL> Judge model identifier
 #   -u, --url <URL>         Target Spring Boot service URL (default: http://localhost:8080)
-#   -o, --run-dir <DIR>     Output directory (default: runs/raw/musique_sample10)
+#   -o, --run-dir <DIR>     Output directory (default: runs/raw/musique_sample10_<timestamp>)
 #   --skip-baseline         Skip baseline C0 run
 #   --eval                  Evaluate runs offline after query collection
 #   -h, --help              Show this help message
@@ -49,7 +50,8 @@ TABLE_NAME="${TABLE_NAME:-vector_store_musique}"
 DEFAULT_QUESTIONS="data/musique/musique_10_sample.jsonl"
 TIMEOUT="${TIMEOUT:-300}"
 QUESTIONS_FILE="${QUESTIONS_FILE:-$DEFAULT_QUESTIONS}"
-RUN_DIR="${RUN_DIR:-runs/raw/musique_sample10}"
+TIMESTAMP="$(date +"%d%m%Y%H%M")"
+RUN_DIR="${RUN_DIR:-runs/raw/musique_sample10_${TIMESTAMP}}"
 JUDGE="${JUDGE:-none}"
 JUDGE_MODEL="${JUDGE_MODEL:-}"
 RUN_BASELINE=true
@@ -110,6 +112,7 @@ echo " Configurations:"
 if [ "$RUN_BASELINE" = true ]; then
   echo "   - C0:  Naive RAG Baseline"
 fi
+echo "   - C1:  Small-to-Big Retrieval (M1)"
 echo "   - C3:  Prompt Caching (M3)"
 echo "   - C4:  Model Routing (M4)"
 echo "   - C10: Prompt Caching + Model Routing (M3+M4)"
@@ -180,7 +183,22 @@ if [ "$RUN_BASELINE" = true ]; then
 fi
 
 # ------------------------------------------------------------------------------
-# 2. Setup 1: C3: Prompt Caching (M3)
+# 2. Setup 1: C1: Small-to-Big Retrieval (M1)
+# ------------------------------------------------------------------------------
+echo -e "\n>>> Running C1: Small-to-Big Retrieval (M1)..."
+"$PYTHON" src/cli.py run-questions \
+  --input "$QUESTIONS_FILE" \
+  --url "$URL" \
+  --limit "$LIMIT" \
+  --timeout "$TIMEOUT" \
+  --modules M1 \
+  --table-name "$TABLE_NAME" \
+  "${JUDGE_ARGS[@]}" \
+  --output "${RUN_DIR}/run_C1_M1.jsonl"
+clear_cache
+
+# ------------------------------------------------------------------------------
+# 3. Setup 2: C3: Prompt Caching (M3)
 # ------------------------------------------------------------------------------
 echo -e "\n>>> Running C3: Prompt Caching (M3)..."
 prewarm_cache
@@ -196,7 +214,7 @@ prewarm_cache
 clear_cache
 
 # ------------------------------------------------------------------------------
-# 3. Setup 2: C4: Model Routing / Cascading (M4)
+# 4. Setup 3: C4: Model Routing / Cascading (M4)
 # ------------------------------------------------------------------------------
 echo -e "\n>>> Running C4: Model Cascading / Routing (M4)..."
 "$PYTHON" src/cli.py run-questions \
@@ -211,7 +229,7 @@ echo -e "\n>>> Running C4: Model Cascading / Routing (M4)..."
 clear_cache
 
 # ------------------------------------------------------------------------------
-# 4. Setup 3: C10: Prompt Caching + Model Routing (M3+M4)
+# 5. Setup 4: C10: Prompt Caching + Model Routing (M3+M4)
 # ------------------------------------------------------------------------------
 echo -e "\n>>> Running C10: Prompt Caching + Model Routing (M3+M4)..."
 prewarm_cache
@@ -227,7 +245,7 @@ prewarm_cache
 clear_cache
 
 # ------------------------------------------------------------------------------
-# 5. Setup 4: C13: S2B + Prompt Caching + Model Routing (M1+M3+M4)
+# 6. Setup 5: C13: S2B + Prompt Caching + Model Routing (M1+M3+M4)
 # ------------------------------------------------------------------------------
 echo -e "\n>>> Running C13: S2B + Prompt Caching + Model Routing (M1+M3+M4)..."
 prewarm_cache
@@ -266,6 +284,7 @@ else
   echo "    ./scripts/utils/evaluate_run.sh $RUN_DIR --judge gemini"
   if [ "$RUN_BASELINE" = true ]; then
     echo " 2. Quick Wilcoxon comparison vs baseline:"
+    echo "    $PYTHON src/cli.py compare --baseline ${RUN_DIR}/run_C0_baseline.jsonl --treatment ${RUN_DIR}/run_C1_M1.jsonl"
     echo "    $PYTHON src/cli.py compare --baseline ${RUN_DIR}/run_C0_baseline.jsonl --treatment ${RUN_DIR}/run_C3_M3.jsonl"
     echo "    $PYTHON src/cli.py compare --baseline ${RUN_DIR}/run_C0_baseline.jsonl --treatment ${RUN_DIR}/run_C10_M3_M4.jsonl"
   fi

@@ -44,7 +44,7 @@ public record RouterProperties(
             classifierModel = "gemini-3.5-flash-lite";
         }
         if (fallbackModel == null || fallbackModel.isBlank()) {
-            fallbackModel = "gemini-3.8-flash";
+            fallbackModel = "gemini-3.5-flash";
         }
         if (temperature < 0.0) {
             temperature = 0.0;
@@ -58,7 +58,7 @@ public record RouterProperties(
         return new RouterProperties(
                 Provider.NOOP,
                 "gemini-3.5-flash-lite",
-                "gemini-3.8-flash",
+                "gemini-3.5-flash",
                 0.0,
                 5000);
     }

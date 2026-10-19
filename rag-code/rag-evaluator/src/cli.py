@@ -1604,7 +1604,7 @@ def run_questions(
     table_name: str = typer.Option("vector_store_nordea", "--table-name", "-t", help="Target vector store table"),
     modules: str = typer.Option("", "--modules", "-m", help="Comma-separated optimization modules"),
     limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of questions to evaluate"),
-    judge: str = typer.Option("claude", "--judge", "-j", envvar="JUDGE_PROVIDER", help="Judge provider: claude, gemini, vertex, ollama, vllm, none"),
+    judge: str = typer.Option("none", "--judge", "-j", help="Judge provider: claude, gemini, vertex, ollama, vllm, none (default: none)"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", envvar="JUDGE_MODEL", help="Judge model identifier"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSONL path for evaluated results"),
     url: Optional[str] = typer.Option(None, "--url", help="RAG service URL"),
@@ -1616,6 +1616,17 @@ def run_questions(
     ),
     timeout: float = typer.Option(300.0, "--timeout", help="Timeout in seconds for RAG service requests (default: 300s)"),
     skip_cache_check: bool = typer.Option(False, "--skip-cache-check", help="Skip pre-flight prompt cache verification"),
+    warmup: int = typer.Option(
+        2,
+        "--warmup",
+        "-w",
+        help="Number of unmeasured warm-up queries before benchmark collection (Thesis §4.1)",
+    ),
+    max_retries: int = typer.Option(
+        3,
+        "--max-retries",
+        help="Number of retry attempts per query on transient HTTP/Vertex AI errors",
+    ),
 ) -> None:
     """Runs a batch of questions from a file against a vector store table and evaluates with RAGAS."""
     rag_url = url or os.getenv("RAG_APP_URL", "http://localhost:8080")
@@ -1648,6 +1659,38 @@ def run_questions(
             console=console,
         )
 
+    # Warm-up phase (Thesis §4.1, §4.6)
+    if warmup > 0 and records:
+        console.print(
+            f"[dim]Executing {warmup} unmeasured warm-up queries to eliminate cold-start / JVM JIT distortions...[/dim]"
+        )
+        has_m4 = any(m.upper() == "M4" for m in module_list)
+        warmup_candidates: list[dict[str, Any]] = []
+        if has_m4:
+            seen_hops = set()
+            for r in records:
+                h = r.get("hopCount") or (len(r.get("question_decomposition", [])) if "question_decomposition" in r else None)
+                if h not in seen_hops:
+                    seen_hops.add(h)
+                    warmup_candidates.append(r)
+                if len(warmup_candidates) >= warmup:
+                    break
+        if len(warmup_candidates) < warmup:
+            warmup_candidates = records[:warmup]
+
+        for w_idx, w_rec in enumerate(warmup_candidates[:warmup], 1):
+            w_q = w_rec.get("question") or w_rec.get("query") or ""
+            if not w_q:
+                continue
+            try:
+                t_w0 = time.perf_counter()
+                client.query(query=w_q, modules=module_list, table_name=table_name)
+                w_ms = (time.perf_counter() - t_w0) * 1000.0
+                if debug:
+                    console.print(f"[dim yellow][DEBUG] Warm-up {w_idx}/{warmup} completed in {w_ms:.0f}ms (unmeasured)[/dim yellow]")
+            except Exception as w_err:
+                console.print(f"[yellow]⚠ Warm-up query {w_idx} warning: {w_err}[/yellow]")
+
     effective_delay: float = _resolve_judge_delay(judge, judge_delay)
 
     # Initialize judge if requested
@@ -1667,6 +1710,8 @@ def run_questions(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = output or Path(f"runs/run_{table_name}_{timestamp}.jsonl")
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    if out_path.exists() and str(out_path) not in ("/dev/null", "nul"):
+        out_path.unlink()
 
     evaluated_records: list[dict[str, Any]] = []
     for i, rec in enumerate(records, 1):
@@ -1690,16 +1735,34 @@ def run_questions(
         q_disp = (q[:90] + "...") if len(q) > 90 else q
         console.print(f"\n[bold cyan]─── Question [{i}/{len(records)}] ───[/bold cyan] [bold white]{q_disp}[/bold white]")
 
-        try:
-            with console.status(
-                f"[bold cyan][{i}/{len(records)}][/bold cyan] Querying RAG service ({table_name})...",
-                spinner="dots",
-            ):
-                t0 = time.perf_counter()
-                resp = client.query(query=q, modules=module_list, table_name=table_name)
-                elapsed = (time.perf_counter() - t0) * 1000.0
-        except Exception as q_err:
-            console.print(f"  [bold red]✗ Query failed for question [{i}/{len(records)}]: {q_err}[/bold red]")
+        resp = None
+        elapsed = 0.0
+        for attempt in range(1, max_retries + 1):
+            try:
+                with console.status(
+                    f"[bold cyan][{i}/{len(records)}][/bold cyan] Querying RAG service ({table_name})"
+                    + (f" [attempt {attempt}/{max_retries}]..." if attempt > 1 else "..."),
+                    spinner="dots",
+                ):
+                    t0 = time.perf_counter()
+                    resp = client.query(query=q, modules=module_list, table_name=table_name)
+                    elapsed = (time.perf_counter() - t0) * 1000.0
+                    break
+            except Exception as q_err:
+                if attempt < max_retries:
+                    backoff = attempt * 3.0
+                    console.print(
+                        f"  [yellow]⚠ Query attempt {attempt}/{max_retries} failed for [{i}/{len(records)}] ({qid}): {q_err}. "
+                        f"Retrying in {backoff:.1f}s...[/yellow]"
+                    )
+                    time.sleep(backoff)
+                else:
+                    console.print(
+                        f"  [bold red]✗ Query failed permanently after {max_retries} attempts for [{i}/{len(records)}] ({qid}): {q_err}[/bold red]"
+                    )
+                    raise typer.Exit(code=1)
+
+        if resp is None:
             continue
 
         ret_chunks = len(resp.get("retrievedChunks", []))

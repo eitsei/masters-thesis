@@ -121,7 +121,7 @@ public class RagQueryService {
             ObjectProvider<GenerationProperties> generationPropertiesProvider,
             ObjectProvider<ModelRouter> modelRouterProvider,
             ObjectProvider<RouterProperties> routerPropertiesProvider,
-            @Value("${spring.ai.google.genai.chat.model:gemini-3.8-flash}") String chatModelName) {
+            @Value("${spring.ai.google.genai.chat.model:gemini-3.5-flash}") String chatModelName) {
         this(
                 vectorStore,
                 chatModel,
@@ -248,7 +248,7 @@ public class RagQueryService {
             int topK,
             Resource answerPromptResource) {
         this(vectorStore, chatModel, reranker, retrievalExpander, promptCache, null, null, null,
-                modelRouter, null, "gemini-3.8-flash", meterRegistry, snippetLengthChars, topK,
+                modelRouter, null, "gemini-3.5-flash", meterRegistry, snippetLengthChars, topK,
                 RerankerProperties.defaultProperties(), answerPromptResource, "vector_store_test", null, null);
     }
 
@@ -282,7 +282,7 @@ public class RagQueryService {
         this.generationProperties = generationProperties != null ? generationProperties : GenerationProperties.defaultProperties();
         this.modelRouter = modelRouter != null ? modelRouter : new NoOpModelRouter();
         this.routerProperties = routerProperties != null ? routerProperties : RouterProperties.defaultProperties();
-        this.chatModelName = (chatModelName != null && !chatModelName.isBlank()) ? chatModelName : "gemini-3.8-flash";
+        this.chatModelName = (chatModelName != null && !chatModelName.isBlank()) ? chatModelName : "gemini-3.5-flash";
         this.meterRegistry = meterRegistry;
         this.snippetLengthChars = snippetLengthChars;
         this.topK = topK;

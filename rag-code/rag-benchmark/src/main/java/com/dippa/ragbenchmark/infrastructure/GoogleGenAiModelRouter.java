@@ -86,13 +86,13 @@ public class GoogleGenAiModelRouter implements ModelRouter, DisposableBean {
                 catalogProperties != null && catalogProperties.googleGenai() != null && catalogProperties.googleGenai().flashLite() != null
                         ? catalogProperties.googleGenai().flashLite() : "gemini-3.5-flash-lite",
                 catalogProperties != null && catalogProperties.googleGenai() != null && catalogProperties.googleGenai().flash() != null
-                        ? catalogProperties.googleGenai().flash() : "gemini-3.8-flash",
+                        ? catalogProperties.googleGenai().flash() : "gemini-3.5-flash",
                 catalogProperties != null && catalogProperties.googleGenai() != null && catalogProperties.googleGenai().pro() != null
-                        ? catalogProperties.googleGenai().pro() : "gemini-3.1-pro",
+                        ? catalogProperties.googleGenai().pro() : "gemini-3.1-pro-preview",
                 routerProperties != null && routerProperties.fallbackModel() != null && !routerProperties.fallbackModel().isBlank()
                         ? routerProperties.fallbackModel()
                         : (catalogProperties != null && catalogProperties.googleGenai() != null && catalogProperties.googleGenai().flash() != null
-                                ? catalogProperties.googleGenai().flash() : "gemini-3.8-flash"),
+                                ? catalogProperties.googleGenai().flash() : "gemini-3.5-flash"),
                 routerProperties != null ? routerProperties.temperature() : 0.0,
                 routerProperties != null ? routerProperties.timeoutMs() : 5000,
                 meterRegistry,
@@ -139,9 +139,9 @@ public class GoogleGenAiModelRouter implements ModelRouter, DisposableBean {
         this.chatModel = chatModel;
         this.classifierModel = (classifierModel != null && !classifierModel.isBlank()) ? classifierModel : "gemini-3.5-flash-lite";
         this.flashLiteModel = (flashLiteModel != null && !flashLiteModel.isBlank()) ? flashLiteModel : "gemini-3.5-flash-lite";
-        this.flashModel = (flashModel != null && !flashModel.isBlank()) ? flashModel : "gemini-3.8-flash";
-        this.proModel = (proModel != null && !proModel.isBlank()) ? proModel : "gemini-3.1-pro";
-        this.fallbackModel = (fallbackModel != null && !fallbackModel.isBlank()) ? fallbackModel : "gemini-3.8-flash";
+        this.flashModel = (flashModel != null && !flashModel.isBlank()) ? flashModel : "gemini-3.5-flash";
+        this.proModel = (proModel != null && !proModel.isBlank()) ? proModel : "gemini-3.1-pro-preview";
+        this.fallbackModel = (fallbackModel != null && !fallbackModel.isBlank()) ? fallbackModel : "gemini-3.5-flash";
         this.temperature = temperature;
         this.timeoutMs = timeoutMs > 0 ? timeoutMs : 5000;
         this.meterRegistry = meterRegistry;
