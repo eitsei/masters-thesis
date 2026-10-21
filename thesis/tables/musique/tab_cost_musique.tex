@@ -9,28 +9,28 @@
 \textbf{Pipeline} & \makecell{\textbf{Uncached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Cached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Output}\\\textbf{Tokens}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$\Delta$ Cost}\\\scriptsize{(\%)}} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
-Naive RAG Baseline & 7,844 & 0 & 23 & \$11.972 & -- \\
+Naive RAG Baseline & 8,001 & 0 & 9 & \$12.082 & -- \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-S2B & 7,933 & 0 & 29 & \$12.161 & +1.6\%\textsuperscript{ns} \\
-SR & 7,962 & 0 & 25 & \$17.169 & +43.4\%\textsuperscript{*} \\
-PC & 689 & 7,153 & 26 & \$3.411 & -71.5\%\textsuperscript{*} \\
-MC & 7,853 & 0 & 19 & \$14.672 & +22.6\%\textsuperscript{*} \\
+S2B & 8,132 & 0 & 9 & \$12.278 & +1.6\%\textsuperscript{**} \\
+SR & 8,030 & 0 & 10 & \$17.131 & +41.8\%\textsuperscript{***} \\
+PC & 842 & 7,157 & 9 & \$2.420 & -80.0\%\textsuperscript{***} \\
+MC & 8,001 & 0 & 10 & \$15.079 & +24.8\%\textsuperscript{***} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
-S2B + SR & 8,017 & 0 & 31 & \$17.302 & +44.5\%\textsuperscript{*} \\
-S2B + PC & 778 & 7,153 & 30 & \$3.586 & -70.0\%\textsuperscript{*} \\
-S2B + MC & 7,933 & 0 & 22 & \$14.589 & +21.9\%\textsuperscript{*} \\
-SR + PC & 808 & 7,153 & 28 & \$8.613 & -28.1\%\textsuperscript{ns} \\
-SR + MC & 7,962 & 0 & 20 & \$19.603 & +63.7\%\textsuperscript{*} \\
-PC + MC & 689 & 7,153 & 25 & \$5.373 & -55.1\%\textsuperscript{ns} \\
+S2B + SR & 8,196 & 0 & 10 & \$17.388 & +43.9\%\textsuperscript{***} \\
+S2B + PC & 973 & 7,157 & 9 & \$2.612 & -78.4\%\textsuperscript{***} \\
+S2B + MC & 8,132 & 0 & 10 & \$14.977 & +24.0\%\textsuperscript{***} \\
+SR + PC & 871 & 7,157 & 9 & \$7.466 & -38.2\%\textsuperscript{***} \\
+SR + MC & 8,030 & 0 & 10 & \$19.914 & +64.8\%\textsuperscript{***} \\
+PC + MC & 842 & 7,157 & 10 & \$3.088 & -74.4\%\textsuperscript{***} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
-S2B + SR + PC & 862 & 7,153 & 32 & \$8.727 & -27.1\%\textsuperscript{ns} \\
-S2B + SR + MC & 8,017 & 0 & 18 & \$19.644 & +64.1\%\textsuperscript{*} \\
-S2B + PC + MC & 778 & 7,153 & 20 & \$5.492 & -54.1\%\textsuperscript{ns} \\
-SR + PC + MC & 808 & 7,153 & 24 & \$10.639 & -11.1\%\textsuperscript{ns} \\
-S2B + SR + PC + MC & 862 & 7,153 & 21 & \$10.593 & -11.5\%\textsuperscript{ns} \\
+S2B + SR + PC & 1,037 & 7,157 & 9 & \$7.715 & -36.1\%\textsuperscript{***} \\
+S2B + SR + MC & 8,196 & 0 & 10 & \$20.346 & +68.4\%\textsuperscript{***} \\
+S2B + PC + MC & 973 & 7,157 & 10 & \$3.374 & -72.1\%\textsuperscript{***} \\
+SR + PC + MC & 871 & 7,157 & 11 & \$8.132 & -32.7\%\textsuperscript{***} \\
+S2B + SR + PC + MC & 1,037 & 7,157 & 10 & \$8.389 & -30.6\%\textsuperscript{***} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
