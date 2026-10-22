@@ -6,20 +6,24 @@
 
 The latency profile on the MuSiQue benchmark largely aligns with theoretical expectations, while revealing several notable empirical patterns. Most notably, prompt caching (PC) yielded no statistically significant reduction in either TTFT or total end-to-end latency ($p \ge 0.05$), contrary to initial expectations. Latency increases under Small-to-Big (S2B) retrieval and Semantic Re-ranking (SR) were expected, as both optimization techniques introduce auxiliary computational stages into the RAG pipeline. In contrast, the latency penalty introduced by Model Cascading (MC) was markedly pronounced compared to S2B and SR, substantially inflating overall response times.  
 
-As shown in Table~\ref{tab:latency_musique}, the primary latency benefits of prompt caching emerged when integrated into multi-component architectures. For instance, compounding PC with the S2B + SR pipeline reduced median total latency from 1,733.5\,ms to 1,527.0\,ms. A comparable mitigation effect is observed in the S2B + PC + MC configuration relative to S2B + MC (decreasing median latency from 2,972.5\,ms to 2,577.0\,ms and $P_{95}$ from 14.2\,s to 4.6\,s). Conversely, Model Cascading introduces substantial tail latency vulnerability ($P_{95}$ exceeding 11\,s to 30\,s) whenever queries are routed to the frontier model, which incurs significantly longer token generation times.
-
 \input{tables/musique/tab_latency_musique}
+
+As shown in Table~\ref{tab:latency_musique}, the primary latency benefits of prompt caching emerged when integrated into multi-component architectures. For instance, compounding PC with the S2B + SR pipeline reduced median total latency from 1,733.5\,ms to 1,527.0\,ms. A comparable mitigation effect is observed in the S2B + PC + MC configuration relative to S2B + MC (decreasing median latency from 2,972.5\,ms to 2,577.0\,ms and $P_{95}$ from 14.2\,s to 4.6\,s). Conversely, Model Cascading introduces substantial tail latency vulnerability ($P_{95}$ exceeding 11\,s to 30\,s) whenever queries are routed to the frontier model, which incurs significantly longer token generation times.
 
 Notably, S2B + PC was the only architectural configuration that achieved a statistically significant latency reduction relative to the naive baseline ($p < 0.001$), decreasing median execution time by 8.0\% (from 1,359.0\,ms to 1,250.0\,ms) while nearly halving tail latency ($P_{95}$ falling from 3,397.2\,ms to 1,745.1\,ms). Furthermore, across all evaluated pipelines, the gap between TTFT and total latency remained minimal (diverging by only 5--60\,ms). This narrow delta is attributable to the concise nature of the generated answers (averaging 9--11 output tokens, as reported in Table~\ref{tab:cost_musique}), indicating that end-to-end execution duration is dominated almost entirely by the retrieval and prompt prefill phases rather than auto-regressive token generation.
 
-Detailed component-wise execution latency breakdowns decomposing processing duration across dense retrieval, cross-encoder neural re-ranking, prompt caching management, model routing classification, and generative token synthesis are provided in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_musique}).
-
-
+Detailed component-wise execution latency breakdowns are provided in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_musique}).
 
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:latency_enterprise}
 
+Overall results of the Latency profile from the Enterprise closed dataset, presented in the Table~\ref{tab:latency_enterprise}, follows the findings of the academic benchmark dataset. Especially, the result that Prompt caching does not provide latency benefits, but counter-intuitively increases the latency significantly by 21.8\% are against the academic expectations. Another un-expected finding is that Small-to-Big and Semantic reranking had lower median total latency than the baseline even together (S2B + SR), although the results are not statistically significant. 
+
 \input{tables/enterprise_closed/tab_latency_enterprise}
+
+The absence of the long tail latencies that were present in Table~\ref{tab:latency_musique} are mostly gone, which indicates that structure of the dataset does not cause similar difficulties that in the Musique dataset. In addition, tail latencies are much more stable across the configurations, which is beneficial in the enterprise context. In overall, none of the configurations provides any meaningful latency benefit. 
+
+The longer outputs (~7-9X) of the questions in the Enterprise closed dataset explains the greater gap between the median TTFT and total latency. For example, in the Table~\ref{tab:latency_musique} the differences are in a range of tens of milliseconds, in Table~\ref{tab:latency_enterprise}, the range is in hundreds of milliseconds, indicating that the streaming phrase is increased proportionally.
 
 The corresponding fine-grained phase-wise latency distributions for the enterprise closed corpus are illustrated in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_enterprise}).
 
@@ -41,7 +45,11 @@ Detailed phase-wise monetary cost decompositions across uncached prompt prefill,
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:cost_enterprise}
 
+The difference between the datasets are clearly visible in the prompt sizes of Tables~\ref{tab:cost_enterprise} and ~\ref{tab:cost_musique}, and thus increasing the costs of all configurations. The model cascading provides great cost benefits as the most of the questions were routed to the cheapest Gemini 3.5 Flash-lite model instead of more expensive Flash 3.5 or 3.1 Pro. For example, in MC configuration, logs showed that 49\% of the questions were handled by Flash-Lite. In addition, routing to cheaper model helped to decrease the costs of the S2B + SR configuration from 19.196\$ to 14.082\$ (26.6\%), providing similar benefits than the prompt caching.
+
 \input{tables/enterprise_closed/tab_cost_enterprise}
+
+The prompt caching combined with the model cascading is the greatest cost reduction configuration in the Table~\ref{tab:cost_enterprise} showing the largest cost reduction of 81.3\% of the all. Small-to-Big with Semantic reranking, is the most expensive configuration with the price of 19.196\$, but even that configuration could be made much cheaper by introducing caching and model cascading reducing cost by -58.7\%.  
 
 The corresponding component-wise operational expenditure breakdown per 1,000 queries for the enterprise closed corpus is illustrated in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:cost_breakdown_enterprise}).
 
@@ -65,9 +73,13 @@ Configuration-level multi-dimensional response quality profiles spanning Context
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:quality_enterprise}
 
+From the Table~\ref{tab:quality_enterprise}, it can be seen that 4 of the tested configuration provided increase in the composite quality compared to the naive baseline, although none is statistically significant. The highest quality is provided by the Small-to-Big with prompt caching, with the composite score of 0.6711 and not showing any weaknesses on any of the RAGAS metrics. This configuration demonstrated full refusal accuracy and only 10\% FRR (shared second smallest), so it can be concluded that it works exceptionally well on that perspective. 
+
 \input{tables/enterprise_closed/tab_quality_enterprise}
 
-The corresponding four-dimensional quality metric distributions for the enterprise closed benchmark corpus are depicted in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:quality_lollipop_enterprise}).
+The worst performing configurations have are mostly related to model cascading. In single-factor setups, the MC has the lowest score of 0.5974, driven by the lower scores in Answer relevancy and in Faithfulnes compared to the baseline. The worst performing individual configuration is the Semantic reranking combined with the model cascading, with the composity quality of 0.5418 (-12.7\% to baseline). This drop is driven by the drop in Faithfulnes and Answer relevancy, indicating factual consistency is not optimal and the answers are not relevant to the user. Interestingly, context precicion is the highest of all with the score of 0.683, indicating that the ranking is working well.
+
+Exact Match and F1 scores are not included in the results, as the output structure of the dataset differs significantly from the Musique. In the enterprise dataset, otuputs are longer piece of text, with around 80-120 words, while Musique contains mostly couple of words, and thus, EM/F1 scores would be artificially low and close to 0. The corresponding four-dimensional quality metric distributions for the enterprise closed benchmark corpus are depicted in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:quality_lollipop_enterprise}).
 
 \FloatBarrier
 \subsection{Trade-off Equilibrium and Pareto Frontier}
