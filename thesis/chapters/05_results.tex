@@ -4,9 +4,13 @@
 \subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
 \label{subsubsec:latency_musique}
 
-\input{tables/musique/tab_latency_musique}
+Latency profile of the Musique dataset is somehow expected, but provides some interesting findings. The major finding was that the prompt caching did not provide any statistically significant improvment neither on TTFT nor total latency, which is against the expectations. Latency increases on the S2B and in SR are very expected, as those both optimization methods add additional steps in the RAG pipeline. The major increase in total latency for MC was surprisingly high compared to S2B and SR.  
+
+According to table 5, the biggest improvment that the PC provided was for the other methods. For example, total latency dropped from ~1700ms to ~1500ms when PC was added on top of the S2B + SR combination. Similar results can be seen, when PC was added on top of S2B + MC. Interestingly, MC seems to cause biggest risk for high tail latencies, when the question is routed to more capable model, which spends longer time on generating the answers.
 
 Detailed component-wise execution latency breakdowns decomposing processing duration across dense retrieval, cross-encoder neural re-ranking, prompt caching management, model routing classification, and generative token synthesis are provided in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_musique}).
+
+\input{tables/musique/tab_latency_musique}
 
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:latency_enterprise}
@@ -20,6 +24,10 @@ The corresponding fine-grained phase-wise latency distributions for the enterpri
 
 \subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
 \label{subsubsec:cost_musique}
+
+Table 7 provides expected results on the cost perspective, as it shows very clearly the benefits of the prompt caching. For example, PC alone provides statistically significant 80\% cost saving compared to non cached baseline, and benefits stays even when combined with the step-adding methods like S2B or SR. The unexpectedly small difference between the naive baseline and SR is due to fact, that structure of the native chunks of the Musique dataset is so close to the child chunk size of the S2B, that those are almost the same. 
+
+Greatest cost increases are on the methods that included SR. This comes for the fact that reranking is proportionally expensive and its cost structure does not favor reranking large amount of documents. Interestingly, MC does not increase the costs that much, even though Gemini 3.1 Pro is much more expensive (amount? and refence to appendix) and 73\% of the questions were routed to that model. Largest cost increase is when all other but PC is applied, when the cost is almost 70\% higher than in baseline, but here again, PC brings costs down.  
 
 \input{tables/musique/tab_cost_musique}
 
