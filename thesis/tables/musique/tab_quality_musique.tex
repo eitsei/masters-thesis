@@ -1,6 +1,7 @@
 \begin{table}[htbp]
 \centering
 \scriptsize
+\renewcommand{\arraystretch}{0.93}
 \setlength{\tabcolsep}{1.2pt}
 \caption{Retrieval, generation, and multi-hop reasoning quality metrics across 16 pipeline architectures on the MuSiQue benchmark ($N = 100$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline.}
 \label{tab:quality_musique}
@@ -33,7 +34,7 @@ SR + PC + MC & 0.451 & 0.463 & 0.588 & 0.141 & 35.0\% / 36.8\% & 85.0\% / 68.8\%
 S2B + SR + PC + MC & 0.418 & 0.481 & 0.619 & 0.167 & 37.0\% / 41.1\% & 80.0\% / 61.3\% & 0.1486\textsuperscript{ns} \\
 \bottomrule
 \end{tabular*}
-\vspace{0.5em}
-\parbox{\linewidth}{\footnotesize
-\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Exact Match (EM) and Token F1 evaluate lexical overlap against reference answers. Refusal Accuracy evaluates correct abstention on unanswerable queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Highest composite quality score is highlighted in bold. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
+\vspace{0.25em}
+\parbox{\linewidth}{\scriptsize
+\textbf{Notes:} Evaluated via RAGAS~\citep{es2024ragas} on answerable queries. EM and Token F1 measure lexical overlap. Refusal Acc. denotes abstention on unanswerable queries; FRR measures false refusals on answerable queries. Composite Quality $Q \in [0, 1]$ represents regularized harmonic mean (Eq.~\ref{eq:composite_quality}). Best $Q$ in bold. $^{*} p < 0.05, ^{**} p < 0.01, ^{***} p < 0.001$, $^{\mathrm{ns}} p \ge 0.05$ (paired Wilcoxon with Holm-Bonferroni correction vs. naive baseline).}
 \end{table}

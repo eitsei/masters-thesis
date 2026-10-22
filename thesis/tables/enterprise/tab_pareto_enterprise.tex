@@ -1,6 +1,7 @@
 \begin{table}[htbp]
 \centering
-\small
+\footnotesize
+\renewcommand{\arraystretch}{0.93}
 \setlength{\tabcolsep}{3.5pt}
 \caption{Multi-objective Pareto efficiency and 3D non-domination trade-off metrics across 16 pipeline architectures on Enterprise.}
 \label{tab:pareto_enterprise_raw}
@@ -33,7 +34,7 @@ SR + PC + MC & 0.4252 & \$10.472 & 11.37 & 41 & 0.04 & No \\
 S2B + SR + PC + MC & 0.1644 & \$10.150 & 6.26 & 16 & 0.03 & No \\
 \bottomrule
 \end{tabular*}
-\vspace{0.5em}
-\parbox{\linewidth}{\footnotesize
-\textbf{Notes:} Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across RAGAS dimensions (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. $T_{\text{total}} P_{50}$ represents median execution latency in seconds. Quality per Dollar ($\mathrm{QPD} = Q / \text{Cost}$) and Quality per Second ($\mathrm{QPS} = Q / T_{\text{total}}$) measure resource efficiency. Pareto optimality denotes non-domination in the 3D trade-off space $(\max Q, \min \text{Cost}, \min T_{\text{total}})$.}
+\vspace{0.25em}
+\parbox{\linewidth}{\scriptsize
+\textbf{Notes:} Composite Quality $Q \in [0, 1]$ (Eq.~\ref{eq:composite_quality}). $\text{QPD} = Q / \text{Cost}_{1\text{k}}$ and $\text{QPS} = Q / T_{\text{total}}$ represent resource efficiency ratios. Pareto optimality denotes 3D non-domination ($\max Q, \min \text{Cost}, \min T_{\text{total}}$). Bold indicates Pareto-optimal configuration.}
 \end{table}
