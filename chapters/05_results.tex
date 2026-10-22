@@ -4,26 +4,20 @@
 \subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
 \label{subsubsec:latency_musique}
 
-\input{tables/musique/tab_latency_musique}
+Latency profile of the Musique dataset is somehow expected, but provides some interesting findings. The major finding was that the prompt caching did not provide any statistically significant improvment neither on TTFT nor total latency, which is against the expectations. Latency increases on the S2B and in SR are very expected, as those both optimization methods add additional steps in the RAG pipeline. The major increase in total latency for MC was surprisingly high compared to S2B and SR.  
 
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\linewidth]{figures/musique/latency_breakdown_musique.pdf}
-\caption{Component-wise latency breakdown across all 16 pipeline configurations on the academic multi-hop benchmark (MuSiQue), decomposing execution latency across retrieval, re-ranking, prompt caching, model routing, and token generation phases.}
-\label{fig:latency_breakdown_musique}
-\end{figure}
+According to table 5, the biggest improvment that the PC provided was for the other methods. For example, total latency dropped from ~1700ms to ~1500ms when PC was added on top of the S2B + SR combination. Similar results can be seen, when PC was added on top of S2B + MC. Interestingly, MC seems to cause biggest risk for high tail latencies, when the question is routed to more capable model, which spends longer time on generating the answers.
+
+Detailed component-wise execution latency breakdowns decomposing processing duration across dense retrieval, cross-encoder neural re-ranking, prompt caching management, model routing classification, and generative token synthesis are provided in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_musique}).
+
+\input{tables/musique/tab_latency_musique}
 
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:latency_enterprise}
 
 \input{tables/enterprise_closed/tab_latency_enterprise}
 
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\linewidth]{figures/enterprise_closed/latency_breakdown_enterprise_closed.pdf}
-\caption{Component-wise latency breakdown across all 16 pipeline configurations on the enterprise closed benchmark corpus, detailing execution duration across retrieval, semantic re-ranking, cache management, and model tier generation phases.}
-\label{fig:latency_breakdown_enterprise}
-\end{figure}
+The corresponding fine-grained phase-wise latency distributions for the enterprise closed corpus are illustrated in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_enterprise}).
 
 \subsection{Operational Expenditure and Token Dynamics}
 \label{subsec:results_cost}
@@ -31,26 +25,20 @@
 \subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
 \label{subsubsec:cost_musique}
 
+Table 7 provides expected results on the cost perspective, as it shows very clearly the benefits of the prompt caching. For example, PC alone provides statistically significant 80\% cost saving compared to non cached baseline, and benefits stays even when combined with the step-adding methods like S2B or SR. The unexpectedly small difference between the naive baseline and SR is due to fact, that structure of the native chunks of the Musique dataset is so close to the child chunk size of the S2B, that those are almost the same. 
+
+Greatest cost increases are on the methods that included SR. This comes for the fact that reranking is proportionally expensive and its cost structure does not favor reranking large amount of documents. Interestingly, MC does not increase the costs that much, even though Gemini 3.1 Pro is much more expensive (amount? and refence to appendix) and 73\% of the questions were routed to that model. Largest cost increase is when all other but PC is applied, when the cost is almost 70\% higher than in baseline, but here again, PC brings costs down.  
+
 \input{tables/musique/tab_cost_musique}
 
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\linewidth]{figures/musique/cost_breakdown_musique.pdf}
-\caption{Component-wise operational expenditure breakdown per 1,000 queries across all 16 pipeline configurations on the academic multi-hop benchmark (MuSiQue), decomposing total monetary cost across uncached prompt tokens, context caching read tokens, generation completion tokens, semantic re-ranking, and model routing.}
-\label{fig:cost_breakdown_musique}
-\end{figure}
+Detailed phase-wise monetary cost decompositions across uncached prompt prefill, context cache lookups, generative completion tokens, auxiliary re-ranking services, and router classifications are provided in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:cost_breakdown_musique}).
 
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:cost_enterprise}
 
 \input{tables/enterprise_closed/tab_cost_enterprise}
 
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\linewidth]{figures/enterprise_closed/cost_breakdown_enterprise_closed.pdf}
-\caption{Component-wise operational expenditure breakdown per 1,000 queries across all 16 pipeline configurations on the enterprise closed benchmark corpus, detailing monetary expenditure across uncached context prefill, context cache lookups, generative completion, and auxiliary neural re-ranking services.}
-\label{fig:cost_breakdown_enterprise}
-\end{figure}
+The corresponding component-wise operational expenditure breakdown per 1,000 queries for the enterprise closed corpus is illustrated in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:cost_breakdown_enterprise}).
 
 \subsection{Retrieval and Generation Quality}
 \label{subsec:results_quality}
@@ -60,24 +48,14 @@
 
 \input{tables/musique/tab_quality_musique}
 
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\linewidth]{figures/musique/quality_radar_musique.pdf}
-\caption{Multi-dimensional response quality profiles across architectural tiers on the academic multi-hop benchmark (MuSiQue), comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy.}
-\label{fig:quality_radar_musique}
-\end{figure}
+Configuration-level multi-dimensional response quality profiles spanning Context Precision, Context Recall, Faithfulness, and Answer Relevancy across architectural tiers are visualized as tier-stratified lollipop plots in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:quality_lollipop_musique}).
 
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:quality_enterprise}
 
 \input{tables/enterprise_closed/tab_quality_enterprise}
 
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\linewidth]{figures/enterprise_closed/quality_radar_enterprise_closed.pdf}
-\caption{Multi-dimensional response quality profiles across architectural tiers on the enterprise closed benchmark corpus, comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy.}
-\label{fig:quality_radar_enterprise}
-\end{figure}
+The corresponding four-dimensional quality metric distributions for the enterprise closed benchmark corpus are depicted in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:quality_lollipop_enterprise}).
 
 \subsection{Trade-off Equilibrium and Pareto Frontier}
 \label{subsec:results_pareto}
@@ -104,4 +82,28 @@
 \includegraphics[width=\linewidth]{figures/enterprise_closed/pareto_frontier_enterprise_closed.pdf}
 \caption{Empirical Pareto frontier of Composite Quality ($Q$) versus median end-to-end execution latency ($T_{\text{total}}\ P_{50}$) and operational expenditure ($\text{Cost}_{1\text{k}}$) on the enterprise closed benchmark corpus. Solid lines delineate the non-dominated empirical Pareto frontier across configurations.}
 \label{fig:pareto_frontier_enterprise}
+\end{figure}
+
+\subsection{Executive Performance Delta Synthesis}
+\label{subsec:results_delta_heatmap}
+
+To provide a consolidated cross-dimensional view of all 15 architectural optimization treatments relative to the unoptimized naive baseline, Figure~\ref{fig:quality_delta_matrix_musique} and Figure~\ref{fig:quality_delta_matrix_enterprise} visualize relative percentage improvements (green) and regressions (red) across all four RAGAS quality dimensions, Composite Quality ($Q$), median end-to-end latency ($P_{50}$), and operational expenditure per 1,000 queries.
+
+\begin{figure}[!htbp]
+\centering
+\begin{subfigure}{\linewidth}
+  \centering
+  \includegraphics[width=0.78\linewidth]{figures/musique/quality_delta_matrix_musique.pdf}
+  \caption{Academic multi-hop benchmark (MuSiQue)}
+  \label{fig:quality_delta_matrix_musique}
+\end{subfigure}
+\\[1ex]
+\begin{subfigure}{\linewidth}
+  \centering
+  \includegraphics[width=0.78\linewidth]{figures/enterprise_closed/quality_delta_matrix_enterprise_closed.pdf}
+  \caption{Enterprise closed benchmark corpus}
+  \label{fig:quality_delta_matrix_enterprise}
+\end{subfigure}
+\caption{Executive performance delta heatmaps relative to the naive baseline on (a) MuSiQue and (b) Enterprise Closed. Cells display absolute metrics alongside relative percentage changes ($\pm\%$). Diverging color gradient highlights performance improvements (green) versus cost/latency regressions (red).}
+\label{fig:quality_delta_matrix_combined}
 \end{figure}

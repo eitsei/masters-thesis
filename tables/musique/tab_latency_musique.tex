@@ -1,39 +1,39 @@
-\begin{table}[!htbp]
+\begin{table}[htbp]
 \centering
-\footnotesize
-\setlength{\tabcolsep}{2.5pt}
-\caption{Latency profiles and computational overhead across all 16 pipeline configurations on the academic multi-hop benchmark (MuSiQue).}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\caption{End-to-end execution latency and Time-to-First-Token (TTFT) across 16 pipeline architectures on MuSiQue. Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline.}
 \label{tab:latency_musique}
-\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l l r r r r r @{}}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l r r r r r @{}}
 \toprule
-\textbf{Config} & \textbf{Pipeline Composition} & \makecell[r]{\textbf{TTFT $P_{50}$}\\\textbf{(ms)}} & \makecell[r]{\textbf{TTFT $P_{95}$}\\\textbf{(ms)}} & \makecell[r]{\textbf{$T_{\text{total}}$ $P_{50}$}\\\textbf{(ms)}} & \makecell[r]{\textbf{$T_{\text{total}}$ $P_{95}$}\\\textbf{(ms)}} & \makecell[r]{\textbf{$\Delta T_{\text{total}}$}\\\textbf{(\%)}} \\
+\textbf{Pipeline} & \makecell{\textbf{TTFT $P_{50}$}\\\scriptsize{(ms)}} & \makecell{\textbf{TTFT $P_{95}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$T_{\text{total}} P_{95}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$\Delta T_{\text{total}}$}\\\scriptsize{(\%)}} \\
 \midrule
-\multicolumn{7}{l}{\textbf{Baseline ($k=0$)}} \\
-$C_{0}$ & Naive RAG Baseline & 0.0 & 0.0 & 2{,}226.5 & 16{,}512.7 & \multicolumn{1}{c}{---} \\
+\multicolumn{6}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
+Naive RAG Baseline & 1307.0 & 3392.5 & 1359.0 & 3397.2 & -- \\
 \midrule
-\multicolumn{7}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-$C_{1}$ & S2B & 0.0 & 0.0 & 1{,}953.5 & 3{,}183.0 & $-12.3\%^{\text{ns}}$ \\
-$C_{2}$ & SR & 0.0 & 0.0 & 2{,}381.5 & 8{,}196.9 & $+7.0\%^{\text{ns}}$ \\
-$C_{3}$ & PC & 0.0 & 0.0 & 4{,}127.5 & 13{,}015.2 & $+85.4\%^{\text{ns}}$ \\
-$C_{4}$ & MC & 0.0 & 0.0 & 2{,}565.0 & 6{,}530.4 & $+15.2\%^{\text{ns}}$ \\
+\multicolumn{6}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
+S2B & 1662.5 & 4303.9 & 1684.0 & 4313.7 & +23.9\%\textsuperscript{**} \\
+SR & 1526.5 & 3214.2 & 1613.5 & 3221.2 & +18.7\%\textsuperscript{**} \\
+PC & 1402.5 & 2430.5 & 1408.0 & 2429.5 & +3.6\%\textsuperscript{ns} \\
+MC & 2724.5 & 11407.9 & 2775.0 & 11986.4 & +104.2\%\textsuperscript{***} \\
 \midrule
-\multicolumn{7}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\
-$C_{5}$ & S2B + SR & 0.0 & 0.0 & 2{,}711.5 & 3{,}476.2 & $+21.8\%^{\text{ns}}$ \\
-$C_{6}$ & S2B + PC & 0.0 & 0.0 & 6{,}170.5 & 29{,}943.0 & $+177.1\%^{\text{ns}}$ \\
-$C_{7}$ & S2B + MC & 0.0 & 0.0 & 3{,}908.0 & 5{,}272.7 & $+75.5\%^{\text{ns}}$ \\
-$C_{8}$ & SR + PC & 0.0 & 0.0 & 6{,}005.0 & 16{,}730.6 & $+169.7\%^{\text{ns}}$ \\
-$C_{9}$ & SR + MC & 0.0 & 0.0 & 2{,}644.0 & 11{,}285.6 & $+18.8\%^{\text{ns}}$ \\
-$C_{10}$ & PC + MC & 0.0 & 0.0 & 5{,}159.5 & 13{,}364.9 & $+131.7\%^{\text{ns}}$ \\
+\multicolumn{6}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
+S2B + SR & 1671.0 & 7754.8 & 1733.5 & 7771.4 & +27.6\%\textsuperscript{***} \\
+S2B + PC & 1239.0 & 1699.4 & 1250.0 & 1745.1 & -8.0\%\textsuperscript{***} \\
+S2B + MC & 2967.0 & 13662.6 & 2972.5 & 14154.4 & +118.7\%\textsuperscript{***} \\
+SR + PC & 1522.0 & 2318.6 & 1521.5 & 2318.6 & +12.0\%\textsuperscript{ns} \\
+SR + MC & 2730.5 & 9089.8 & 2732.5 & 9105.9 & +101.1\%\textsuperscript{***} \\
+PC + MC & 2780.0 & 4504.8 & 2802.5 & 4504.2 & +106.2\%\textsuperscript{***} \\
 \midrule
-\multicolumn{7}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\
-$C_{11}$ & S2B + SR + PC & 0.0 & 0.0 & 4{,}697.0 & 13{,}402.0 & $+111.0\%^{\text{ns}}$ \\
-$C_{12}$ & S2B + SR + MC & 0.0 & 0.0 & 2{,}657.5 & 9{,}142.9 & $+19.4\%^{\text{ns}}$ \\
-$C_{13}$ & S2B + PC + MC & 0.0 & 0.0 & 8{,}083.5 & 34{,}618.3 & $+263.1\%^{\text{ns}}$ \\
-$C_{14}$ & SR + PC + MC & 0.0 & 0.0 & 5{,}312.0 & 63{,}074.9 & $+138.6\%^{\text{ns}}$ \\
-$C_{15}$ & S2B + SR + PC + MC (Full-Stack) & 0.0 & 0.0 & 7{,}736.0 & 59{,}401.1 & $+247.5\%^{\text{ns}}$ \\
+\multicolumn{6}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
+S2B + SR + PC & 1524.5 & 2202.2 & 1527.0 & 2202.2 & +12.4\%\textsuperscript{ns} \\
+S2B + SR + MC & 2879.5 & 30752.5 & 2885.5 & 30883.4 & +112.3\%\textsuperscript{***} \\
+S2B + PC + MC & 2571.5 & 4638.8 & 2577.0 & 4643.6 & +89.6\%\textsuperscript{***} \\
+SR + PC + MC & 2916.5 & 5888.9 & 2931.0 & 5893.6 & +115.7\%\textsuperscript{***} \\
+S2B + SR + PC + MC & 2807.0 & 4301.6 & 2808.0 & 4305.7 & +106.6\%\textsuperscript{***} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
-\parbox{\textwidth}{\footnotesize
-\textbf{Notes:} TTFT: Time to First Token; $T_{\text{total}}$: end-to-end execution latency; $P_{50}$ and $P_{95}$ denote median and 95th percentile distributions, respectively. $\Delta T_{\text{total}}$ reflects relative percentage shift in median total latency against naive baseline ($C_0$). In the MuSiQue evaluation suite, responses were generated in batch non-streaming mode, resulting in unmeasured TTFT. Statistical significance evaluated via paired two-tailed Wilcoxon signed-rank tests with Holm-Bonferroni correction ($^{*}p < 0.05$, $^{**}p < 0.01$, $^{***}p < 0.001$, $^{\text{ns}}p \ge 0.05$).}
+\parbox{\linewidth}{\footnotesize
+\textbf{Notes:} $P_{50}$ and $P_{95}$ denote median and 95th percentile execution latencies. TTFT denotes Time-to-First-Token. $\Delta T_{\text{total}}$ reflects percentage change in median latency relative to the naive baseline. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
 \end{table}

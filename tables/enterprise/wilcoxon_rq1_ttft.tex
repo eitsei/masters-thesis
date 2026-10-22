@@ -1,31 +1,31 @@
 \begin{table}[!htbp]
 \centering
 \small
-\caption{Paired Wilcoxon signed-rank test results for Time to First Token (RQ1) against baseline ($C_0$).}
+\caption{Paired Wilcoxon signed-rank test results for Time to First Token (RQ1) against the naive baseline.}
 \label{tab:wilcoxon_rq1_ttft}
 \begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l r r r r r r c @{}}
 \toprule
 \textbf{Configuration} & \textbf{$C_0$ Med} & \textbf{$C_k$ Med} & \textbf{$\tilde{\mu}_\Delta$} & \textbf{$W$-Stat} & \textbf{$p_{\text{raw}}$} & \textbf{$p_{\text{adj}}$} & \textbf{Sig} \\
  & \scriptsize{(ms)} & \scriptsize{(ms)} & \scriptsize{(ms)} & & & & \\
 \midrule
-C1\_M1 & 4648.5 & 2672.0 & -1792.5 & 9.0 & 0.0645 & 0.8379 & ns \\
-C2\_M2 & 4648.5 & 3127.5 & -2179.0 & 25.0 & 0.8457 & 1.0000 & ns \\
-C3\_M3 & 4648.5 & 7635.5 & +2262.5 & 7.0 & 0.0371 & 0.5195 & ns \\
-C4\_M4 & 4648.5 & 2797.0 & -1792.5 & 14.0 & 0.1934 & 1.0000 & ns \\
-C5\_M1\_M2 & 4648.5 & 2226.0 & -2706.5 & 0.0 & 0.0020 & 0.0293 & \textbf{*} \\
-C6\_M1\_M3 & 4648.5 & 3741.5 & -534.5 & 26.0 & 0.9219 & 1.0000 & ns \\
-C7\_M1\_M4 & 4648.5 & 2329.5 & -2406.0 & 10.0 & 0.0840 & 1.0000 & ns \\
-C8\_M2\_M3 & 4648.5 & 7931.5 & +1753.0 & 14.0 & 0.1934 & 1.0000 & ns \\
-C9\_M2\_M4 & 4648.5 & 2449.0 & -1539.0 & 21.0 & 0.5566 & 1.0000 & ns \\
-C10\_M3\_M4 & 4648.5 & 3596.0 & -1053.5 & 10.0 & 0.0840 & 1.0000 & ns \\
-C11\_M1\_M2\_M3 & 4648.5 & 4592.5 & +404.5 & 27.0 & 1.0000 & 1.0000 & ns \\
-C12\_M1\_M2\_M4 & 4648.5 & 1829.0 & -2574.0 & 15.0 & 0.2324 & 1.0000 & ns \\
-C13\_M1\_M3\_M4 & 4648.5 & 5305.5 & -240.0 & 27.0 & 1.0000 & 1.0000 & ns \\
-C14\_M2\_M3\_M4 & 4648.5 & 4294.0 & -844.0 & 21.0 & 0.5566 & 1.0000 & ns \\
-C15\_M1\_M2\_M3\_M4 & 4444.0 & 3876.0 & -977.0 & 17.0 & 0.5703 & 1.0000 & ns \\
+C1\_M1 & 3953.5 & 7035.5 & +4426.5 & 21.0 & 0.5566 & 1.0000 & ns \\
+C2\_M2 & 3953.5 & 2717.0 & -455.5 & 16.0 & 0.2754 & 1.0000 & ns \\
+C3\_M3 & 3953.5 & 3358.0 & +575.5 & 21.0 & 0.5566 & 1.0000 & ns \\
+C4\_M4 & 3953.5 & 2191.0 & -218.0 & 15.0 & 0.2324 & 1.0000 & ns \\
+C5\_M1\_M2 & 3953.5 & 2418.5 & -875.0 & 12.0 & 0.1309 & 1.0000 & ns \\
+C6\_M1\_M3 & 3953.5 & 8609.5 & +2186.5 & 18.0 & 0.3750 & 1.0000 & ns \\
+C7\_M1\_M4 & 3953.5 & 2577.5 & +95.0 & 25.0 & 0.8457 & 1.0000 & ns \\
+C8\_M2\_M3 & 3953.5 & 6315.5 & +3106.5 & 24.0 & 0.7695 & 1.0000 & ns \\
+C9\_M2\_M4 & 3953.5 & 2561.5 & -1384.0 & 19.0 & 0.4316 & 1.0000 & ns \\
+C10\_M3\_M4 & 3953.5 & 4224.0 & +429.5 & 21.0 & 0.5566 & 1.0000 & ns \\
+C11\_M1\_M2\_M3 & 3953.5 & 6429.0 & +1828.5 & 26.0 & 0.9219 & 1.0000 & ns \\
+C12\_M1\_M2\_M4 & 3953.5 & 2986.5 & -1256.5 & 14.0 & 0.1934 & 1.0000 & ns \\
+C13\_M1\_M3\_M4 & 3953.5 & 4823.0 & +869.5 & 21.0 & 0.5566 & 1.0000 & ns \\
+C14\_M2\_M3\_M4 & 3953.5 & 5996.5 & +2684.0 & 18.0 & 0.3750 & 1.0000 & ns \\
+C15\_M1\_M2\_M3\_M4 & 5312.0 & 3336.0 & -1110.0 & 14.0 & 1.0000 & 1.0000 & ns \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
 \parbox{\textwidth}{\footnotesize
-\textbf{Notes:} $\tilde{\mu}_\Delta$ represents the median paired difference ($C_k - C_0$). Two-tailed Wilcoxon signed-rank test evaluated at $\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\text{adj}}$). Significance flags: $^{***}\,p < 0.001$, $^{**}\,p < 0.01$, $^{*}\,p < 0.05$, $\text{ns}\,p \ge 0.05$.}
+\textbf{Notes:} $\tilde{\mu}_\Delta$ represents the median paired difference relative to the naive baseline. Two-tailed Wilcoxon signed-rank test evaluated at $\alpha = 0.05$. Family-wise error rate controlled via Holm-Bonferroni step-down adjusted $p$-values ($p_{\text{adj}}$). Significance flags: $^{***}\,p < 0.001$, $^{**}\,p < 0.01$, $^{*}\,p < 0.05$, $\text{ns}\,p \ge 0.05$.}
 \end{table}

@@ -1,39 +1,39 @@
-\begin{table}[!htbp]
+\begin{table}[htbp]
 \centering
-\scriptsize
-\setlength{\tabcolsep}{2pt}
-\caption{Multi-objective trade-off equilibrium, operational efficiency ratios (QPD, QPS), and Pareto optimality on the MuSiQue multi-hop benchmark.}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\caption{Multi-objective Pareto efficiency and 3D non-domination trade-off metrics across 16 pipeline architectures on MuSiQue.}
 \label{tab:pareto_musique}
-\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c c c @{}}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c r r r r c @{}}
 \toprule
-\textbf{Config} & \textbf{Pipeline} & \makecell[c]{\textbf{Composite} \\ \textbf{Quality $Q$}} & \makecell[c]{\textbf{$\text{Cost}_{1\text{k}}$} \\ \textbf{(\$)}} & \makecell[c]{\textbf{$T_{\text{total}}\ P_{50}$} \\ \textbf{(s)}} & \makecell[c]{\textbf{Quality per} \\ \textbf{Dollar (QPD)}} & \makecell[c]{\textbf{Quality per} \\ \textbf{Second (QPS)}} & \makecell[c]{\textbf{Pareto} \\ \textbf{Optimal}} \\
+\textbf{Pipeline} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(s)}} & \textbf{QPD} & \textbf{QPS} & \makecell{\textbf{Pareto}\\\textbf{Optimal}} \\
 \midrule
-\multicolumn{8}{l}{\textbf{Baseline ($k=0$)}} \\
-$C_{0}$ & Naive RAG Baseline & 0.3186 & 3.870 & 2.227 & 82.34 & 0.1431 & \textbf{Yes} \\
+\multicolumn{7}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
+Naive RAG Baseline & 0.2104 & \$12.082 & 1.36 & 17 & 0.15 & \textbf{Yes} \\
 \midrule
-\multicolumn{8}{l}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-$C_{1}$ & S2B & 0.3723 & 4.005 & 1.954 & 92.95 & 0.1906 & \textbf{Yes} \\
-$C_{2}$ & SR & 0.2543 & 8.837 & 2.381 & 28.78 & 0.1068 & No \\
-$C_{3}$ & PC & 0.3879 & 0.703 & 4.128 & 551.62 & 0.0940 & \textbf{Yes} \\
-$C_{4}$ & MC & 0.1874 & 5.570 & 2.565 & 33.64 & 0.0731 & No \\
+\multicolumn{7}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
+S2B & 0.1851 & \$12.278 & 1.68 & 15 & 0.11 & No \\
+SR & 0.1735 & \$17.131 & 1.61 & 10 & 0.11 & No \\
+PC & 0.1856 & \$2.420 & 1.41 & 77 & 0.13 & \textbf{Yes} \\
+MC & 0.1789 & \$15.079 & 2.77 & 12 & 0.06 & No \\
 \midrule
-\multicolumn{8}{l}{\textbf{Pairwise Combinations ($k=2$)}} \\
-$C_{5}$ & S2B + SR & 0.3159 & 8.975 & 2.712 & 35.19 & 0.1165 & No \\
-$C_{6}$ & S2B + PC & 0.4123 & 0.685 & 6.170 & 602.08 & 0.0668 & \textbf{Yes} \\
-$C_{7}$ & S2B + MC & 0.3245 & 5.786 & 3.908 & 56.09 & 0.0830 & No \\
-$C_{8}$ & SR + PC & 0.4062 & 5.633 & 6.005 & 72.11 & 0.0677 & No \\
-$C_{9}$ & SR + MC & 0.3134 & 10.607 & 2.644 & 29.54 & 0.1185 & No \\
-$C_{10}$ & PC + MC & 0.4453 & 1.471 & 5.160 & 302.65 & 0.0863 & \textbf{Yes} \\
+\multicolumn{7}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
+S2B + SR & 0.1995 & \$17.388 & 1.73 & 11 & 0.12 & No \\
+S2B + PC & 0.2006 & \$2.612 & 1.25 & 77 & 0.16 & \textbf{Yes} \\
+S2B + MC & 0.1566 & \$14.977 & 2.97 & 10 & 0.05 & No \\
+SR + PC & 0.1697 & \$7.466 & 1.52 & 23 & 0.11 & No \\
+SR + MC & 0.1575 & \$19.914 & 2.73 & 8 & 0.06 & No \\
+PC + MC & 0.1600 & \$3.088 & 2.80 & 52 & 0.06 & No \\
 \midrule
-\multicolumn{8}{l}{\textbf{Higher-Order Triplets \& Full-Stack ($k \ge 3$)}} \\
-$C_{11}$ & S2B + SR + PC & 0.4456 & 5.642 & 4.697 & 78.98 & 0.0949 & \textbf{Yes} \\
-$C_{12}$ & S2B + SR + MC & 0.1421 & 11.309 & 2.658 & 12.56 & 0.0535 & No \\
-$C_{13}$ & S2B + PC + MC & 0.4624 & 2.433 & 8.084 & 190.05 & 0.0572 & \textbf{Yes} \\
-$C_{14}$ & SR + PC + MC & 0.2599 & 6.526 & 5.312 & 39.82 & 0.0489 & No \\
-$C_{15}$ & \makecell[l]{S2B + SR + PC + MC \\ (Full-Stack)} & 0.4508 & 6.526 & 7.736 & 69.07 & 0.0583 & \textbf{Yes} \\
+\multicolumn{7}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
+S2B + SR + PC & 0.2069 & \$7.715 & 1.53 & 27 & 0.14 & \textbf{Yes} \\
+S2B + SR + MC & 0.1834 & \$20.346 & 2.89 & 9 & 0.06 & No \\
+S2B + PC + MC & 0.1664 & \$3.374 & 2.58 & 49 & 0.06 & No \\
+SR + PC + MC & 0.1209 & \$8.132 & 2.93 & 15 & 0.04 & No \\
+S2B + SR + PC + MC & 0.1486 & \$8.389 & 2.81 & 18 & 0.05 & No \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
 \parbox{\linewidth}{\footnotesize
-\textbf{Notes:} Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across Context Precision, Context Recall, Faithfulness, and Answer Relevancy (Eq.~\ref{eq:composite_quality}). $\text{Cost}_{1\text{k}}$ denotes monetary operational expenditure normalized per 1,000 queries in USD. $T_{\text{total}}\ P_{50}$ is median end-to-end execution latency in seconds. Quality per Dollar (QPD, Eq.~\ref{eq:qpd}) and Quality per Second (QPS, Eq.~\ref{eq:qps}) measure economic and computational efficiency. Pareto Optimal indicates non-dominated configurations across the three-dimensional objective space ($\max Q, \min \text{Cost}, \min T_{\text{total}}$).}
+\textbf{Notes:} Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across RAGAS dimensions (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. $T_{\text{total}} P_{50}$ represents median execution latency in seconds. Quality per Dollar ($\mathrm{QPD} = Q / \text{Cost}$) and Quality per Second ($\mathrm{QPS} = Q / T_{\text{total}}$) measure resource efficiency. Pareto optimality denotes non-domination in the 3D trade-off space $(\max Q, \min \text{Cost}, \min T_{\text{total}})$.}
 \end{table}
