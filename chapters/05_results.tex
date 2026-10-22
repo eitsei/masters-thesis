@@ -4,9 +4,9 @@
 \subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
 \label{subsubsec:latency_musique}
 
-Latency profile of the Musique dataset is somehow expected, but provides some interesting findings. The major finding was that the prompt caching did not provide any statistically significant improvment neither on TTFT nor total latency, which is against the expectations. Latency increases on the S2B and in SR are very expected, as those both optimization methods add additional steps in the RAG pipeline. The major increase in total latency for MC was surprisingly high compared to S2B and SR.  
+Latency profile of the Musique dataset is somehow expected, but provides some interesting findings. The major finding was that the prompt caching did not provide any statistically significant improvement neither on TTFT nor total latency, which is against the expectations. Latency increases on the S2B and in SR are very expected, as those both optimization methods add additional steps in the RAG pipeline. The major increase in total latency for MC was surprisingly high compared to S2B and SR.  
 
-According to table 5, the biggest improvment that the PC provided was for the other methods. For example, total latency dropped from ~1700ms to ~1500ms when PC was added on top of the S2B + SR combination. Similar results can be seen, when PC was added on top of S2B + MC. Interestingly, MC seems to cause biggest risk for high tail latencies, when the question is routed to more capable model, which spends longer time on generating the answers.
+According to table 5, the biggest improvement that the PC provided was for the other methods. For example, total latency dropped from ~1700ms to ~1500ms when PC was added on top of the S2B + SR combination. Similar results can be seen, when PC was added on top of S2B + MC. Interestingly, MC seems to cause biggest risk for high tail latencies, when the question is routed to more capable model, which spends longer time on generating the answers.
 
 Detailed component-wise execution latency breakdowns decomposing processing duration across dense retrieval, cross-encoder neural re-ranking, prompt caching management, model routing classification, and generative token synthesis are provided in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_musique}).
 
@@ -48,6 +48,10 @@ The corresponding component-wise operational expenditure breakdown per 1,000 que
 
 \input{tables/musique/tab_quality_musique}
 
+None of the optimization methods provided any improvement on the quality of the answers in the Musique dataset. The most probable reason for this catastrophic failure is the structure of the questions in the dataset. Especially 3- and 4-hop questions are structured in a way that the question-in-hand does not share the enough data to fetch all relevant chunks into the context in a single vector retrieval. In addition, in 4-hop questions, when the top-K is 5, it would need 80\% retrieval accuracy to hit all the relevant documents. 
+
+One of the main findings though is that the MC seems to have much higher refusal accuracy than other variations indicating that it managed to understand the limits of its capacity better than other variations. For example in single-factor runs, MC won all other variations with high margin (20-25 \% points), but on the other hand, its false refusal rate is also higher. This high refusal accuracy and high FRR is due to fact that it just refused to answer in majority of questions, for example in SR + PC + MC, it refused to answer 72\% of the question, while the number is 65\% for SR + MC. Finally, none of the answers thou was not statistically significantly different from the baseline.
+
 Configuration-level multi-dimensional response quality profiles spanning Context Precision, Context Recall, Faithfulness, and Answer Relevancy across architectural tiers are visualized as tier-stratified lollipop plots in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:quality_lollipop_musique}).
 
 \subsubsection{Enterprise Production Corpus}
@@ -60,10 +64,17 @@ The corresponding four-dimensional quality metric distributions for the enterpri
 \subsection{Trade-off Equilibrium and Pareto Frontier}
 \label{subsec:results_pareto}
 
+
+
 \subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
 \label{subsubsec:pareto_musique}
 
 \input{tables/musique/tab_pareto_musique}
+
+
+Pareto optimal variations for the Musique dataset is Baseline, PC, S2B + PC and S2B + SR + PC. For all Pareto optimal combinations, the main driver is the lower costs and relatively smaller drop in composite quality. Each of the non-baseline variations, quality per dollar and -second are highest in the reference group, and thus dominates the rest. High costs of SR and increased latency of the MC are the main driver for failures of those combinations, while the PC seems to be the positive driver for optimal solutions. For example, adding PC on top of S2B + SR combination, increases its QPD by 145\% and QPS by 16.7\%. On the other hand, MC drops both values for that S2B + SR by dropping QPD from 11 to 9 and QPS 0.12 to 0.06 mainly driven by the dramatic increase in median total latency (189\%) and mediocre increase in costs (17\%).
+
+From Figure ~\ref{fig:pareto_frontier_musique:a} it is clearly visible the division between MC configurations and the rests. The MC variations are clearly clustered on the right side of the figure, while the rests are clustered on the left side. Also, the quality is relatively stable between the configurations. Similar effect is not visible on the Figure ~\ref{fig:pareto_frontier_musique:b}, where most of the configurations are between Composite quality of \~0.18--\~0.2 and costs are scattered relatively evenly.
 
 \begin{figure}[!htbp]
 \centering

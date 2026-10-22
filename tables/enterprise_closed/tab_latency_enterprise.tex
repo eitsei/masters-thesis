@@ -9,28 +9,28 @@
 \textbf{Pipeline} & \makecell{\textbf{TTFT $P_{50}$}\\\scriptsize{(ms)}} & \makecell{\textbf{TTFT $P_{95}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$T_{\text{total}} P_{95}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$\Delta T_{\text{total}}$}\\\scriptsize{(\%)}} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
-Naive RAG Baseline & 1517.0 & 7878.1 & 1932.5 & 8123.9 & -- \\
+Naive RAG Baseline & 1135.0 & 1827.2 & 1407.0 & 2492.9 & -- \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-S2B & 1486.5 & 19310.8 & 1855.5 & 20167.5 & -4.0\%\textsuperscript{ns} \\
-SR & 2128.5 & 20096.0 & 2379.5 & 19946.9 & +23.1\%\textsuperscript{ns} \\
-PC & 2596.5 & 13985.9 & 3050.0 & 15803.5 & +57.8\%\textsuperscript{ns} \\
-MC & 2002.5 & 10615.3 & 2247.5 & 10511.3 & +16.3\%\textsuperscript{ns} \\
+S2B & 1117.0 & 1493.2 & 1347.0 & 2163.0 & -4.3\%\textsuperscript{ns} \\
+SR & 1200.0 & 1551.2 & 1389.5 & 2228.2 & -1.2\%\textsuperscript{ns} \\
+PC & 1562.5 & 1887.3 & 1714.0 & 2615.6 & +21.8\%\textsuperscript{***} \\
+MC & 1715.0 & 3670.5 & 1943.5 & 4804.3 & +38.1\%\textsuperscript{***} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
-S2B + SR & 2935.0 & 37568.9 & 3590.0 & 36934.3 & +85.8\%\textsuperscript{ns} \\
-S2B + PC & 1808.5 & 7449.3 & 2113.0 & 7011.8 & +9.3\%\textsuperscript{ns} \\
-S2B + MC & 3070.5 & 38226.5 & 3212.0 & 80290.4 & +66.2\%\textsuperscript{ns} \\
-SR + PC & 17141.0 & 100664.3 & 17418.0 & 100143.3 & +801.3\%\textsuperscript{ns} \\
-SR + MC & 2393.5 & 38900.8 & 2982.5 & 38043.8 & +54.3\%\textsuperscript{ns} \\
-PC + MC & 8009.5 & 25023.3 & 8272.5 & 24781.8 & +328.1\%\textsuperscript{ns} \\
+S2B + SR & 1219.5 & 1698.4 & 1446.5 & 2240.7 & +2.8\%\textsuperscript{ns} \\
+S2B + PC & 1523.5 & 2232.6 & 1735.0 & 2686.5 & +23.3\%\textsuperscript{***} \\
+S2B + MC & 1787.0 & 4339.8 & 2054.0 & 5956.2 & +46.0\%\textsuperscript{***} \\
+SR + PC & 1672.0 & 2011.1 & 1836.5 & 2654.8 & +30.5\%\textsuperscript{***} \\
+SR + MC & 1881.0 & 3764.3 & 2105.5 & 4606.1 & +49.6\%\textsuperscript{***} \\
+PC + MC & 1974.0 & 4713.1 & 2150.5 & 4742.9 & +52.8\%\textsuperscript{***} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
-S2B + SR + PC & 2256.0 & 12359.2 & 2907.5 & 13234.9 & +50.5\%\textsuperscript{ns} \\
-S2B + SR + MC & 3115.0 & 31735.2 & 3697.0 & 31503.6 & +91.3\%\textsuperscript{ns} \\
-S2B + PC + MC & 6813.5 & 107870.5 & 6797.0 & 107289.1 & +251.7\%\textsuperscript{ns} \\
-SR + PC + MC & 4042.0 & 118949.4 & 4050.0 & 118309.8 & +109.6\%\textsuperscript{ns} \\
-S2B + SR + PC + MC & 8926.0 & 54762.9 & 9346.5 & 54607.5 & +383.6\%\textsuperscript{ns} \\
+S2B + SR + PC & 1593.5 & 4083.6 & 1720.0 & 4510.3 & +22.2\%\textsuperscript{***} \\
+S2B + SR + MC & 1927.5 & 3888.6 & 2127.5 & 5151.5 & +51.2\%\textsuperscript{***} \\
+S2B + PC + MC & 2059.5 & 3163.5 & 2332.5 & 3849.2 & +65.8\%\textsuperscript{***} \\
+SR + PC + MC & 1980.0 & 3299.7 & 2095.0 & 4057.1 & +48.9\%\textsuperscript{***} \\
+S2B + SR + PC + MC & 2152.0 & 6482.9 & 2532.5 & 6531.1 & +80.0\%\textsuperscript{***} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
