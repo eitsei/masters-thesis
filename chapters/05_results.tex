@@ -4,63 +4,84 @@
 \subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
 \label{subsubsec:latency_musique}
 
-Latency profile of the Musique dataset is somehow expected, but provides some interesting findings. The major finding was that the prompt caching did not provide any statistically significant improvement neither on TTFT nor total latency, which is against the expectations. Latency increases on the S2B and in SR are very expected, as those both optimization methods add additional steps in the RAG pipeline. The major increase in total latency for MC was surprisingly high compared to S2B and SR.  
-
-According to table 5, the biggest improvement that the PC provided was for the other methods. For example, total latency dropped from ~1700ms to ~1500ms when PC was added on top of the S2B + SR combination. Similar results can be seen, when PC was added on top of S2B + MC. Interestingly, MC seems to cause biggest risk for high tail latencies, when the question is routed to more capable model, which spends longer time on generating the answers.
-
-Detailed component-wise execution latency breakdowns decomposing processing duration across dense retrieval, cross-encoder neural re-ranking, prompt caching management, model routing classification, and generative token synthesis are provided in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_musique}).
+The latency profile on the MuSiQue benchmark largely aligns with theoretical expectations, while revealing several notable empirical patterns. Most notably, prompt caching (PC) yielded no statistically significant reduction in either TTFT or total end-to-end latency ($p \ge 0.05$), contrary to initial expectations. Latency increases under Small-to-Big (S2B) retrieval and Semantic Re-ranking (SR) were expected, as both optimization techniques introduce auxiliary computational stages into the RAG pipeline. In contrast, the latency penalty introduced by Model Cascading (MC) was markedly pronounced compared to S2B and SR, substantially inflating overall response times.  
 
 \input{tables/musique/tab_latency_musique}
+
+As shown in Table~\ref{tab:latency_musique}, the primary latency benefits of prompt caching emerged when integrated into multi-component architectures. For instance, compounding PC with the S2B + SR pipeline reduced median total latency from 1,733.5\,ms to 1,527.0\,ms. A comparable mitigation effect is observed in the S2B + PC + MC configuration relative to S2B + MC (decreasing median latency from 2,972.5\,ms to 2,577.0\,ms and $P_{95}$ from 14.2\,s to 4.6\,s). Conversely, Model Cascading introduces substantial tail latency vulnerability ($P_{95}$ exceeding 11\,s to 30\,s) whenever queries are routed to the frontier model, which incurs significantly longer token generation times.
+
+Notably, S2B + PC was the only architectural configuration that achieved a statistically significant latency reduction relative to the naive baseline ($p < 0.001$), decreasing median execution time by 8.0\% (from 1,359.0\,ms to 1,250.0\,ms) while nearly halving tail latency ($P_{95}$ falling from 3,397.2\,ms to 1,745.1\,ms). Furthermore, across all evaluated pipelines, the gap between TTFT and total latency remained minimal (diverging by only 5--60\,ms). This narrow delta is attributable to the concise nature of the generated answers (averaging 9--11 output tokens, as reported in Table~\ref{tab:cost_musique}), indicating that end-to-end execution duration is dominated almost entirely by the retrieval and prompt prefill phases rather than auto-regressive token generation.
+
+Detailed component-wise execution latency breakdowns are provided in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_musique}).
 
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:latency_enterprise}
 
+Overall results of the Latency profile from the Enterprise closed dataset, presented in the Table~\ref{tab:latency_enterprise}, follows the findings of the academic benchmark dataset. Especially, the result that Prompt caching does not provide latency benefits, but counter-intuitively increases the latency significantly by 21.8\% are against the academic expectations. Another un-expected finding is that Small-to-Big and Semantic reranking had lower median total latency than the baseline even together (S2B + SR), although the results are not statistically significant. 
+
 \input{tables/enterprise_closed/tab_latency_enterprise}
+
+The absence of the long tail latencies that were present in Table~\ref{tab:latency_musique} are mostly gone, which indicates that structure of the dataset does not cause similar difficulties that in the Musique dataset. In addition, tail latencies are much more stable across the configurations, which is beneficial in the enterprise context. In overall, none of the configurations provides any meaningful latency benefit. 
+
+The longer outputs (~7-9X) of the questions in the Enterprise closed dataset explains the greater gap between the median TTFT and total latency. For example, in the Table~\ref{tab:latency_musique} the differences are in a range of tens of milliseconds, in Table~\ref{tab:latency_enterprise}, the range is in hundreds of milliseconds, indicating that the streaming phrase is increased proportionally.
 
 The corresponding fine-grained phase-wise latency distributions for the enterprise closed corpus are illustrated in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_enterprise}).
 
+\FloatBarrier
 \subsection{Operational Expenditure and Token Dynamics}
 \label{subsec:results_cost}
 
 \subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
 \label{subsubsec:cost_musique}
 
-Table 7 provides expected results on the cost perspective, as it shows very clearly the benefits of the prompt caching. For example, PC alone provides statistically significant 80\% cost saving compared to non cached baseline, and benefits stays even when combined with the step-adding methods like S2B or SR. The unexpectedly small difference between the naive baseline and SR is due to fact, that structure of the native chunks of the Musique dataset is so close to the child chunk size of the S2B, that those are almost the same. 
-
-Greatest cost increases are on the methods that included SR. This comes for the fact that reranking is proportionally expensive and its cost structure does not favor reranking large amount of documents. Interestingly, MC does not increase the costs that much, even though Gemini 3.1 Pro is much more expensive (amount? and refence to appendix) and 73\% of the questions were routed to that model. Largest cost increase is when all other but PC is applied, when the cost is almost 70\% higher than in baseline, but here again, PC brings costs down.  
+Table~\ref{tab:cost_musique} details the operational expenditure and token dynamics across all 16 pipeline architectures on MuSiQue, underscoring the decisive economic impact of prompt caching. Across all cached configurations, exactly 7,157 prompt tokens are served directly from the context cache at a 90\% tariff discount, leaving only 842--1,037 tokens billed at full uncached prefill rates. Consequently, in isolation, PC achieves a statistically significant 80.0\% cost reduction ($p < 0.001$) relative to the uncached naive baseline, and these economic savings persist when integrated with multi-stage retrieval methods such as S2B or SR. The negligible cost delta between the naive baseline and isolated S2B (+1.6\%) is attributable to the fact that the native paragraph boundaries in MuSiQue closely match the S2B child chunk sizing, resulting in virtually identical prompt token volumes. 
 
 \input{tables/musique/tab_cost_musique}
+
+The most pronounced cost escalations are observed across configurations incorporating Semantic Re-ranking. This stems from the auxiliary API fees of the cross-encoder re-ranking service, which charges a fixed rate per scored document (\$0.00010 per document, detailed in Table~\ref{tab:pricing_catalog}), rendering neural re-ranking economically demanding over larger candidate pools. Interestingly, Model Cascading incurs only a moderate cost increase (+24.8\% in isolation), even though Gemini 3.1 Pro carries higher token pricing (Table~\ref{tab:pricing_catalog}) and handled 73\% of all queries. The highest overall expenditure occurs when all non-caching optimizations are compounded (S2B + SR + MC), reaching \$20.35 per 1,000 queries (+68.4\% over baseline). However, introducing prompt caching into this configuration (S2B + SR + PC + MC) curtails expenditure to \$8.39, transforming an otherwise severe cost regression into a 30.6\% net saving relative to the naive baseline.
 
 Detailed phase-wise monetary cost decompositions across uncached prompt prefill, context cache lookups, generative completion tokens, auxiliary re-ranking services, and router classifications are provided in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:cost_breakdown_musique}).
 
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:cost_enterprise}
 
+The difference between the datasets are clearly visible in the prompt sizes of Tables~\ref{tab:cost_enterprise} and ~\ref{tab:cost_musique}, and thus increasing the costs of all configurations. The model cascading provides great cost benefits as the most of the questions were routed to the cheapest Gemini 3.5 Flash-lite model instead of more expensive Flash 3.5 or 3.1 Pro. For example, in MC configuration, logs showed that 49\% of the questions were handled by Flash-Lite. In addition, routing to cheaper model helped to decrease the costs of the S2B + SR configuration from 19.196\$ to 14.082\$ (26.6\%), providing similar benefits than the prompt caching.
+
 \input{tables/enterprise_closed/tab_cost_enterprise}
+
+The prompt caching combined with the model cascading is the greatest cost reduction configuration in the Table~\ref{tab:cost_enterprise} showing the largest cost reduction of 81.3\% of the all. Small-to-Big with Semantic reranking, is the most expensive configuration with the price of 19.196\$, but even that configuration could be made much cheaper by introducing caching and model cascading reducing cost by -58.7\%.  
 
 The corresponding component-wise operational expenditure breakdown per 1,000 queries for the enterprise closed corpus is illustrated in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:cost_breakdown_enterprise}).
 
+\FloatBarrier
 \subsection{Retrieval and Generation Quality}
 \label{subsec:results_quality}
 
 \subsubsection{Academic Multi-Hop Benchmark (MuSiQue)}
 \label{subsubsec:quality_musique}
 
+As shown in Table~\ref{tab:quality_musique}, none of the architectural optimizations yielded a statistically significant improvement in response quality over the naive baseline ($p \ge 0.05$ across all configurations). This performance ceiling stems primarily from the intrinsic compositional structure of the MuSiQue benchmark. In particular, 3- and 4-hop queries exhibit high multi-hop reasoning complexity where the raw input query lacks sufficient semantic overlap to retrieve all disjoint, intermediate supporting passages within a single-shot dense retrieval step. Furthermore, under a constrained context window of $\text{top-}k = 5$, a 4-hop question requires an 80\% retrieval precision (4 out of 5 slots) simply to assemble the requisite context, leaving virtually no tolerance for distracting passages. 
+
 \input{tables/musique/tab_quality_musique}
 
-None of the optimization methods provided any improvement on the quality of the answers in the Musique dataset. The most probable reason for this catastrophic failure is the structure of the questions in the dataset. Especially 3- and 4-hop questions are structured in a way that the question-in-hand does not share the enough data to fetch all relevant chunks into the context in a single vector retrieval. In addition, in 4-hop questions, when the top-K is 5, it would need 80\% retrieval accuracy to hit all the relevant documents. 
+A notable behavioral pattern emerges in Model Cascading, which demonstrates substantially higher refusal accuracy on unanswerable queries than non-cascaded architectures. In isolated single-factor evaluations, MC achieved a refusal accuracy of 90.0\% compared to 65.0\%--70.0\% across other configurations. However, this apparent conservatism comes at the cost of an elevated False Refusal Rate (FRR, rising to 56.2\% in isolation and up to 68.8\% in SR + PC + MC). This reveals that rather than displaying genuine multi-hop reasoning discernment, the frontier model tier suffered from systematic over-refusal. Specifically, raw query execution logs indicate that the model refused to answer 65\% of all benchmark queries under SR + MC, and 72\% under SR + PC + MC. Consequently, as reflected by the lack of statistically significant divergence across Composite Quality ($Q$), these conservative refusal dynamics did not translate into meaningful quality improvements over the baseline.
 
-One of the main findings though is that the MC seems to have much higher refusal accuracy than other variations indicating that it managed to understand the limits of its capacity better than other variations. For example in single-factor runs, MC won all other variations with high margin (20-25 \% points), but on the other hand, its false refusal rate is also higher. This high refusal accuracy and high FRR is due to fact that it just refused to answer in majority of questions, for example in SR + PC + MC, it refused to answer 72\% of the question, while the number is 65\% for SR + MC. Finally, none of the answers thou was not statistically significantly different from the baseline.
+Exact Match (EM) and Token F1 scores remain low and tightly bounded across all configurations, spanning 33.0\%--42.0\% for EM and 36.8\%--46.3\% for Token F1. Model Cascading achieves the highest EM score of 42.0\% alongside the second-highest F1 score (45.6\%), whereas S2B + PC delivers the highest overall F1 score (46.3\%). This elevation in MC's lexical overlap is primarily an artifact of refusal scoring, as correct abstentions on unanswerable queries are rewarded with a score of 1.0 in both metrics. Conversely, this high propensity to abstain severely penalizes answerable queries: MC's elevated False Refusal Rate causes Answer Relevancy to plummet from the baseline's 0.242 to 0.141--0.187 across cascaded configurations. Furthermore, while isolated optimizations occasionally improve individual dimensions---such as Semantic Re-ranking increasing Faithfulness from 0.588 to 0.623 at the expense of Context Recall (0.562 to 0.463)---the penalizing sensitivity of the regularized harmonic mean (Equation~\ref{eq:composite_quality}) causes these localized weaknesses to depress Composite Quality ($Q$) overall.
 
 Configuration-level multi-dimensional response quality profiles spanning Context Precision, Context Recall, Faithfulness, and Answer Relevancy across architectural tiers are visualized as tier-stratified lollipop plots in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:quality_lollipop_musique}).
 
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:quality_enterprise}
 
+From the Table~\ref{tab:quality_enterprise}, it can be seen that 4 of the tested configuration provided increase in the composite quality compared to the naive baseline, although none is statistically significant. The highest quality is provided by the Small-to-Big with prompt caching, with the composite score of 0.6711 and not showing any weaknesses on any of the RAGAS metrics. This configuration demonstrated full refusal accuracy and only 10\% FRR (shared second smallest), so it can be concluded that it works exceptionally well on that perspective. 
+
 \input{tables/enterprise_closed/tab_quality_enterprise}
 
-The corresponding four-dimensional quality metric distributions for the enterprise closed benchmark corpus are depicted in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:quality_lollipop_enterprise}).
+The worst performing configurations have are mostly related to model cascading. In single-factor setups, the MC has the lowest score of 0.5974, driven by the lower scores in Answer relevancy and in Faithfulnes compared to the baseline. The worst performing individual configuration is the Semantic reranking combined with the model cascading, with the composity quality of 0.5418 (-12.7\% to baseline). This drop is driven by the drop in Faithfulnes and Answer relevancy, indicating factual consistency is not optimal and the answers are not relevant to the user. Interestingly, context precicion is the highest of all with the score of 0.683, indicating that the ranking is working well.
 
+Exact Match and F1 scores are not included in the results, as the output structure of the dataset differs significantly from the Musique. In the enterprise dataset, otuputs are longer piece of text, with around 80-120 words, while Musique contains mostly couple of words, and thus, EM/F1 scores would be artificially low and close to 0. The corresponding four-dimensional quality metric distributions for the enterprise closed benchmark corpus are depicted in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:quality_lollipop_enterprise}).
+
+\FloatBarrier
 \subsection{Trade-off Equilibrium and Pareto Frontier}
 \label{subsec:results_pareto}
 
@@ -72,9 +93,9 @@ The corresponding four-dimensional quality metric distributions for the enterpri
 \input{tables/musique/tab_pareto_musique}
 
 
-Pareto optimal variations for the Musique dataset is Baseline, PC, S2B + PC and S2B + SR + PC. For all Pareto optimal combinations, the main driver is the lower costs and relatively smaller drop in composite quality. Each of the non-baseline variations, quality per dollar and -second are highest in the reference group, and thus dominates the rest. High costs of SR and increased latency of the MC are the main driver for failures of those combinations, while the PC seems to be the positive driver for optimal solutions. For example, adding PC on top of S2B + SR combination, increases its QPD by 145\% and QPS by 16.7\%. On the other hand, MC drops both values for that S2B + SR by dropping QPD from 11 to 9 and QPS 0.12 to 0.06 mainly driven by the dramatic increase in median total latency (189\%) and mediocre increase in costs (17\%).
+As summarized in Table~\ref{tab:pareto_musique}, four architectures define the non-dominated empirical Pareto frontier on MuSiQue: the naive baseline, PC, S2B + PC, and S2B + SR + PC. Across all Pareto-optimal configurations, non-domination is primarily propelled by steep operational cost reductions alongside well-preserved Composite Quality ($Q$). For each non-baseline Pareto configuration, Quality per Dollar (QPD) and Quality per Second (QPS) demonstrate superior efficiency trade-offs relative to non-cached alternatives. Conversely, the high auxiliary API charges of Semantic Re-ranking and the severe latency overhead of Model Cascading represent the primary causes of sub-optimality in dominated pipelines, whereas prompt caching acts as the critical catalyst for Pareto efficiency. For instance, compounding PC with the S2B + SR pipeline elevates its QPD by 145.5\% (from 11 to 27) and QPS by 16.7\% (from 0.12 to 0.14). In contrast, introducing MC into the S2B + SR pipeline degrades both efficiency ratios—reducing QPD from 11 to 9 and halving QPS from 0.12 to 0.06—driven primarily by a 67.1\% surge in median latency and a moderate 17.0\% cost increase.
 
-From Figure ~\ref{fig:pareto_frontier_musique:a} it is clearly visible the division between MC configurations and the rests. The MC variations are clearly clustered on the right side of the figure, while the rests are clustered on the left side. Also, the quality is relatively stable between the configurations. Similar effect is not visible on the Figure ~\ref{fig:pareto_frontier_musique:b}, where most of the configurations are between Composite quality of \~0.18--\~0.2 and costs are scattered relatively evenly.
+The structural divergence between Model Cascading and non-cascaded architectures is visually evident in Figure~\ref{fig:pareto_frontier_musique}(a). All MC configurations cluster distinctly in the high-latency regime ($T_{\text{total}}\ P_{50} > 2.5$\,s along the right-hand boundary), whereas non-cascaded pipelines remain confined to lower latencies ($1.25\text{--}1.75$\,s). Furthermore, Composite Quality remains constrained within a narrow band across all variations ($Q \approx 0.15\text{--}0.21$), underscoring the limited impact of model routing on retrieval-constrained reasoning. In contrast, Figure~\ref{fig:pareto_frontier_musique}(b) reveals that operational expenditures do not exhibit binary clustering, but are distributed continuously across the \$2.42 to \$20.35 range depending directly on the inclusion of prompt caching and cross-encoder re-ranking.
 
 \begin{figure}[!htbp]
 \centering
@@ -95,6 +116,7 @@ From Figure ~\ref{fig:pareto_frontier_musique:a} it is clearly visible the divis
 \label{fig:pareto_frontier_enterprise}
 \end{figure}
 
+\FloatBarrier
 \subsection{Executive Performance Delta Synthesis}
 \label{subsec:results_delta_heatmap}
 

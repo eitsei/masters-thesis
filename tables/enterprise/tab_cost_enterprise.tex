@@ -1,6 +1,7 @@
 \begin{table}[htbp]
 \centering
-\small
+\footnotesize
+\renewcommand{\arraystretch}{0.93}
 \setlength{\tabcolsep}{3.5pt}
 \caption{Operational cost and token consumption breakdown across 16 pipeline architectures on Enterprise. Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline.}
 \label{tab:cost_enterprise_raw}
@@ -33,7 +34,7 @@ SR + PC + MC & 26 & 0 & 477 & \$10.472 & +84.9\%\textsuperscript{*} \\
 S2B + SR + PC + MC & 23 & 0 & 440 & \$10.150 & +79.3\%\textsuperscript{ns} \\
 \bottomrule
 \end{tabular*}
-\vspace{0.5em}
-\parbox{\linewidth}{\footnotesize
-\textbf{Notes:} Prompt and completion tokens represent query sample averages. If cached prompt tokens are reported ($N_{\text{cached}} > 0$), uncached prompt tokens are computed as $\max(0, N_{\text{prompt}} - N_{\text{cached}})$. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. $\Delta\text{Cost}$ reflects percentage change relative to the naive baseline. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
+\vspace{0.25em}
+\parbox{\linewidth}{\scriptsize
+\textbf{Notes:} Per-query sample token averages. Cost normalized per 1,000 queries based on Google Cloud Gemini enterprise tariffs. $\Delta\text{Cost}$ denotes percentage change relative to baseline. $^{*} p < 0.05, ^{**} p < 0.01, ^{***} p < 0.001$, $^{\mathrm{ns}} p \ge 0.05$ (paired Wilcoxon with Holm-Bonferroni correction vs. naive baseline).}
 \end{table}

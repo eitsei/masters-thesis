@@ -1,6 +1,7 @@
 \begin{table}[htbp]
 \centering
-\small
+\footnotesize
+\renewcommand{\arraystretch}{0.93}
 \setlength{\tabcolsep}{3.5pt}
 \caption{End-to-end execution latency and Time-to-First-Token (TTFT) across 16 pipeline architectures on Enterprise Closed. Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline.}
 \label{tab:latency_enterprise}
@@ -33,7 +34,7 @@ SR + PC + MC & 1980.0 & 3299.7 & 2095.0 & 4057.1 & +48.9\%\textsuperscript{***} 
 S2B + SR + PC + MC & 2152.0 & 6482.9 & 2532.5 & 6531.1 & +80.0\%\textsuperscript{***} \\
 \bottomrule
 \end{tabular*}
-\vspace{0.5em}
-\parbox{\linewidth}{\footnotesize
-\textbf{Notes:} $P_{50}$ and $P_{95}$ denote median and 95th percentile execution latencies. TTFT denotes Time-to-First-Token. $\Delta T_{\text{total}}$ reflects percentage change in median latency relative to the naive baseline. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
+\vspace{0.25em}
+\parbox{\linewidth}{\scriptsize
+\textbf{Notes:} $P_{50}$ and $P_{95}$ denote median and 95th percentile execution latencies. $\Delta T_{\text{total}}$ denotes percentage change relative to baseline. $^{*} p < 0.05, ^{**} p < 0.01, ^{***} p < 0.001$, $^{\mathrm{ns}} p \ge 0.05$ (paired Wilcoxon with Holm-Bonferroni correction vs. naive baseline).}
 \end{table}
