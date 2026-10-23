@@ -364,6 +364,10 @@ def test_export_latency_latex(tmp_path: Path, sample_benchmark_records):
     assert out_tex.exists()
     assert "\\label{tab:latency_musique}" in content
     assert "\\begin{table}[htbp]" in content
+    assert "\\footnotesize" in content
+    assert "\\renewcommand{\\arraystretch}{0.93}" in content
+    assert "\\vspace{0.25em}" in content
+    assert "\\parbox{\\linewidth}{\\scriptsize" in content
     assert "TTFT $P_{50}$" in content
     assert "$T_{\\text{total}} P_{50}$" in content
     assert "$\\Delta T_{\\text{total}}$" in content
@@ -407,6 +411,10 @@ def test_export_cost_latex(tmp_path: Path, sample_benchmark_records):
 
     assert out_tex.exists()
     assert "\\label{tab:cost_musique}" in content
+    assert "\\footnotesize" in content
+    assert "\\renewcommand{\\arraystretch}{0.93}" in content
+    assert "\\vspace{0.25em}" in content
+    assert "\\parbox{\\linewidth}{\\scriptsize" in content
     assert "Uncached" in content
     assert "Cached" in content
     assert "Output" in content
@@ -440,10 +448,14 @@ def test_export_quality_musique_latex(tmp_path: Path, sample_benchmark_records):
 
     assert out_tex.exists()
     assert "\\label{tab:quality_musique}" in content
-    assert "Context Precision" in content
-    assert "Context Recall" in content
-    assert "Faithfulness" in content
-    assert "Answer Relevancy" in content
+    assert "\\scriptsize" in content
+    assert "\\renewcommand{\\arraystretch}{0.93}" in content
+    assert "\\vspace{0.25em}" in content
+    assert "\\parbox{\\linewidth}{\\scriptsize" in content
+    assert "Context" in content and "Precision" in content
+    assert "Context" in content and "Recall" in content
+    assert "Faithful" in content
+    assert "Answer" in content and "Relevancy" in content
     assert "Token" in content and "F1" in content
     assert "Exact" in content and "Match" in content
     assert "Refusal Acc." in content
@@ -470,6 +482,10 @@ def test_export_quality_enterprise_latex_dynamic_n(tmp_path: Path, sample_benchm
 
     assert out_tex.exists()
     assert "\\label{tab:quality_enterprise_raw}" in content
+    assert "\\scriptsize" in content
+    assert "\\renewcommand{\\arraystretch}{0.93}" in content
+    assert "\\vspace{0.25em}" in content
+    assert "\\parbox{\\linewidth}{\\scriptsize" in content
     assert "($N = 5$)" in content
     assert "($N = 100$)" not in content
 
@@ -494,6 +510,10 @@ def test_export_pareto_latex(tmp_path: Path, sample_benchmark_records):
 
     assert out_tex.exists()
     assert "\\label{tab:pareto_musique}" in content
+    assert "\\footnotesize" in content
+    assert "\\renewcommand{\\arraystretch}{0.93}" in content
+    assert "\\vspace{0.25em}" in content
+    assert "\\parbox{\\linewidth}{\\scriptsize" in content
     assert "Composite" in content and "Quality" in content
     assert "Cost / 1k" in content
     assert "$T_{\\text{total}} P_{50}$" in content

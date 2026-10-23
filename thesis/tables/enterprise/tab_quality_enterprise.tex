@@ -1,8 +1,9 @@
 \begin{table}[htbp]
 \centering
 \scriptsize
+\renewcommand{\arraystretch}{0.93}
 \setlength{\tabcolsep}{2.2pt}
-\caption{Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline architectures on the Enterprise Knowledge Corpus ($N = 100$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline.}
+\caption{Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline architectures on the unconstrained raw Enterprise Knowledge Corpus ($N = 100$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline.}
 \label{tab:quality_enterprise_raw}
 \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c c c @{}}
 \toprule
@@ -33,7 +34,7 @@ SR + PC + MC & 0.654 & 0.742 & 0.782 & 0.633 & 100.0\% / 16.2\% & 0.5434\textsup
 S2B + SR + PC + MC & 0.680 & 0.785 & 0.833 & 0.677 & 100.0\% / 12.5\% & 0.6028\textsuperscript{ns} \\
 \bottomrule
 \end{tabular*}
-\vspace{0.5em}
-\parbox{\linewidth}{\footnotesize
-\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Refusal Accuracy evaluates correct abstention on unanswerable out-of-domain (OOD) queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
+\vspace{0.25em}
+\parbox{\linewidth}{\scriptsize
+\textbf{Notes:} Evaluated via RAGAS~\citep{es2024ragas} on answerable queries. Refusal Acc. denotes abstention on unanswerable out-of-domain (OOD) queries; FRR measures false refusals on answerable queries. Composite Quality $Q \in [0, 1]$ represents regularized harmonic mean (Eq.~\ref{eq:composite_quality}). Best $Q$ in bold. $^{*} p < 0.05, ^{**} p < 0.01, ^{***} p < 0.001$, $^{\mathrm{ns}} p \ge 0.05$ (paired Wilcoxon with Holm-Bonferroni correction vs. naive baseline).}
 \end{table}

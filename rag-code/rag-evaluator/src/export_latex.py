@@ -712,6 +712,7 @@ def export_quality_enterprise_latex(
         r"\begin{table}[htbp]",
         r"\centering",
         r"\scriptsize",
+        r"\renewcommand{\arraystretch}{0.93}",
         r"\setlength{\tabcolsep}{2.2pt}",
         f"\\caption{{{caption}}}",
         f"\\label{{{label}}}",
@@ -778,9 +779,9 @@ def export_quality_enterprise_latex(
         [
             r"\bottomrule",
             r"\end{tabular*}",
-            r"\vspace{0.5em}",
-            r"\parbox{\linewidth}{\footnotesize",
-            r"\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Refusal Accuracy evaluates correct abstention on unanswerable out-of-domain (OOD) queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
+            r"\vspace{0.25em}",
+            r"\parbox{\linewidth}{\scriptsize",
+            r"\textbf{Notes:} Evaluated via RAGAS~\citep{es2024ragas} on answerable queries. Refusal Acc. denotes abstention on unanswerable out-of-domain (OOD) queries; FRR measures false refusals on answerable queries. Composite Quality $Q \in [0, 1]$ represents regularized harmonic mean (Eq.~\ref{eq:composite_quality}). Best $Q$ in bold. $^{*} p < 0.05, ^{**} p < 0.01, ^{***} p < 0.001$, $^{\mathrm{ns}} p \ge 0.05$ (paired Wilcoxon with Holm-Bonferroni correction vs. naive baseline).}",
             r"\end{table}",
             "",
         ]
@@ -834,7 +835,8 @@ def export_latency_latex(
     latex_lines = [
         r"\begin{table}[htbp]",
         r"\centering",
-        r"\small",
+        r"\footnotesize",
+        r"\renewcommand{\arraystretch}{0.93}",
         r"\setlength{\tabcolsep}{3.5pt}",
         f"\\caption{{{caption}}}",
         f"\\label{{{label}}}",
@@ -910,12 +912,11 @@ def export_latency_latex(
         [
             r"\bottomrule",
             r"\end{tabular*}",
-            r"\vspace{0.5em}",
-            r"\parbox{\linewidth}{\footnotesize",
-            f"\\textbf{{Notes:}} $P_{{50}}$ and $P_{{95}}$ denote median and 95th percentile execution latencies. "
-            f"TTFT denotes Time-to-First-Token.{ttft_note} "
-            f"$\\Delta T_{{\\text{{total}}}}$ reflects percentage change in median latency relative to the naive baseline. "
-            f"Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{{*}} p < 0.05$, $^{{**}} p < 0.01$, $^{{***}} p < 0.001$, $\\mathrm{{ns}} = p \\ge 0.05$).}}",
+            r"\vspace{0.25em}",
+            r"\parbox{\linewidth}{\scriptsize",
+            f"\\textbf{{Notes:}} $P_{{50}}$ and $P_{{95}}$ denote median and 95th percentile execution latencies.{ttft_note} "
+            f"$\\Delta T_{{\\text{{total}}}}$ denotes percentage change relative to baseline. "
+            f"$^{{*}} p < 0.05, ^{{**}} p < 0.01, ^{{***}} p < 0.001$, $^{{\\mathrm{{ns}}}} p \\ge 0.05$ (paired Wilcoxon with Holm-Bonferroni correction vs. naive baseline).}}",
             r"\end{table}",
             "",
         ]
@@ -961,7 +962,8 @@ def export_cost_latex(
     latex_lines = [
         r"\begin{table}[htbp]",
         r"\centering",
-        r"\small",
+        r"\footnotesize",
+        r"\renewcommand{\arraystretch}{0.93}",
         r"\setlength{\tabcolsep}{3.5pt}",
         f"\\caption{{{caption}}}",
         f"\\label{{{label}}}",
@@ -1044,9 +1046,9 @@ def export_cost_latex(
         [
             r"\bottomrule",
             r"\end{tabular*}",
-            r"\vspace{0.5em}",
-            r"\parbox{\linewidth}{\footnotesize",
-            r"\textbf{Notes:} Prompt and completion tokens represent query sample averages. If cached prompt tokens are reported ($N_{\text{cached}} > 0$), uncached prompt tokens are computed as $\max(0, N_{\text{prompt}} - N_{\text{cached}})$. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. $\Delta\text{Cost}$ reflects percentage change relative to the naive baseline. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
+            r"\vspace{0.25em}",
+            r"\parbox{\linewidth}{\scriptsize",
+            r"\textbf{Notes:} Per-query sample token averages. Cost normalized per 1,000 queries based on Google Cloud Gemini enterprise tariffs. $\Delta\text{Cost}$ denotes percentage change relative to baseline. $^{*} p < 0.05, ^{**} p < 0.01, ^{***} p < 0.001$, $^{\mathrm{ns}} p \ge 0.05$ (paired Wilcoxon with Holm-Bonferroni correction vs. naive baseline).}",
             r"\end{table}",
             "",
         ]
@@ -1093,6 +1095,7 @@ def export_quality_musique_latex(
         r"\begin{table}[htbp]",
         r"\centering",
         r"\scriptsize",
+        r"\renewcommand{\arraystretch}{0.93}",
         r"\setlength{\tabcolsep}{1.2pt}",
         f"\\caption{{{caption}}}",
         f"\\label{{{label}}}",
@@ -1160,9 +1163,9 @@ def export_quality_musique_latex(
         [
             r"\bottomrule",
             r"\end{tabular*}",
-            r"\vspace{0.5em}",
-            r"\parbox{\linewidth}{\footnotesize",
-            r"\textbf{Notes:} Context Precision, Context Recall, Faithfulness, and Answer Relevancy are evaluated via RAGAS~\citep{es2024ragas} exclusively on answerable queries. Exact Match (EM) and Token F1 evaluate lexical overlap against reference answers. Refusal Accuracy evaluates correct abstention on unanswerable queries, while False Refusal Rate (FRR) measures erroneous abstention on answerable queries. Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across the four RAGAS dimensions on answerable queries (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Highest composite quality score is highlighted in bold. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}",
+            r"\vspace{0.25em}",
+            r"\parbox{\linewidth}{\scriptsize",
+            r"\textbf{Notes:} Evaluated via RAGAS~\citep{es2024ragas} on answerable queries. EM and Token F1 measure lexical overlap. Refusal Acc. denotes abstention on unanswerable queries; FRR measures false refusals on answerable queries. Composite Quality $Q \in [0, 1]$ represents regularized harmonic mean (Eq.~\ref{eq:composite_quality}). Best $Q$ in bold. $^{*} p < 0.05, ^{**} p < 0.01, ^{***} p < 0.001$, $^{\mathrm{ns}} p \ge 0.05$ (paired Wilcoxon with Holm-Bonferroni correction vs. naive baseline).}",
             r"\end{table}",
             "",
         ]
@@ -1221,7 +1224,8 @@ def export_pareto_latex(
     latex_lines = [
         r"\begin{table}[htbp]",
         r"\centering",
-        r"\small",
+        r"\footnotesize",
+        r"\renewcommand{\arraystretch}{0.93}",
         r"\setlength{\tabcolsep}{3.5pt}",
         f"\\caption{{{caption}}}",
         f"\\label{{{label}}}",
@@ -1278,9 +1282,9 @@ def export_pareto_latex(
         [
             r"\bottomrule",
             r"\end{tabular*}",
-            r"\vspace{0.5em}",
-            r"\parbox{\linewidth}{\footnotesize",
-            r"\textbf{Notes:} Composite Quality $Q \in [0, 1]$ represents the regularized harmonic mean across RAGAS dimensions (Equation~\ref{eq:composite_quality}, $\epsilon = 10^{-4}$). Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. $T_{\text{total}} P_{50}$ represents median execution latency in seconds. Quality per Dollar ($\mathrm{QPD} = Q / \text{Cost}$) and Quality per Second ($\mathrm{QPS} = Q / T_{\text{total}}$) measure resource efficiency. Pareto optimality denotes non-domination in the 3D trade-off space $(\max Q, \min \text{Cost}, \min T_{\text{total}})$.}",
+            r"\vspace{0.25em}",
+            r"\parbox{\linewidth}{\scriptsize",
+            r"\textbf{Notes:} Composite Quality $Q \in [0, 1]$ (Eq.~\ref{eq:composite_quality}). $\text{QPD} = Q / \text{Cost}_{1\text{k}}$ and $\text{QPS} = Q / T_{\text{total}}$ represent resource efficiency ratios. Pareto optimality denotes 3D non-domination ($\max Q, \min \text{Cost}, \min T_{\text{total}}$). Bold indicates Pareto-optimal configuration.}",
             r"\end{table}",
             "",
         ]
