@@ -107,6 +107,8 @@ The structural divergence between Model Cascading and non-cascaded architectures
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:pareto_enterprise}
 
+The Pareto optimality of the enterprise closed corpus, presented in Table~\ref{tab:pareto_enterprise}, is mainly driven by QPD, but in some cases (Baseline and S2B), also by QPS. The highest value of QPD is provided by the cheapest configuration PC + MC, with the score of 239, while the highest QPS is from Small-to-Big configuration with the score of 0.48. Only one of the Pareto optimal configurations presented lower composite quality than the baseline, presenting a drop of -2\%. Even though MC does not have neither high QPD nor QPS alone, when combined with Pareto optimal S2B + PC, it does not deteriorate the results, but helps to boost QPD from 137 to 200. The naive baseline and PC share Pareto optimality between both benchmark corpus's, in Table~\ref{tab:pareto_enterprise} and Table~\ref{tab:pareto_musique}.
+
 \input{tables/enterprise_closed/tab_pareto_enterprise}
 
 \begin{figure}[!htbp]
@@ -116,11 +118,13 @@ The structural divergence between Model Cascading and non-cascaded architectures
 \label{fig:pareto_frontier_enterprise}
 \end{figure}
 
+Figures~\ref{fig:pareto_frontier_enterprise}(a) and ~\ref{fig:pareto_frontier_enterprise}(b) presents the Pareto frontier on composite quality versus the QPS and QPD. There are four different clusters on the operational cost axis clearly visible in Figure~\ref{fig:pareto_frontier_enterprise}(b). The first cluster, which are all on the Pareto frontier, are clustered between \$2.5 and \$5. The second cluster between 7.5 and 10 and so on. The latencies are much more scattered, although there is a small cluster around the median latency of 1400ms, while rest of the value are on the higher range. 
+
 \FloatBarrier
 \subsection{Executive Performance Delta Synthesis}
 \label{subsec:results_delta_heatmap}
 
-To provide a consolidated cross-dimensional view of all 15 architectural optimization treatments relative to the unoptimized naive baseline, Figure~\ref{fig:quality_delta_matrix_musique} and Figure~\ref{fig:quality_delta_matrix_enterprise} visualize relative percentage improvements (green) and regressions (red) across all four RAGAS quality dimensions, Composite Quality ($Q$), median end-to-end latency ($P_{50}$), and operational expenditure per 1,000 queries.
+To provide a consolidated cross-dimensional view of all 15 architectural optimization treatments relative to the unoptimized naive baseline, Figure~\ref{fig:quality_delta_matrix_musique} and Figure~\ref{fig:quality_delta_matrix_enterprise} visualize relative percentage improvements (green) and regressions (red) across all four RAGAS quality dimensions, Composite Quality ($Q$), median end-to-end latency ($P_{50}$), and operational expenditure per 1,000 queries. The heatmap clearly shows that beating the quality of the naive baseline is a hard task. In the Musique corpus, none of the tested configurations managed to beat it, while in the Enterprise closed corpus, few managed, but the margins are relatively low (Global maximum of 8.1\%). The story is similar with the latencies. Very few configurations managed to lower it, but none with statistically significant margin, while most of the configurations have large opposite impact, when more than doubling the latency. The greatest benefits are on the cost dimension, where almost all configurations provided meaningful cost savings mainly driven by the prompt caching.
 
 \begin{figure}[!htbp]
 \centering
