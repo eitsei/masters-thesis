@@ -3,3 +3,76 @@ As a chapter, this is the most freeform one.
 A good way to discuss the points is first to write up subtitles with clear statements and then expand on those.
 Discussion points can occasionally be also in a question format or refer to a larger context beyond the thesis to bring in ideas from other papers to consider.
 In case your work has limitations that you can observe, it can be a good idea to write a separate section considering those.
+
+% =========================================================================
+% DRAFT NOTES: Prompt Caching Latency Inversion in Enterprise RAG (Nordea Closed)
+% =========================================================================
+%
+% -------------------------------------------------------------------------
+% 1. EMPIIRINEN HAVAINTO (Latenssi-inversio Enterprise Closed -aineistossa, N=100)
+% -------------------------------------------------------------------------
+% - Vastoin intuitiota ja perusoletusta, Module M3 (Prompt Caching) ei tuo 
+%   latenssihyötyjä yrityskontekstissa, vaan nostaa kokonaislatenssia:
+%     * C0 Baseline:    T_total P50 = 1 407 ms | TTFT P50 = 1 135 ms
+%     * C3 (M3 Prompt Caching): T_total P50 = 1 714 ms (+21.8 %) | TTFT P50 = 1 563 ms (+37.7 %)
+%     * C5 (M1+M2 S2B + SR):    T_total P50 = 1 446 ms | TTFT P50 = 1 220 ms
+% - C3 on merkittävästi hitaampi kuin C0 Baseline ja jopa selvästi hitaampi kuin 
+%   C5 (S2B + SR), jonka odotettiin olevan raskas ylimääräisen semanttisen rerankkauksen 
+%   vuoksi (rerank-vaiheen P50 = 108 ms).
+%
+% -------------------------------------------------------------------------
+% 2. TEKNINEN JUURISYY: T_prefill ja etä-KV-cachen overhead
+% -------------------------------------------------------------------------
+% - Kun puretaan latenssikomponentit (context_inspector.py ja evaluoidut ajot):
+%     * T_prefill C0: median = 827 ms
+%     * T_prefill C3: median = 1 308 ms (+481 ms)
+%     * T_stream C0:  median = 147 ms
+%     * T_stream C3:  median = 105 ms
+% - Itse vastaustokenien generointi (T_stream) on C3:ssa identtinen tai jopa 
+%   aavistuksen nopeampi kuin C0:ssa. Koko latenssirangaistus syntyy mallin 
+%   prefill-vaiheessa ennen ensimmäisen tokenin tuloa (TTFT).
+% - Gemini 3.5 Flash laskee Googlen TPU-laitteistolla ~7 000 - 8 500 tokenin rinnakkaisen 
+%   prefill-huomiolaskennan (attention prefill) muutamissa kymmenissä millisekunneissa.
+% - Kun pyyntö käyttää Vertex AI explicit context cachingia (cachedContentName):
+%     1. Vertex AI -infrastruktuuri joutuu validoimaan välimuistiviitteen ja etsimään 
+%        sen hajautetusta KV-välimuistivarastosta.
+%     2. Pyyntö on reititettävä tai sarjallistettu KV-tila on ladattava verkon yli 
+%        juuri sille TPU-kiihdyttimelle, joka pyyntöä palvelee.
+%     3. Tämä etätilan sidonta ja välimuistinhaku aiheuttaa kiinteän ~300-500 ms 
+%        RPC- ja synkronointiviiveen (fixed coordination overhead).
+%
+% -------------------------------------------------------------------------
+% 3. KONTEKSTIKOON "BREAK-EVEN" -KYNNYS
+% -------------------------------------------------------------------------
+% - Välimuistiin tallennettu staattinen etuliite (järjestelmäohjeet + few-shot -kirjasto, 
+%   prompts/answer-generation.st) on tarkalleen 7 157 tokenia.
+% - Vertex AI / Gemini Context Caching on suunniteltu massiivisille konteksteille 
+%   (32k - 1M+ tokenia, esim. kirjat, koodirepot, videot). Tällöin KV-uudelleenlaskenta 
+%   kestäisi sekunteja, jolloin ~300-500 ms noutoviive tuo suuren nettovoiton.
+% - 7 000 tokenin kokoluokassa etävälimuistin noutaminen kestää pidempään kuin se aika, 
+%   joka kuluisi tokenien puhtaaseen uudelleenlaskentaan TPU:n HBM-muistissa tyhjästä.
+%   -> Yritys-RAG:ssa syntyy "latency break-even" -ongelma: konteksti on liian lyhyt 
+%      latenssisäästöille, mutta ylittää palveluntarjoajan minimivälimuistikynnyksen (4 096 tok).
+%
+% -------------------------------------------------------------------------
+% 4. KONTEKSTIVÄLIMUISTI VS. SEMANTTINEN VASTAUSVÄLIMUISTI
+% -------------------------------------------------------------------------
+% - M3 toteuttaa mallitason KV-kontekstivälimuistin (Gemini CachedContent), 
+%   EI sovellustason semanttista vastausvälimuistia (kuten GPTCache tai Redis).
+% - Vastausvälimuisti toisi osumalla 0-10 ms latenssin, mutta kontekstivälimuistissa 
+%   LLM joutuu aina suorittamaan uuden päättelyn ja generoinnin dynaamisesti 
+%   noudetuille yritysdokumenteille.
+%
+% -------------------------------------------------------------------------
+% 5. DIPLOMITYÖN TULOS & PARETO-ANALYYSI (RQ1 vs. RQ2)
+% -------------------------------------------------------------------------
+% - Prompt Caching ei toimi yritystason RAG:ssa latenssinoptimoijana, vaan puhtaana 
+%   kustannusoptimointina:
+%     * Latenssi (RQ1): T_total nousee +21.8 % (1 407 ms -> 1 714 ms).
+%     * Kustannus (RQ2): Ajokustannus putoaa -70.7 % ($13.58 -> $3.98 / 1k kyselyä; 
+%       yhdessä M4-reitityksen kanssa jopa $2.54 / 1k eli -81.3 %).
+% - Laatu (RQ3): F1 säilyy identtisenä (C0: 59.4 % vs. C3: 58.8 %).
+% - Johtopäätös: Järjestelmäarkkitehdin on tehtävä tietoinen Pareto-valinta: 
+%   ollaanko valmiita maksamaan ~300 ms lisälatenssia käyttäjälle vastineena yli 
+%   70 % operatiivisesta pilvikustannussäästöstä.
+
