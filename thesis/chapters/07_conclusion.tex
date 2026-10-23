@@ -1,4 +1,60 @@
-The idea of the conclusion is the opposite of the introduction.
-Here we literally bring the reader out of the topic, not in.
-A good way to write conclusion is to start by reminding the reader of your research question(s) and then state how your work addressed them.
-To finish your conclusion, consider open research questions (this can be a list for example).
+% Template notes:
+% The idea of the conclusion is the opposite of the introduction.
+% Here we literally bring the reader out of the topic, not in.
+% A good way to write conclusion is to start by reminding the reader of your research question(s) and then state how your work addressed them.
+% To finish your conclusion, consider open research questions (this can be a list for example).
+
+% =========================================================================
+% SUOSITELTU KAPPALERAKENNE LUKUUN 7 (Ilman \subsection-otsikoita, ~1.5-2 s.)
+% =========================================================================
+%
+% -------------------------------------------------------------------------
+% 1. KOKOAVA AVAUSKAPPALE (1 kappale)
+% -------------------------------------------------------------------------
+% - Muistuttaa lukijaa työn päätavoitteesta ja kontribuutiosta: neljän
+%   modulaarisen RAG-optimoinnin (Small-to-Big Retrieval, Semantic Re-ranking,
+%   Prompt Caching ja Model Cascading) sekä niiden 16 täysfaktoriaalisen
+%   yhdistelmän (C0...C15) empiirinen arviointi tuotantotason Java / Spring AI
+%   -arkkitehtuurissa akateemisen monihyppyaineiston (MuSiQue) ja aidon
+%   yritystietokannan (Enterprise Closed & Raw) yli.
+%
+% -------------------------------------------------------------------------
+% 2. VASTAUKSET TUTKIMUSKYSYMYKSIIN RQ1–RQ4 (1–2 kappaletta tai \textbf{RQ1...})
+% -------------------------------------------------------------------------
+% - Tiivistää suorat, kvantitatiiviset vastaukset Johdannon tutkimuskysymyksiin
+%   (Table 1, 01_introduction.tex) 2–3 virkkeellä per kysymys:
+%     * RQ1 (Latency): Modulaariset optimoinnit harvoin alentavat mediaanilatenssia
+%       (poikkeuksena S2B + PC MuSiQuessa -8.0 % ja S2B:n kevyt etu yritysdatassa).
+%       PC tuo etä-KV-haun vuoksi ~300 ms mediaanilisän, mutta toimii kriittisenä
+%       P95-häntälatenssin sulakkeena (circuit-breaker, jopa -86 %). MC kasvattaa
+%       latenssia etenkin frontier-mallille reititettäessä.
+%     * RQ2 (Cost): Prompt Caching on tehokkain yksittäinen kustannusvipu
+%       (-70.7 % ... -80.0 %). Yrityskorpuksessa MC kääntää kustannukset laskuun
+%       (-34.2 %), ja yhdistelmä PC + MC saavuttaa jopa 81.3 % säästön ($2.54 / 1k)
+%       sekä kompensoi täysin monivaiheisen haun (S2B + SR) API-kustannukset.
+%     * RQ3 (Quality): Suljetuissa korpuksissa naiivi baseline on vahva, eikä
+%       yksittäinen optimointi ylitä sitä tilastollisesti merkitsevästi; S2B + PC
+%       saavuttaa korkeimman kokonaislaadun (Q = 0.6711) ja 100 % OOD-tarkkuuden.
+%       Suodattamattomassa yrityskannassa (Raw) S2B + SR -yhdistelmä tuottaa
+%       tilastollisesti merkitsevän (+28.1 % ... +28.8 %) laatuparannuksen.
+%     * RQ4 (Interaction & Pareto Equilibrium): Kolme arkkitehtuuria (Baseline,
+%       PC ja S2B + PC) pysyy Pareto-optimaalisina kaikilla korpuksilla. Moduulien
+%       välillä esiintyy vahva synergia-bifurkaatio: S2B suojaa MC:tä kontekstin
+%       pirstaloitumiselta (S2B + MC), kun taas pelkkä re-ranking yhdistettynä
+%       reititykseen (SR + MC) heikentää synteesin luotettavuutta.
+%
+% -------------------------------------------------------------------------
+% 3. JATKOTUTKIMUSAIHEET / FUTURE WORK & LOPETUS (1–2 kappaletta)
+% -------------------------------------------------------------------------
+% - Nostaa esiin keskeiset jatkotutkimussuunnat:
+%     1. Iteratiivinen ja agenttipohjainen monihyppyhaku (multi-step / agentic RAG)
+%        yksivaiheisen (single-shot) haun 3–4 hypyn laatukaton murtamiseksi.
+%     2. Kaksitasoinen välimuistiarkkitehtuuri: mallitason KV-kontekstivälimuistin
+%        (Prompt Caching) yhdistäminen sovellustason semanttiseen vastausvälimuistiin
+%        sekä kustannusten että TTFT-latenssin minimoimiseksi.
+%     3. Monikielinen yritys-RAG (cross-lingual retrieval & synthesis, esim.
+%        pohjoismaiset pankkiaineistot FI/SV/DA/NO/EN) ja dynaaminen palastelu.
+%     4. Monipilvi- ja avoimen lähdekoodin malliperheiden vertailu reitityksessä.
+% - Kokoava lopetusvirke: tasapaino operatiivisen tehokkuuden ja vastausten
+%   luotettavuuden välillä yritystason tekoälyjärjestelmissä.
+
