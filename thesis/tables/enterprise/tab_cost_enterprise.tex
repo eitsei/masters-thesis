@@ -1,7 +1,6 @@
 \begin{table}[htbp]
 \centering
-\footnotesize
-\renewcommand{\arraystretch}{0.93}
+\small
 \setlength{\tabcolsep}{3.5pt}
 \caption{Operational cost and token consumption breakdown across 16 pipeline architectures on Enterprise. Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline.}
 \label{tab:cost_enterprise_raw}
@@ -10,31 +9,31 @@
 \textbf{Pipeline} & \makecell{\textbf{Uncached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Cached}\\\textbf{Prompt Tok}} & \makecell{\textbf{Output}\\\textbf{Tokens}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$\Delta$ Cost}\\\scriptsize{(\%)}} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
-Naive RAG Baseline & 6,458 & 0 & 218 & \$5.662 & -- \\
+Naive RAG Baseline & 9,412 & 0 & 74 & \$14.785 & -- \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
-S2B & 7,525 & 0 & 190 & \$6.355 & +12.2\%\textsuperscript{ns} \\
-SR & 5,852 & 0 & 168 & \$10.020 & +77.0\%\textsuperscript{*} \\
-PC & 33 & 0 & 584 & \$6.817 & +20.4\%\textsuperscript{*} \\
-MC & 6,458 & 0 & 163 & \$5.321 & -6.0\%\textsuperscript{ns} \\
+S2B & 10,627 & 0 & 83 & \$16.690 & +12.9\%\textsuperscript{***} \\
+SR & 9,465 & 0 & 74 & \$19.866 & +34.4\%\textsuperscript{***} \\
+PC & 2,230 & 7,157 & 81 & \$5.147 & -65.2\%\textsuperscript{***} \\
+MC & 9,412 & 0 & 66 & \$9.465 & -36.0\%\textsuperscript{***} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
-S2B + SR & 7,895 & 0 & 226 & \$11.771 & +107.9\%\textsuperscript{*} \\
-S2B + PC & 28 & 0 & 428 & \$7.027 & +24.1\%\textsuperscript{ns} \\
-S2B + MC & 7,525 & 0 & 173 & \$6.338 & +11.9\%\textsuperscript{ns} \\
-SR + PC & 26 & 0 & 380 & \$11.073 & +95.6\%\textsuperscript{*} \\
-SR + MC & 5,849 & 0 & 141 & \$9.827 & +73.6\%\textsuperscript{*} \\
-PC + MC & 24 & 0 & 323 & \$6.035 & +6.6\%\textsuperscript{ns} \\
+S2B + SR & 10,904 & 0 & 83 & \$22.101 & +49.5\%\textsuperscript{***} \\
+S2B + PC & 3,468 & 7,157 & 86 & \$7.048 & -52.3\%\textsuperscript{***} \\
+S2B + MC & 10,627 & 0 & 73 & \$11.200 & -24.3\%\textsuperscript{***} \\
+SR + PC & 2,306 & 7,157 & 86 & \$10.311 & -30.3\%\textsuperscript{***} \\
+SR + MC & 9,465 & 0 & 70 & \$14.413 & -2.5\%\textsuperscript{*} \\
+PC + MC & 2,253 & 7,157 & 73 & \$3.463 & -76.6\%\textsuperscript{***} \\
 \midrule
 \multicolumn{6}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
-S2B + SR + PC & 23 & 0 & 396 & \$12.181 & +115.1\%\textsuperscript{*} \\
-S2B + SR + MC & 7,895 & 0 & 160 & \$11.277 & +99.2\%\textsuperscript{*} \\
-S2B + PC + MC & 28 & 0 & 463 & \$6.988 & +23.4\%\textsuperscript{ns} \\
-SR + PC + MC & 26 & 0 & 477 & \$10.472 & +84.9\%\textsuperscript{*} \\
-S2B + SR + PC + MC & 23 & 0 & 440 & \$10.150 & +79.3\%\textsuperscript{ns} \\
+S2B + SR + PC & 3,745 & 7,157 & 86 & \$12.461 & -15.7\%\textsuperscript{***} \\
+S2B + SR + MC & 10,904 & 0 & 67 & \$15.976 & +8.1\%\textsuperscript{**} \\
+S2B + PC + MC & 3,468 & 7,157 & 71 & \$4.582 & -69.0\%\textsuperscript{***} \\
+SR + PC + MC & 2,306 & 7,157 & 71 & \$8.375 & -43.4\%\textsuperscript{***} \\
+S2B + SR + PC + MC & 3,745 & 7,157 & 73 & \$9.802 & -33.7\%\textsuperscript{***} \\
 \bottomrule
 \end{tabular*}
-\vspace{0.25em}
-\parbox{\linewidth}{\scriptsize
-\textbf{Notes:} Per-query sample token averages. Cost normalized per 1,000 queries based on Google Cloud Gemini enterprise tariffs. $\Delta\text{Cost}$ denotes percentage change relative to baseline. $^{*} p < 0.05, ^{**} p < 0.01, ^{***} p < 0.001$, $^{\mathrm{ns}} p \ge 0.05$ (paired Wilcoxon with Holm-Bonferroni correction vs. naive baseline).}
+\vspace{0.5em}
+\parbox{\linewidth}{\footnotesize
+\textbf{Notes:} Prompt and completion tokens represent query sample averages. If cached prompt tokens are reported ($N_{\text{cached}} > 0$), uncached prompt tokens are computed as $\max(0, N_{\text{prompt}} - N_{\text{cached}})$. Cost reflects Google Cloud Gemini Enterprise platform pricing normalized per 1,000 queries. $\Delta\text{Cost}$ reflects percentage change relative to the naive baseline. Statistical significance flags denote two-tailed paired Wilcoxon signed-rank tests against the naive baseline with Holm-Bonferroni correction ($^{*} p < 0.05$, $^{**} p < 0.01$, $^{***} p < 0.001$, $\mathrm{ns} = p \ge 0.05$).}
 \end{table}

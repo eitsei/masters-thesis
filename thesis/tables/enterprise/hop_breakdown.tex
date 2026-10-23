@@ -11,10 +11,11 @@
 \textbf{Reasoning Tier} & \textbf{$N$} & \textbf{$P_{50}$} & \textbf{$P_{95}$} & \makecell{\textbf{Tokens}\\\scriptsize{avg}} & \makecell{\textbf{Cost}\\\scriptsize{(\$/1k)}} & \textbf{EM} & \textbf{F1} & \textbf{Faith} & \textbf{AR} & \textbf{CP} & \makecell{\textbf{Comp}\\\textbf{$Q$}} \\
  & & \scriptsize{(ms)} & \scriptsize{(ms)} & & & \scriptsize{(\%)} & \scriptsize{(\%)} & & & & \scriptsize{$[0,1]$} \\
 \midrule
-Out-of-Domain & 7 & 11703.0 & 27040.8 & 6627 & \$5.495 & 28.6\% & 55.8\% & 1.000 & 0.734 & 0.877 & \textbf{0.8766} \\
-2-Hop Reasoning & 3 & 4290.0 & 5883.9 & 6790 & \$6.051 & 0.0\% & 28.6\% & 0.944 & 0.741 & 0.442 & \textbf{0.4498} \\
+Out-of-Domain & 20 & 1352.5 & 1696.9 & 9458 & \$14.353 & 100.0\% & 100.0\% & -- & -- & -- & -- \\
+1-Hop Reasoning & 40 & 1663.0 & 2302.4 & 9459 & \$14.753 & 0.0\% & 37.3\% & 0.831 & 0.662 & 0.676 & \textbf{0.5934} \\
+2-Hop Reasoning & 40 & 1804.0 & 2328.6 & 9527 & \$15.034 & 0.0\% & 42.6\% & 0.678 & 0.577 & 0.451 & \textbf{0.4062} \\
 \midrule
-\textbf{Combined Corpus} & 10 & 5175.5 & 25615.2 & 6676 & \$5.662 & 20.0\% & 47.6\% & 0.979 & 0.737 & 0.714 & \textbf{0.7165} \\
+\textbf{Combined Corpus} & 100 & 1660.5 & 2320.2 & 9486 & \$14.785 & 20.0\% & 52.0\% & 0.756 & 0.620 & 0.564 & \textbf{0.5022} \\
 \bottomrule
 \end{tabular*}
 \vspace{0.5em}
