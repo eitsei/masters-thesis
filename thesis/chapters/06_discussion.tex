@@ -38,6 +38,16 @@
 %
 % =========================================================================
 % DRAFT NOTES 1: Prompt Caching Latency Inversion in Enterprise RAG (Nordea Closed)
+
+Promt caching did not provided any latency benefits in either of the tested corpora, which is a clearly against the acedemic expectations of the Chapter~\ref{sec:literature-review}, and even increased the latencies in some of the tested configurations. <lisää jotain lähteitä tähän ja vertaile tuloksia>
+
+In the enterprise closed corpus, standalone prompt caching median latency were 21.8\% higher than more heavier S2B + SR configuration, which does computationally heavy reranking and child-to-parent expansions, and thus could be expected to be slower. There are couple of reasons for that. The first reason is that prefil phrase have extra \~500ms delay that comes from the lookup and extra network calls for the KV cache. When the streaming part is indeed faster (147ms for baseline and 105ms for prompt caching), this does not help to offset the increased latency from the prefil. The second reason is that the cached context were too small to take full advantage of if. The results would have been probably much more favorable for prompt caching if the context size would have been in the magnitude of tens or hundreds thousands tokens, instead of 7157 used in the tests.
+
+However, long tail latencies of the MuSiQue corpus seems to benefit very well from the prompt caching, indicating that when the computational resources of the LLM provider are scarce, using cached prefixes instead of recalculating it provides substantial benefit. For instance, Small-to-Big and Model cascading had a total tail latency of 14 seconds in Table~\ref{tab:latency_musique} went down to 4.6 second, when the prompt caching were included. Absolute latency drop was even higher when prompt caching was added on top of S2B + SR + MC configuration, reducing it 26.7 seconds.
+
+One indication of this finding is that enterprises could implement dynamic caching based on the current load of the LLM provider. When there are excess capacity, adding the cache does not provide any meaningful latency benefits, but during the rush hours, it is very useful. Another considerations is the costs savings, that were large when using caching, more deeply analyzed in subsections~\ref{subsubsec:cost_musique} and ~\ref{subsubsec:cost_enterprise}. To conclude, in these testing setups, prompt caching acted purely as cost saving optimization method.
+
+In addition, there are multiple other ways to cache the prefix instead of explicit KV cache. For example, application level semantic caching could be interesting possibility for deeper consideration (see, for example RAGCache\citet{jin2025ragcache} or Redis (https://redis.io/docs/latest/develop/ai/redisvl/api/cache/ (is this good?)). Also, all LLM providers have own implementations of caching, and the analysis provided here is only restricted the caching options that Google Vertex AI provides.
 % =========================================================================
 %
 % 1. EMPIIRINEN HAVAINTO (Latenssi-inversio Enterprise Closed -aineistossa, N=100)
