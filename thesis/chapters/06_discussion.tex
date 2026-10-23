@@ -75,4 +75,103 @@ In case your work has limitations that you can observe, it can be a good idea to
 % - Johtopäätös: Järjestelmäarkkitehdin on tehtävä tietoinen Pareto-valinta: 
 %   ollaanko valmiita maksamaan ~300 ms lisälatenssia käyttäjälle vastineena yli 
 %   70 % operatiivisesta pilvikustannussäästöstä.
+%
+% =========================================================================
+% DRAFT NOTES 1B: Prompt Caching Häntälatenssin Sulakkeena (Circuit-Breaker)
+% =========================================================================
+% - Vaikka PC nostaa mediaanilatenssia, MuSiQuessa se toimii kriittisenä 
+%   P95-häntälatenssin leikkurina monivaiheisissa ketjuissa:
+%     * S2B + SR (C5):    P95 = 7 771 ms -> S2B + SR + PC (C11):    P95 = 2 202 ms (-71.7 %)
+%     * S2B + MC (C7):    P95 = 14 154 ms -> S2B + PC + MC (C13):   P95 = 4 644 ms (-67.2 %)
+%     * S2B + SR + MC (C12): P95 = 30 883 ms -> S2B + SR + PC + MC (C15): P95 = 4 306 ms (-86.1 %)
+%     * S2B + PC (C6):    P50 = 1 250 ms (-8.0 %, p < 0.001) ja P95 = 1 745 ms (baseline: 3 397 ms)
+% - JSONL-raakadata paljastaa: Ilman välimuistia monimutkaiset ketjut kärsivät satunnaisista 
+%   20-90 s TPU-muistinvaraus- ja jonotuspiikeistä ruuhka-aikoina (esim. C12 kyselyssä 
+%   3hop1__135793_87694_64412: T_prefill = 89.7 s).
+% - Cachen käyttö eliminoi nämä ääripiikit, koska 7 157 tokenin esilaskettu tila on jo 
+%   valmiiksi kiinnitetty TPU:n muistiin. PC toimii siis SLA-sulakkeena (Circuit-Breaker).
+%
+% =========================================================================
+% DRAFT NOTES 2: Frontier-mallin (Gemini 3.1 Pro) Over-Refusal Paradox (RQ3 / M4)
+% =========================================================================
+% - Reititysjakautuma:
+%     * MuSiQue: Pro-dominantti (77 % Pro, 21 % Flash, 2 % Lite; 3/4-hop 100 % Pro).
+%     * Enterprise Closed: Lite/Flash-dominantti (49 % Lite, 38 % Flash, 13 % Pro; 
+%       1-hop 97.5 % Lite, 2-hop 67.5 % Flash / 30 % Pro).
+% - Paradoksi MuSiQuessa: Frontier-malli Gemini 3.1 Pro kieltäytyy vastaamasta 
+%   vastattaviin kysymyksiin huomattavasti herkemmin kuin Gemini 3.5 Flash:
+%     * C0 Baseline (Flash): FRR = 42.5 %
+%     * C4 MC (Pro-dominantti): FRR = 63.9 % (Pron oma FRR vastattavissa = 63.9 %)
+%     * C14 SR+PC+MC: FRR = 78.3 % Prolla (koko putken FRR = 68.8 %)
+% - Juurisyy JSONL-datassa (Ehdollinen Context Recall -analyysi):
+%     * Kun haettu konteksti on osittainen (CR < 1.0, eli 1 välihyppy puuttuu top-5:stä):
+%       Pro kieltäytyy 87.0 % - 96.8 % ajasta, kun taas Flash kieltäytyy vain 50.0 % - 68.6 % 
+%       ja kykenee päättelemään puuttuvan askeleen.
+%     * Täydelläkin kontekstilla (CR = 1.0) Pro kieltäytyy 42.3 % - 58.6 % ajasta monimutkaisissa 
+%       monihyppytehtävissä tulkiten synteesin epävarmaksi (Flash kieltäytyy vain 0 - 22 %).
+% - Johtopäätös: Pron tiukka RLHF- ja grounding-ohjeistus tekee siitä tuotantoon turvallisen 
+%   (100 % OOD Refusal Accuracy), mutta se rankaisee monihyppyhaun osittaista osumatarkkuutta.
+%
+% =========================================================================
+% DRAFT NOTES 3: Synergia-bifurkaatio: SR + MC (C9) romahdus vs. S2B + MC (C7) menestys
+% =========================================================================
+% - Enterprise Closedissa havaitaan jyrkkä laatuero:
+%     * S2B + MC (C7):  Q = 0.6587 (toiseksi paras), Faith = 0.858, FRR = 11.2 %
+%     * SR + MC (C9):   Q = 0.5418 (koko testin huonoin, -12.7 %), Faith = 0.780, FRR = 17.5 %
+%     * Huom: C9:llä on silti koko testin KORKEIN Context Precision (0.683 vs. C7:n 0.661)!
+% - Juurisyy JSONL-datasta (Kyselyt 1hop__nordea_0030, 2hop__nordea_0009, 0019, 0020, 0040):
+%     * Re-ranker ilman S2B-laajennusta karsii pois reunaehtojen ja 2-hypyn taustakappaleet 
+%       (kontekstin pituus putoaa 4.5k merkkiin vs. C7:n 8.1k merkkiin).
+%     * Flash-Lite ei kykene rekonstruoimaan puuttuvia ehtoja kapeista paloista: se kieltäytyy 
+%       tai hallusinoi ehtoja (Faithfulness putoaa Litellä 0.906 -> 0.849, esim. kysely 0040: Faith = 0.50).
+%     * Pro kieltäytyy herkästi puutteellisella kontekstilla (Pron FRR C9:ssä peräti 50.0 %!).
+%     * C7:ssä S2B:n 1 024 tokenin vanhempidokumentti toimii suojakilpenä: Litellä FRR on 
+%       vain 2.4 % ja Faithfulness 0.906. S2B suojaa kevyitä ja tiukkoja malleja pirstaloitumiselta.
+%
+% =========================================================================
+% DRAFT NOTES 4: Hakukohinan Kynnysarvo (Retrieval Noise Threshold) & Korpusten Inversio
+% =========================================================================
+% - Suljetussa korpuksessa (Enterprise Closed, 20 kandidaattia / kysely, 1 701 palaa):
+%     * C1 S2B pärjää yksin erinomaisesti (Q = 0.6449 ns).
+%     * Re-rankingin lisääminen (C5 S2B + SR) LASKEE laatua (Q = 0.5813 ns), koska puhdas 
+%       kanta ei tarvitse karsintaa ja re-ranker rikkoo peräkkäisten lapsipalojen koheesion.
+% - Avoimessa raakakorpuksessa (Enterprise Raw, 2 420 uniikkia palaa, PDF-ehdot ja web):
+%     * Baseline C0 romahtaa (Q = 0.5022, 2-hop FRR hyppää 12.5 % -> 27.5 %).
+%     * Re-ranking toimii välttämättömänä kohinasuodattimena (Noise Gate), joka siivoaa distraktorit 
+%       ennen S2B-laajennusta:
+%         - S2B + SR (C5):    Q = 0.6433** (p_adj = 0.0077, +28.1 % parannus baselineen)
+%         - S2B + SR + PC (C11): Q = 0.6466** (p_adj = 0.0029, +28.8 % parannus)
+%         - S2B + SR + MC (C12): Q = 0.6162*  (p_adj = 0.0470, +22.7 % parannus)
+%         - Context Precision paranee tilastollisesti merkitsevästi (p_adj < 0.05) peräti 7 S2B-putkessa.
+%         - 2-hop FRR putoaa 27.5 %:sta 7.5 %:iin!
+% - Johtopäätös: Re-ranking tuo tilastollisesti vahvistetun hyödyn vasta, kun hakukohina 
+%   ylittää kriittisen kynnysarvon. Kuratoidussa kannassa se on redundanssi.
+%
+% =========================================================================
+% DRAFT NOTES 5: Harmonisen Keskiarvon Q (eps = 10^-4) "Heikoimman Lenkin Rangaistus"
+% =========================================================================
+% - Säännöllistetyn harmonisen keskiarvon kaava (Eq. 4.25):
+%     * Jos YKSIKIN neljästä metriikasta (CP, CR, Faith, AR) on 0.0:
+%       nimittäjään tulee 1/10^-4 = 10 000, jolloin Q(q) romahtaa välittömästi arvoon <= 0.0004.
+% - Empiirinen todiste: MuSiQuessa 68.8 % - 77.5 % vastattavista kyselyistä sisältää vähintään 
+%   yhden nollametristen (useimmiten FRR:n aiheuttama Faith=0, AR=0 tai noudon CR=0).
+% - Tilastollinen seuraus: Koska yli puolet otoksesta on nollassa, mediaani-Q naulautuu arvoon 
+%   0.0002 kaikilla putkilla, ja parittainen mediaaniero muuttuu muotoon mu_delta = 0.0000.
+% - Tämä nollaa parametrittoman Wilcoxon-testin tilastollisen voiman (sidokset / ties).
+% - Metodologinen opetus: Harmoninen Q on ankara teollinen luotettavuusmittari (penalizes single-point-of-failure), 
+%   mutta tilastolliseen hypoteesitestaukseen se vaatii suuren otoskoon tai jatkuvamman metriikan.
+%
+% =========================================================================
+% DRAFT NOTES 6: Poikkileikkaavat Havainnot (PC Attention Anchoring & S2B Latenssi)
+% =========================================================================
+% - PC:n huomion ankkurointivaikutus (Attention Anchoring):
+%     * C6 (S2B + PC) saavuttaa korkeamman Faithfulnessin (0.886) kuin C1 S2B (0.863).
+%     * Staattisen kehotteen ja CoT-esimerkkien jäädyttäminen KV-cacheen ankkuroi huomion, 
+%       estäen tarkkaavaisuuden hajoamista (attention dilution / drift) pitkissä 1 024 tokenin ikkunoissa.
+% - Small-to-Bigin negatiivinen latenssidelta yritysaineistoissa (-4.3 % Closed, -2.4 % Raw):
+%     * PostgreSQL:n parent-laajennus vie vain 1-2 ms (T_expand).
+%     * Kompaktimpi 128 tokenin lapsi-indeksi leikkaa noudon P95-häntälatenssin puoleen (674 -> 317 ms).
+%     * Eheä parent-konteksti nopeuttaa LLM:n striimausta (T_stream P50: 147 -> 131.5 ms), koska 
+%       malli vastaa varmemmin ilman epävarmuuden kiertelyä.
+%
 
