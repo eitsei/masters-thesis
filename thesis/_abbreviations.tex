@@ -6,11 +6,15 @@
 \begin{tabular}{ll}
 AI          & Artificial Intelligence \\
 API         & Application Programming Interface \\
-BLEU        & Bilingual Evaluation Understudy \\
+AR          & Answer Relevancy \\
+BM25        & Best Matching 25 \\
+CP          & Context Precision \\
+CR          & Context Recall \\
 DCC         & Document Contextual Coherence \\
-E2E         & End-to-End \\
 EM          & Exact Match \\
 FRR         & False Refusal Rate \\
+GCP         & Google Cloud Platform \\
+GPU         & Graphics Processing Unit \\
 HNSW        & Hierarchical Navigable Small World \\
 ICC         & Intrachunk Cohesion \\
 KV          & Key-Value \\
@@ -18,35 +22,36 @@ LitM        & Lost in the Middle \\
 LLM         & Large Language Model \\
 MC          & Model Cascading \\
 MRL         & Matryoshka Representation Learning \\
-NDCG        & Normalized Discounted Cumulative Gain \\
-NLP         & Natural Language Processing \\
 OOD         & Out-of-Domain \\
 PC          & Prompt Caching \\
-PLM         & Pre-trained Language Model \\
 QPD         & Quality per Dollar \\
 QPS         & Quality per Second \\
 RAG         & Retrieval-Augmented Generation \\
-ROUGE       & Recall-Oriented Understudy for Gisting Evaluation \\
+RAGAS       & Retrieval Augmented Generation Assessment \\
 S2B         & Small-to-Big \\
 SLA         & Service Level Agreement \\
 SR          & Semantic Re-ranking \\
 TTFT        & Time-to-First-Token \\
+vLLM        & Virtual Large Language Model \\
+VRAM        & Video Random Access Memory \\
 \end{tabular}
 
 \vspace{0.6cm}
 
 \subsection*{Glossary}
 
-\begin{tabular}{lp{9.5cm}}
-\textbf{Chunking}           & The process of dividing a large source text into smaller, distinct segments (chunks) prior to vector database insertion. \\
-\textbf{Context Window}     & The maximum amount of text (measured in tokens) that a language model can process in a single prompt iteration. \\
-\textbf{Cosine Similarity}   & A mathematical metric used to measure the semantic similarity between two vectors by calculating the cosine of the angle between them. \\
-\textbf{Embedding}          & A mathematical vector representation of text that captures its semantic and contextual meaning in a high-dimensional space. \\
-\textbf{Hallucination}      & A phenomenon where a language model generates output that is fluent and plausible but factually incorrect or unsupported by the training data. \\
-\textbf{Inference}          & The operational phase where a fully trained language model processes a user prompt and generates an output response. \\
-\textbf{Non-parametric Knowledge} & Data or information that resides outside the language model's internal weights, typically stored in an external database, and retrieved dynamically during inference. \\
-\textbf{Parametric Knowledge} & The static, internal information that is permanently embedded within a language model's weights during its training phase. \\
-\textbf{Time-to-First-Token} & A performance metric that measures the latency from the moment a prompt is sent to the model until it begins generating its very first output token. \\
-\textbf{Token}              & The foundational atomic unit of text (such as a word, character, or sub-word) into which input strings are split before being processed by a language model. \\
-\textbf{Vectorization}      & The algorithmic process of converting textual data into numerical vectors (embeddings) using a machine learning model. \\
+\begin{tabular}{lp{8.8cm}}
+\textbf{Bi-Encoder}             & An information retrieval architecture that embeds queries and passages into separate dense vectors independently for scalable nearest neighbor search. \\
+\textbf{Context Window}         & The maximum token sequence length that a language model can process within a single forward pass, bounded by memory and attention complexity. \\
+\textbf{Cross-Encoder}          & A neural ranking model performing bidirectional cross-attention over concatenated query--document pairs, maximizing precision at higher latency cost. \\
+\textbf{Faithfulness}           & An evaluation metric measuring the extent to which an answer's factual claims are grounded directly within and supported by the retrieved context passages. \\
+\textbf{Hallucination}          & A failure mode wherein a language model generates syntactically fluent output that is factually ungrounded, fabricated, or contradictory to the context. \\
+\textbf{Lost in the Middle}     & An attention degradation phenomenon where language models effectively recall facts at the beginning or end of a context window, but struggle with the middle. \\
+\textbf{Model Cascading}        & An adaptive inference strategy that routes incoming queries across model tiers (from lightweight to frontier) based on complexity to minimize cost and latency. \\
+\textbf{Non-parametric Knowledge} & External factual information retrieved dynamically from a vector index or database at inference time, residing outside the static model weights. \\
+\textbf{Parametric Knowledge}   & The internal knowledge and linguistic capabilities permanently encoded within the static weights of a neural network during pre-training. \\
+\textbf{Pareto Frontier}        & In multi-objective optimization, the set of non-dominated system configurations where no metric (latency, cost, quality) can improve without degrading another. \\
+\textbf{Prompt Caching}         & An inference optimization persisting pre-computed Key-Value (KV) attention states of static prompt prefixes in accelerator memory across requests. \\
+\textbf{Semantic Re-ranking}    & A multi-stage retrieval technique where a fast bi-encoder candidate set is rescored and reordered by an expressive cross-encoder prior to generation. \\
+\textbf{Small-to-Big Retrieval} & A hierarchical retrieval strategy where compact child chunks are indexed for vector search but expanded to surrounding parent documents before generation. \\
 \end{tabular}
