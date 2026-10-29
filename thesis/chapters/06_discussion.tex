@@ -57,71 +57,11 @@ Finally, the suboptimal performance of the fully compounded four-module architec
 \subsection{Corpus Topology and Retrieval Noise Thresholds}
 \label{subsec:disc_corpus_topology}
 
-% -------------------------------------------------------------------------
-% RAKENNE & YDINPOINTIT (Taso 3: Datan topologia ja käytännön suositukset)
-% -------------------------------------------------------------------------
-% - Hakukohinan kynnysarvo (Retrieval Noise Threshold): Miksi S2B + SR ei
-%   parantanut laatua tilastollisesti suljetussa yrityskorpuksessa (Enterprise Closed),
-%   mutta tuotti tilastollisesti merkitsevän +28.1-28.8 % laatuhypyn (p_adj < 0.01)
-%   avoimessa raakakorpuksessa (Enterprise Raw)?
-% - Re-ranking kohinasuodattimena (Noise Gate): Esisuodatetuissa tai pienissä
-%   tietokannoissa re-ranking on kallis redundanssi, joka voi rikkoa peräkkäisten
-%   lapsipalojen koheesion. Suodattamattomassa tuotantokannassa (PDF-ehdot,
-%   verkkosivut, distraktorit) se on välttämätön portinvartija ennen S2B-laajennusta
-%   (pudottaen 2-hop FRR:n 27.5 % -> 7.5 %).
-% - Käytännön valintamatriisi yritysarkkitehdeille:
-%     * Kustannus- ja laatuoptimi (yleissuositus): S2B + PC (Pareto-optimaalinen
-%       kaikissa ympäristöissä, paras laatu ja -70 % kustannus).
-%     * Maksimisäästö korkealla volyymillä: PC + MC tai S2B + PC + MC (jopa -81.3 %
-%       kustannussäästö, kunhan ~300-500 ms lisälatenssi hyväksytään).
-%     * Suodattamaton / kohinainen yritystietokanta: S2B + SR + PC (laatu varmistetaan
-%       re-rankingilla, ja PC kompensoi ristiinkooderin API-kulut).
-%
-% =========================================================================
-% DRAFT NOTES 4: Hakukohinan Kynnysarvo (Retrieval Noise Threshold) & Korpusten Inversio
-% =========================================================================
-% - Suljetussa korpuksessa (Enterprise Closed, 20 kandidaattia / kysely, 1 701 palaa):
-%     * C1 S2B pärjää yksin erinomaisesti (Q = 0.6449 ns).
-%     * Re-rankingin lisääminen (C5 S2B + SR) LASKEE laatua (Q = 0.5813 ns), koska puhdas 
-%       kanta ei tarvitse karsintaa ja re-ranker rikkoo peräkkäisten lapsipalojen koheesion.
-% - Avoimessa raakakorpuksessa (Enterprise Raw, 2 420 uniikkia palaa, PDF-ehdot ja web):
-%     * Baseline C0 romahtaa (Q = 0.5022, 2-hop FRR hyppää 12.5 % -> 27.5 %).
-%     * Re-ranking toimii välttämättömänä kohinasuodattimena (Noise Gate), joka siivoaa distraktorit 
-%       ennen S2B-laajennusta:
-%         - S2B + SR (C5):    Q = 0.6433** (p_adj = 0.0077, +28.1 % parannus baselineen)
-%         - S2B + SR + PC (C11): Q = 0.6466** (p_adj = 0.0029, +28.8 % parannus)
-%         - S2B + SR + MC (C12): Q = 0.6162*  (p_adj = 0.0470, +22.7 % parannus)
-%         - Context Precision paranee tilastollisesti merkitsevästi (p_adj < 0.05) peräti 7 S2B-putkessa.
-%         - 2-hop FRR putoaa 27.5 %:sta 7.5 %:iin!
-% - Johtopäätös: Re-ranking tuo tilastollisesti vahvistetun hyödyn vasta, kun hakukohina 
-%   ylittää kriittisen kynnysarvon. Kuratoidussa kannassa se on redundanssi.
-%
-% -------------------------------------------------------------------------
-% PEILAUS LUVUN 3 KIRJALLISUUTEEN (03_literature_review.tex)
-% -------------------------------------------------------------------------
-% - [TUKEE]: Rivillä 36 (03_literature_review.tex) tutkijat Elias Lumer, Matt Melich, Olivia Zino, Elena Kim, Sara Dieter, Pradeep Honaganahalli Basavaraju, Vamse Kumar Subbiah, James A. Burke ja Roberto Hernandez ("Rethinking Retrieval: From Traditional Retrieval Augmented Generation to Agentic and Non-Vector Reasoning Systems in the Financial Domain for Large Language Models")
-%   löysivät, että kontekstin laajentaminen naapuripaloihin nosti voittoprosentin 65 %:iin erillisiin paloihin verrattuna finanssiteksteissä, mikä tukee S2B:n erinomaista suorituskykyä suodattamattomassa Enterprise Raw -korpuksessa (S2B yksin nosti laadun Q = 0.6368:aan vs. baseline 0.5022, +26.8 % parannus, ja Closed-korpuksessa Q = 0.6449:ään vs. 0.6209).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{lumer2025rethinking}
-%
-% - [TUKEE]: Rivillä 36 (03_literature_review.tex) tutkijat Paulo Roberto de Moura J{\'u}nior, Jean Lelong ja Annabelle Blangero ("Adaptive Chunking: Optimizing Chunking-Method Selection for {RAG}")
-%   löysivät, että dokumentin rakenteeseen mukautuva paloittelu nostaa loppupään vastaustarkkuutta 8–10 prosenttiyksikköä ilman kehotemuutoksia, mikä tukee empiirisiä tuloksiamme suodattamattomassa Enterprise Raw -korpuksessa: S2B:n hierarkkinen vanhempilaajennus nosti Faithfulness-tulosta tasan 10.0 prosenttiyksikköä suhteessa perusviivaan (0.756 -> 0.856) ilman muutoksia kehotteisiin tai malleihin.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{demourajunior2026adaptive}
-%
-% - [TUKEE]: Rivillä 39 (03_literature_review.tex) tutkijat Mateusz {\'{S}}migielski, Micha{\l} Rajkowski, Mateusz Zbrocki, Micha{\l} Bernacki-Janson, Karol Kunicki, Julianna Godziszewska, Maciej Piasecki ja Konrad Wojtasik ("Chunking Methods on Retrieval-Augmented Generation -- Effectiveness Evaluation Against Computational Cost and Limitations") sekä Elias Lumer et al. ("Rethinking Retrieval: From Traditional Retrieval Augmented Generation to Agentic and Non-Vector Reasoning Systems in the Financial Domain for Large Language Models")
-%   löysivät, että malliohjatut paloittelumenetelmät voivat viedä kymmeniä tunteja kiinteän paloittelun valmistuessa alle sekunnissa ja että hierarkkisten solmutiivistelmien luominen nostaa esikäsittelykustannuksia moninkertaisesti ($1.19 -> $6.12 per raportti), mikä tukee yritysarkkitehtuurimme valintaa käyttää determinististä lapsi-vanhempipaloittelua (128 -> 1 024 tokenia) ja PostgreSQL-osoitinlaajennusta ilman LLM-pohjaisia esilaskentakuluja.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{smigielski2026chunking}, \cite{lumer2025rethinking}
-%
-% - [TÄYDENTÄÄ]: Rivillä 43 ja 59 (03_literature_review.tex) tutkijat Gabriel de Souza P. Moreira, Ronay Ak, Benedikt Schifferer, Mengyao Xu, Radek Osmulski ja Even Oldridge ("Enhancing {Q\&A} Text Retrieval with Ranking Models: Benchmarking, fine-tuning and deploying Rerankers for {RAG}") sekä Zhiyuan Cheng, Longying Lai, Yue Liu, Kai Cheng ja Xiaoxi Qi ("Enhancing Financial Report Question-Answering: A Retrieval-Augmented Generation System with Reranking Analysis")
-%   löysivät, että kaksivaiheinen haku ristiinkooderilla parantaa noudon relevanssia (14 % suhteellinen ja 9 pp absoluuttinen parannus NDCG@10-metriikkaan BEIR QA -aineistoissa), mikä täydentää havaintoamme hakukohinan kynnysarvosta (Retrieval Noise Threshold): esisuodatetussa kannassa (Enterprise Closed) re-ranking nostaa kyllä Context Precisionia (0.676), mutta on loppupään laadulle redundanssi (S2B+SR Q = 0.5813 vs. S2B 0.6449); sen sijaan suodattamattomassa tuotantokannassa (Enterprise Raw) se toimii välttämättömänä kohinasuodattimena (Noise Gate), jolloin S2B+SR tuottaa tilastollisesti merkitsevän +28.1 % laatuhypyn (Q = 0.6433**, p_adj = 0.0077) ja S2B+SR+PC +28.8 % hypyn (Q = 0.6466**, p_adj = 0.0029).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citep{moreira2024enhancing, cheng2026enhancing}, \citet{moreira2024enhancing}
-%
-% - [TUKEE]: Rivillä 59 (03_literature_review.tex) tutkijat Zhepei Wei, Wei-Lin Chen ja Yu Meng ("InstructRAG: Instructing Retrieval-Augmented Generation via Self-Synthesized Rationales") sekä Zhiyuan Cheng, Longying Lai, Yue Liu, Kai Cheng ja Xiaoxi Qi ("Enhancing Financial Report Question-Answering: A Retrieval-Augmented Generation System with Reranking Analysis")
-%   löysivät, että eksplisiittinen kohinanpoisto (denoising) nostaa tarkkuutta 8.3 % kandidaattimäärän kasvaessa ja että finanssiraporteissa ristiinkooderi nosti korkean oikeellisuuden vastausten osuutta 33.5 % -> 49.0 % ja vähensi vakavia hallusinaatioita 35.3 % -> 22.5 %, mikä tukee suoraan löydöksiämme Enterprise Raw -korpuksessa, jossa S2B+SR (C5) pudotti 2-hypyn virheelliset kieltäytymiset (FRR) 27.5 %:sta 7.5 %:iin ja nosti Composite Qualityn Q = 0.5022:sta arvoon 0.6433** (+28.1 %).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{wei2025instructrag}, \cite{cheng2026enhancing}
-%
-% - [TÄYDENTÄÄ]: Rivillä 61 (03_literature_review.tex) tutkijat Gabriel de Souza P. Moreira, Ronay Ak, Benedikt Schifferer, Mengyao Xu, Radek Osmulski ja Even Oldridge ("Enhancing {Q\&A} Text Retrieval with Ranking Models: Benchmarking, fine-tuning and deploying Rerankers for {RAG}")
-%   löysivät, että karsittu 4 miljardin parametrin rerankeri lisää keskimäärin noin 266 ms viivettä, mikä täydentää yrityskäyttöönoton kustannus- ja latenssianalyysiä: pilvipohjainen Vertex AI Ranking lisäsi latenssia maltillisesti (rerank-vaiheen P50 = 108 ms), mutta sen suora API-kustannus ($0.00010 per dokumentti) nostaa S2B+SR-putken kulut $19.196:een / 1k (+41.4 %), mikä tekee yhdistelmästä S2B+SR+PC ($9.412 / 1k) tai S2B+SR+PC+MC ($7.922 / 1k) välttämättömän taloudellisesti kestävälle tuotantokäytölle kohinaisissa korpuksissa.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{moreira2024enhancing}
+In pre-filtered and structurally constrained benchmarks---specifically MuSiQue and the closed enterprise corpus---semantic re-ranking acts primarily as an expensive distractor. In these clean settings, cross-encoder scoring depresses composite quality, exhibiting severe antagonism when compounded with Small-to-Big retrieval (dropping $Q$ from $0.6449$ in S2B down to $0.5813$ in S2B + SR, Table~\ref{tab:quality_enterprise}). Conversely, in the unconstrained Enterprise Raw corpus, which presents a broader document topology containing complex tabular clauses and noisy web documentation, the empirical dynamic inverts completely. In this uncurated setting, S2B + SR yields the third-highest composite quality overall ($Q = 0.6433$, a statistically significant $+28.1\%$ gain over the baseline, $p < 0.01$, Table~\ref{tab:quality_enterprise_raw}) while suppressing the false refusal rate to merely 7.5\% (falling from 27.5\% to 7.5\% on two-hop queries). Furthermore, compounding prompt caching into this pipeline (S2B + SR + PC) delivers the second-highest quality across the raw benchmark ($Q = 0.6466$, $+28.8\%$, $p < 0.01$), where S2B + SR provides discriminative accuracy while prompt caching fully neutralizes the cross-encoder API tariff.
+
+The primary mechanism governing this cross-corpus inversion is the retrieval noise threshold. In curated corpora with high signal-to-noise ratios, dense semantic retrieval already concentrates gold-standard context within top ranks. In these environments, cross-encoders disrupt intra-document ordering and prematurely prune adjacent child chunks necessary for procedural synthesis. In contrast, in uncurated production corpora, dense vector embeddings frequently retrieve semantically adjacent but factually irrelevant distractors. In such environments, the cross-encoder operates as an indispensable noise gate \citep{moreira2024enhancing, wei2025instructrag}, filtering out distractors prior to relational parent expansion. These findings indicate that semantic re-ranking delivers actionable enterprise utility only when corpus noise exceeds a critical threshold---represented empirically in this study by the transition from the isolated candidate pools of the closed corpus (1,701 chunks) to the unconstrained document corpus (2,420 chunks with raw background noise).
+
+These empirical dynamics yield three actionable architectural recommendations for enterprise system architects, conditioned on operational constraints and corpus characteristics. First, the general recommendation across environments is to deploy Small-to-Big retrieval with prompt caching (S2B + PC), which establishes the Pareto-optimal benchmark by maximizing composite quality ($Q = 0.6633$--$0.6711$) while securing a 66.3\%--70.7\% operational cost reduction. Second, for high-volume deployments prioritizing maximum expenditure reduction, combining prompt caching with model cascading (PC + MC or S2B + PC + MC) provides the greatest economic efficiency, slashing baseline expenditures by up to 81.3\% with QPD values reaching 200--239, provided that the cloud API routing delay (550--650\,ms, $P_{50} \approx 600$\,ms) is acceptable. Finally, as document repositories expand into uncurated enterprise corpora with elevated retrieval noise, integrating semantic re-ranking alongside Small-to-Big retrieval and prompt caching (S2B + SR + PC) transitions from an expensive computational redundancy into an indispensable prerequisite for suppressing hallucinations and false refusals.
 
 
 \subsection{Methodological Limitations and Threats to Validity}
@@ -133,58 +73,9 @@ Furthermore, academic research has increasingly shifted from naive single-shot d
 
 Finally, the evaluated optimizations---Small-to-Big retrieval, semantic re-ranking, prompt caching, and model cascading---represent only a targeted subset of paradigms surveyed in contemporary literature \citep{gao2023retrieval, wu2025ragnlp, gan2025rag}. As outlined in Chapter~\ref{sec:introduction}, this selection was deliberate: rather than isolating and evaluating multiple algorithmic variants within a single pipeline stage, the objective of this thesis was to select complementary methods targeting four distinct, consecutive phases of the RAG lifecycle: indexing context expansion, post-retrieval filtering, prefill attention reuse, and generation-tier routing. While this cross-pipeline breadth was essential for analyzing systemic multi-module interactions and Pareto equilibria, it inherently restricted the depth of exploration regarding intra-module variations within each individual phase (such as dynamic LLM chunking, learned neural routers, or in-memory vector databases), as surveyed in Chapter~\ref{sec:literature-review}. This structural trade-off also contextualizes why empirical results in industrial environments frequently diverge from published academic gains: whereas literature often benchmarks isolated, in-memory prototypes under idealized conditions, production customer-facing deployments must reconcile managed cloud APIs, network serialization, and strict latency-cost budgets.
 
-% -------------------------------------------------------------------------
-% RAKENNE & YDINPOINTIT (Taso 4: Mittausmetodologian kritiikki ja rajoitteet)
-% -------------------------------------------------------------------------
-% - Harmonisen keskiarvon (Q, eps = 10^-4) "heikoimman lenkin rangaistus":
-%   Miksi yksittäinen nollametriikka (CP, CR, Faith tai AR = 0) pudottaa koko
-%   kyselyn Q-arvon tasolle <= 0.0004?
-% - Vaikutus tilastolliseen voimaan: MuSiQuessa 68.8-77.5 % kyselyistä sisältää
-%   vähintään yhden nollan, mikä lukitsee mediaani-Q:n arvoon 0.0002 ja luo
-%   sidoksia (ties), jotka heikentävät parametrittoman Wilcoxon-testin
-%   erottelukykyä. Miksi Q on silti perusteltu teollinen SLA-mittari
-%   (nollatoleranssi yksittäisen vaiheen pettämiselle), mutta vaatii rinnalleen
-%   osatekijäkohtaisen tarkastelun.
-% - Muut tutkimuksen rajoitteet (Threats to Validity):
-%     * Yhden pilviekosysteemin (Google Cloud Vertex AI & Gemini 3.x -malliperhe)
-%       infrastruktuurisidonnaisuus (esim. KV-välimuistin toteutus voi poiketa
-%       muilla pilvialustoilla).
-%     * Staattinen yksivaiheinen (single-shot) haku vs. iteratiivinen/agenttipohjainen
-%       monihyppyhaku (selittää MuSiQuen 3-4 hypyn laatukaton).
-%     * LLM-as-a-Judge (RAGAS) -arvioinnin luontaiset rajoitteet.
-%
-% =========================================================================
-% DRAFT NOTES 5: Harmonisen Keskiarvon Q (eps = 10^-4) "Heikoimman Lenkin Rangaistus"
-% =========================================================================
-% - Säännöllistetyn harmonisen keskiarvon kaava (Eq. 4.25):
-%     * Jos YKSIKIN neljästä metriikasta (CP, CR, Faith, AR) on 0.0:
-%       nimittäjään tulee 1/10^-4 = 10 000, jolloin Q(q) romahtaa välittömästi arvoon <= 0.0004.
-% - Empiirinen todiste: MuSiQuessa 68.8 % - 77.5 % vastattavista kyselyistä sisältää vähintään 
-%   yhden nollametristen (useimmiten FRR:n aiheuttama Faith=0, AR=0 tai noudon CR=0).
-% - Tilastollinen seuraus: Koska yli puolet otoksesta on nollassa, mediaani-Q naulautuu arvoon 
-%   0.0002 kaikilla putkilla, ja parittainen mediaaniero muuttuu muotoon mu_delta = 0.0000.
-% - Tämä nollaa parametrittoman Wilcoxon-testin tilastollisen voiman (sidokset / ties).
-% - Metodologinen opetus: Harmoninen Q on ankara teollinen luotettavuusmittari (penalizes single-point-of-failure), 
-%   mutta tilastolliseen hypoteesitestaukseen se vaatii suuren otoskoon tai jatkuvamman metriikan.
-%
-% -------------------------------------------------------------------------
-% PEILAUS LUVUN 3 KIRJALLISUUTEEN (03_literature_review.tex)
-% -------------------------------------------------------------------------
-% - [TÄYDENTÄÄ]: Rivillä 1 (03_literature_review.tex) tutkijat Hao Yu, Aoran Gan, Kai Zhang, Shiwei Tong, Qi Liu ja Zhaofeng Liu ("Evaluation of Retrieval-Augmented Generation: A Survey"), Yunfan Gao, Yun Xiong, Xinyu Gao, Kangxiang Jia, Jinliu Pan, Yuxi Bi, Yixin Dai, Jiawei Sun, Haofen Wang ja muut ("Retrieval-augmented generation for large language models: A survey"), sekä Shangyu Wu, Ying Xiong, Yufei Cui, Haolun Wu, Can Chen, Ye Yuan, Lianming Huang, Xue Liu, Tei-Wei Kuo, Nan Guan ja Chun Jason Xue ("Retrieval-Augmented Generation for Natural Language Processing: A Survey") sekä Claes Wohlin ("Guidelines for snowballing in systematic literature studies and a replication in software engineering")
-%   jäsensivät RAG-järjestelmät modulaarisiin paradigmoihin ja esittivät suorituskyvyn arvioinnin toisistaan riippumattomina osametriikoina, mikä täydentää ja kritisoi arviointimetodologiaa harmonisen keskiarvon (Q) "heikoimman lenkin rangaistuksen" kautta: osametriikoiden erillinen tarkastelu peittää tuotantojärjestelmien kriittiset vikapisteet, kun taas säännöllistetyssä harmonisessa keskiarvossa yksikin nolla (CP, CR, Faith tai AR = 0) pudottaa koko kyselyn Q-arvon tasolle <= 0.0004 (lukiten MuSiQuen mediaani-Q:n arvoon 0.0002 ja luoden sidoksia Wilcoxon-testiin).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{gan2025rag, gao2023retrieval, wu2025ragnlp}, \cite{guidelines}
-%
-% - [TÄYDENTÄÄ]: Rivillä 18 (03_literature_review.tex) tutkijat Jaewan Park, Solbee Cho ja Jay-Yoon Lee ("Stop-RAG: Value-Based Retrieval Control for Iterative RAG") sekä Soyeong Jeong et al. ("Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity")
-%   löysivät, että arvo-ohjattu adaptiivinen pysäytysmekanismi karsii tarpeettomia iteratiivisia noutosilmukoita 14–49 % ja että moniaskelisen haun dynaaminen valinta optimoi monihyppypäättelyä, mikä täydentää metodologista rajoitettamme: benchmarkimme käytti staattista yhden vaiheen (single-shot) hakua kiinteällä top-5-ikkunalla, mikä muodosti laatukaton MuSiQuen 3- ja 4-hypyn kyselyille (Q = 0.15–0.21, p >= 0.05), joissa väliaskeleita ei voitu hakea iteratiivisesti.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{park2025stoprag}, \citet{jeong2024adaptive}
-%
-% - [TÄYDENTÄÄ / RISTIRIIDASSA]: Rivillä 20 (03_literature_review.tex) tutkijat Minghao Guo et al. ("DeepSieve: Information Sieving via LLM-as-a-Knowledge-Router"), rivillä 25 ja 36 tutkijat Zihang Li et al. ("Bridge-RAG: An Abstract Bridge Tree-Based Retrieval Augmented Generation Algorithm"), rivillä 36 tutkijat Shengyuan Chen et al. ("LogicRAG: Retrieval Augmented Generation with Adaptive Reasoning Structures") sekä Minsang Kim, Cheoneum Park ja Seungjun Baek ("QPaug: Question and Passage Augmentation for Open-Domain Question Answering of LLMs")
-%   löysivät, että kyselyn dynaaminen purkaminen alikyselyiden verkoksi (DAG / CoT) tai hierarkkisiksi abstraktiopuiksi nostaa monihyppytarkkuutta merkittävästi (+14.7 pp LogicRAG, +44 % BLEU Bridge-RAG, +34 % F1 QPaug, +20.7 pp F1 DeepSieve), mikä täydentää ja selittää, miksi staattinen yhden askeleen S2B ja monoliittinen mallireititys eivät yksin rikkoneet MuSiQuen monihyppykattoa (EM 33.0–42.0 %, F1 36.8–46.3 %): erillisten välihyppyjen yhdistäminen vaatii kyselyn dekompositiota eikä pelkkää vanhempikontekstin laajennusta.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{guo2026deepsieve}, \cite{li2026bridgerag}, \cite{chen2026logicrag}, \cite{kim2024qpaug}
-%
-% - [TÄYDENTÄÄ]: Rivillä 59 (03_literature_review.tex) tutkijat Yue Yu, Wei Ping, Zihan Liu, Boxin Wang, Jiaxuan You, Chao Zhang, Mohammad Shoeybi ja Bryan Catanzaro ("RankRAG: Unifying Context Ranking with Retrieval-Augmented Generation in LLMs")
-%   löysivät monitehtävämallin saavuttavan 50.6–82.9 % EM-tarkkuuden lyhyiden faktojen QA-aineistoissa (NaturalQA, TriviaQA, PopQA), mikä täydentää arviointimittareiden metodologista kritiikkiä: MuSiQuessa MC:n korkein EM (42.0 %) oli osin kieltäytymispisteytyksen artefakti (oikea abstention = 1.0), kun taas yritysaineiston monivirkkeisissä proseduraalisissa vastauksissa (62–86 tokenia) pintatason EM/F1 putoaa nollaan, mikä tekee semanttisesta RAGAS-arvioinnista välttämättömän.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{yu2024rankrag}
+The chosen aggregation method, the regularized harmonic mean (Equation~\ref{eq:composite_quality}, with $\epsilon = 10^{-4}$), acts very strictly. It combines the four quality dimensions defined by the RAGAS framework \citep{es2024ragas}---Context Precision, Context Recall, Faithfulness, and Answer Relevancy---which are evaluated using an automated LLM judge. The harmonic mean heavily penalizes the weakest metric: if any single RAGAS dimension is zero, the formula causes the composite score for that query to drop to $Q(q) \le 0.0004$. On the multi-hop MuSiQue benchmark, 68.8\%--77.5\% of queries contained at least one zero across configurations (Table~\ref{tab:quality_musique}), mainly due to model refusals or missing retrieval context. This penalty locks the median composite quality on MuSiQue to $P_{50} \approx 0.0002$, creating many ties that reduce the statistical power of the paired Wilcoxon tests. In enterprise production, however, this strict behavior is often desirable, as companies have near-zero tolerance for complete failures in customer-facing assistants. Furthermore, because RAGAS relies on a non-deterministic LLM judge, composite quality scores should be combined with deterministic evaluation metrics. Examples evaluated in this benchmark include Exact Match, token $F_1$, and false refusal rates (FRR), but organizations can also adopt other deterministic methods, such as rule-based pattern matching or regex validators, to build a more comprehensive view of system reliability.
+
+Lastly, the evaluation was conducted using the open-source model Qwen3.8-27B \citep{yang2025qwen3}, running locally on servers hosted by CSC\footnote{CSC -- IT Center for Science, \url{https://csc.fi}.} as batch jobs via vLLM. While the hardware at CSC is on par with commercial data centers, local hosting has different practical characteristics. Running the evaluation model locally removes external network jitter, public cloud queuing times, and third-party API changes from the evaluation process. Although production enterprise RAG systems must respond quickly to users under strict latency limits, evaluation pipelines do not have the same real-time requirements. Enterprises can therefore run evaluation offline during off-peak hours using open-source models, avoiding the high token costs of commercial APIs.
 
 
 
