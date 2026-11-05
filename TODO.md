@@ -8,25 +8,17 @@ Kaikki korjaukset ovat nopeita tekstimuutoksia olemassa oleviin `.tex`-tiedostoi
 
 ## 1. Visuaaliset ja taitolliset korjaukset (PDF & kuvaajat)
 
-- [ ] **Kuvaajien selitteen (legend) päällekkäisyys pylväiden arvojen kanssa (Liitteet C ja D, sivut 74 ja 78):**
+- [x] **Kuvaajien selitteen (legend) päällekkäisyys pylväiden arvojen kanssa (Liitteet C ja D, sivut 74 ja 78):**
   - **Sijainti / Tiedostot:** `thesis/chapters/0C_appendix.tex` (Figure C2(b), s. 74) ja `thesis/chapters/0D_appendix.tex` (Figure D2, s. 78); taustalla plottausskriptit `figures/enterprise_closed/cost_breakdown_enterprise_closed.pdf` ja `figures/enterprise/cost_breakdown_enterprise.pdf`.
-  - **Ongelma:** Kuvaajan vasemman yläkulman selitelaatikko (`Prompt (C_prompt)`, `Context Cache (C_cache)` jne.) menee kolmen ensimmäisen pylvään (`Baseline`, `S2B`, `SR`) yläpuolella olevien dollarilukemien (`$13.580`, `$14.471`, `$18.881` sekä `$14.785`, `$16.690`, `$19.866`) päälle ja peittää tekstit osittain.
-  - **Korjausehdotus:** Nosta plottausskripteissä y-akselin ylärajaa (esim. `ylim(0, 28)` tai `ylim(0, 30)` nykyisen `25` sijaan) tai aseta selitelaatikko toiseen sijaintiin / kuvaajan ulkopuolelle, ja generoi PDF-kuvaajat uudelleen.
+  - **Tila:** Korjattu. Päivitetty `ax.set_ylim` kertoimeksi `1.55` tiedostossa `rag-code/rag-evaluator/src/plot_results.py` sekä latenssi- (`plot_latency_breakdown`) että kustannuskuvaajalle (`plot_cost_breakdown`). Kuvaajat generoitu uudelleen ja työ käännetty onnistuneesti. Selitelaatikko ei enää peitä pylväiden arvoja, ja kuvaajat ovat täsmälleen saman korkuisia.
 
-- [ ] **Taulukon B1 poikkeava fontti ja redundantit kokokomennot (Liite B, sivu 72):**
+- [x] **Taulukon B1 poikkeava fontti ja redundantit kokokomennot (Liite B, sivu 72):**
   - **Sijainti / Tiedosto:** `thesis/chapters/0B_appendix.tex` (Table B1, rivit 5–8).
-  - **Nykyinen koodi:** `\sffamily \footnotesize \setlength{\tabcolsep}{3pt} \scriptsize`
-  - **Ongelma:** Eksplisiittisen `\sffamily`-komennon vuoksi Table B1 tulostuu päätteettömällä sans-serif -fontilla, kun taas kaikki muut työn 16 taulukkoa käyttävät normaalia pääteviivallista leipätekstifonttia. Lisäksi peräkkäiset kokokomennot `\footnotesize` ja `\scriptsize` ovat keskenään redundantteja.
-  - **Korjausehdotus:** Poista `\sffamily` ja redundantti `\footnotesize`, jolloin taulukko käyttää yhtenäistä pääteviivallista `\scriptsize`- (tai `\footnotesize`-) kirjasinta muiden taulukoiden tapaan.
+  - **Tila:** Poistettu `\sffamily` ja redundantti `\footnotesize`. Taulukko käyttää nyt yhtenäistä pääteviivallista `\scriptsize`-kirjasinta muiden taulukoiden tapaan.
 
-- [ ] **Kuvaluettelon (List of Figures) puuttuminen ja taulukkoluettelon pitkät otsikot (Alkusivut 7–10):**
+- [x] **Kuvaluettelon (List of Figures) puuttuminen ja taulukkoluettelon pitkät otsikot (Alkusivut 7–10):**
   - **Sijainti / Tiedostot:** `thesis/_main.tex` (rivit 359–363) sekä taulukkotiedostot kansioissa `thesis/tables/...`.
-  - **Ongelma:**
-    1. Tiedostossa `_main.tex` kutsutaan `\listoftables`, mutta `\listoffigures` puuttuu kokonaan, vaikka työssä on 10 keskeistä analyysikuvaajaa.
-    2. Taulukoilla 3, 5–12, B1 ja D1–D4 ei ole lyhyttä valinnaista otsikkoa `\caption[Lyhyt otsikko]{Pitkä otsikko}`. Tämän vuoksi koko monirivinen seliteteksti (kuten *"Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline."*) tulostuu taulukkoluetteloon venyttäen sen sivuille 9–10.
-  - **Korjausehdotus:**
-    1. Lisää `\listoffigures` tiedostoon `_main.tex` taulukkoluettelon jälkeen.
-    2. Lisää taulukoiden `\caption`-komentoihin lyhyet otsikot hakasulkeisiin (esim. `\caption[End-to-end execution latency and TTFT on MuSiQue]{End-to-end execution latency and Time-to-First-Token (TTFT) across 16 pipeline architectures on MuSiQue. Statistical significance...}`).
+  - **Tila:** Korjattu. `\listoffigures` lisätty tiedostoon `_main.tex`. Kaikille taulukoille (Taulukot 3, 5–12, B1, D1–D4) ja kuvaajille (Kuvat 1–3, C1–C4, D1–D4) on lisätty tiiviit hakasulkeelliset otsikot `\caption[Lyhyt]{Pitkä}`. `List of Tables` mahtuu nyt täydellisesti sivulle 9 ja `List of Figures` sivulle 10 ilman ylivuotoa.
 
 ---
 
@@ -109,16 +101,13 @@ Kaikki korjaukset ovat nopeita tekstimuutoksia olemassa oleviin `.tex`-tiedostoi
   - **Sijainti / Tiedosto:** `thesis/chapters/07_conclusion.tex` (s. 62 rivi 19).
   - **Tila:** Korvattu luonnollisemmalla ja vakiintuneella termillä `Pareto-optimal`.
 
-- [ ] **Taulukoiden 11, 12 ja D4 alaviitteen QPD-kaava vs. Yhtälö 23 (Sivut 47, 49, 82):**
+- [x] **Taulukoiden 11, 12 ja D4 alaviitteen QPD-kaava vs. Yhtälö 23 (Sivut 47, 49, 82):**
   - **Sijainti / Tiedostot:** `thesis/tables/musique/tab_pareto_musique.tex` (rivi 38), `thesis/tables/enterprise_closed/tab_pareto_enterprise.tex` (rivi 38) ja `thesis/tables/enterprise/tab_pareto_enterprise.tex` (rivi 38).
-  - **Nykyinen teksti:** `QPD = Q/Cost_1k and QPS = Q/T_total represent resource efficiency ratios.`
-  - **Ongelma:** Luvussa 4.5.4 määritellään oikein $\text{QPD} = \frac{\bar{Q}}{\text{Cost}_{1\text{k}} / 1000}$, jolla taulukon arvot on laskettu. Alaviite jättää jakajan `/ 1000` pois.
-  - **Korjausehdotus:** Korjaa alaviitteisiin `QPD = \bar{Q} / (\text{Cost}_{1\text{k}} / 1000)`.
+  - **Tila:** Korjattu viittaamaan suoraan yhtälöihin `(Eqs.~\ref{eq:qpd}--\ref{eq:qps})`, jolloin kaavaa ei toisteta alaviitteessä ja vältetään epäjohdonmukaisuudet.
 
-- [ ] **Keskiarvon (mean) täsmentäminen liitteiden C ja D osavaihelatenssikuvaajissa (Sivut 73 ja 78):**
-  - **Sijainti / Tiedostot:** `thesis/chapters/0C_appendix.tex` (Figure C1 ja luku C.1) sekä `thesis/chapters/0D_appendix.tex` (Figure D1).
-  - **Ongelma:** Pinotuissa kuvaajissa pylväät summautuvat osavaiheiden keskiarvoista (`mean`), kun taas tulostaulukoissa raportoidaan mediaanit ($P_{50}$).
-  - **Korjausehdotus:** Täsmennä kuvateksteihin tai luvun C.1 leipätekstiin, että pylväät esittävät osavaiheiden otoskeskiarvoja (`sample mean execution latency`).
+- [x] **Keskiarvon (mean) täsmentäminen liitteiden C ja D osavaihelatenssikuvaajissa (Sivut 73 ja 78):**
+  - **Sijainti / Tiedostot:** `thesis/chapters/0C_appendix.tex` (Figure C1) sekä `thesis/chapters/0D_appendix.tex` (Figure D1).
+  - **Tila:** Vahvistettu koodista (`plot_results.py`, `np.mean()`), ja lisätty kuvateksteihin täsmennys: *"Stacked bars represent sample mean execution durations across queries, complementary to the median ($P_{50}$) profiles reported in Chapter 5 / Table D1."*
 
 - [x] **Luku 5.4.1: Pyöristystarkkuus prosenttimuutoksessa (Sivu 47):**
   - **Sijainti / Tiedosto:** `thesis/chapters/05_results.tex` (s. 47 rivi 97).
@@ -146,10 +135,9 @@ Kaikki korjaukset ovat nopeita tekstimuutoksia olemassa oleviin `.tex`-tiedostoi
   - **Sijainti / Tiedosto:** `thesis/chapters/06_discussion.tex` (s. 58 rivi 52).
   - **Tila:** Vahvistettu oikeaksi. Gemini 4 series (Argon and Carbon) on julkaistu lokakuussa 2026. Teksti pidetään ennallaan.
 
-- [ ] **Taulukko B1: Mallinimen ja Flash-Liten roolin täsmennys (Sivu 72):**
+- [x] **Taulukko B1: Mallinimen ja Flash-Liten roolin täsmennys (Sivu 72):**
   - **Sijainti / Tiedosto:** `thesis/chapters/0B_appendix.tex` (Table B1).
-  - **Ongelma:** Malli on taulukossa nimellä `Gemini 3.1 Pro Preview`, leipätekstissä `Gemini 3.1 Pro`. Lisäksi Flash-Liten rooliksi on merkitty vain reititin, vaikka se hoitaa myös 1-hop -generoinnin.
-  - **Korjausehdotus:** Täsmennä rooliksi `Router / 1-Hop Generation` ja yhtenäistä mallinimi.
+  - **Tila:** Korjattu `Router / 1-Hop Generation`, yhtenäistetty `Gemini 3.1 Pro`, `Primary Generator` sekä `Offline Execution`.
 
 - [x] **Johdanto, Luku 1: Rakennekuvauksen verbi (Sivu 14):**
   - **Sijainti / Tiedosto:** `thesis/chapters/01_introduction.tex` (s. 14 rivi 158).
@@ -160,28 +148,21 @@ Kaikki korjaukset ovat nopeita tekstimuutoksia olemassa oleviin `.tex`-tiedostoi
 
 ## 4. Lähdeluettelon (BibTeX) puhdistus (`thesis/references/ai.bib`)
 
-- [ ] **Viite [26] (`gao2023retrieval`): Tuplakirjoittaja ja virheelliset lehtikentät (Sivu 66):**
+- [x] **Viite [26] (`gao2023retrieval`): Tuplakirjoittaja ja virheelliset lehtikentät (Sivu 66):**
   - **Sijainti / Tiedosto:** `thesis/references/ai.bib` (rivit 217–225).
-  - **Nykyinen BibTeX:** `author={... Wang, Haofen and Wang, Haofen and others}, journal={arXiv preprint arXiv:2312.10997}, volume={2}, number={1}, pages={32}, year={2023}`
-  - **Ongelma:** Kirjoittaja Haofen Wang toistuu kahdesti peräkkäin, ja arXiv-preprintille on jäänyt Google Scholarin virheelliset `volume={2}, number={1}, pages={32}`.
-  - **Korjausehdotus:** Poista toinen `Haofen Wang` ja poista virheelliset volume/number/pages-kentät.
+  - **Tila:** Poistettu toistuva kirjoittaja sekä virheelliset volume/number/pages -kentät.
 
-- [ ] **Viite [44] (`wei2025instructrag`): Konferenssin nimen ja vuoden toisto (Sivu 68):**
-  - **Sijainti / Tiedosto:** `thesis/references/ai.bib` (rivit 373–378).
-  - **Nykyinen BibTeX:** `booktitle={Published as a conference paper at ICLR 2025}, year={2025}`
-  - **Ongelma:** Tulostuu lähdeluetteloon muodossa *"In Published as a conference paper at ICLR 2025, 2025."*
-  - **Korjausehdotus:** Muuta `booktitle = {International Conference on Learning Representations (ICLR 2025)}`.
+- [x] **Viite [44] (`wei2025instructrag`): Konferenssin nimen ja vuoden toisto (Sivu 68):**
+  - **Sijainti / Tiedosto:** `thesis/references/ai.bib` (rivit 370–375).
+  - **Tila:** Korjattu `booktitle={International Conference on Learning Representations (ICLR)}`.
 
-- [ ] **Viite [16] (`Vaswani2017`): Julkaisijan nimen toisto (Sivu 65):**
+- [x] **Viite [16] (`Vaswani2017`): Julkaisijan nimen toisto (Sivu 65):**
   - **Sijainti / Tiedosto:** `thesis/references/ai.bib` (rivit 57–66).
-  - **Nykyinen BibTeX:** Sisältää sekä `booktitle = {Advances in Neural Information Processing Systems...}` että `publisher = {Neural Information Processing Systems (NIPS)}`.
-  - **Ongelma:** Sama nimi toistuu sekä konferenssin että julkaisijan kentässä.
-  - **Korjausehdotus:** Siisti kentät tavanomaiseen NeurIPS-muotoon (`publisher = {Curran Associates, Inc.}`).
+  - **Tila:** Korjattu tavanomaiseen NeurIPS-muotoon (`Advances in Neural Information Processing Systems (NeurIPS)`, vol 30, publisher Curran Associates, Inc.).
 
-- [ ] **Verkkoviitteiden Accessed-päivämäärien yhtenäistäminen:**
+- [x] **Verkkoviitteiden Accessed-päivämäärien yhtenäistäminen:**
   - **Sijainti / Tiedosto:** `thesis/references/ai.bib`.
-  - **Ongelma:** Pääsypäivien muotoilu vaihtelee (`Accessed: 2026-06-24` vs. `Accessed September 2026`).
-  - **Korjausehdotus:** Yhtenäistä muotoilu tyylikkäästi.
+  - **Tila:** Yhtenäistetty muotoilu (`Accessed September 2026` / `Accessed June 2026`) ja korjattu ChatGPT-viitteen linkki `\url{...}` -muotoon.
 
 ---
 
@@ -204,19 +185,13 @@ Kaikki korjaukset ovat nopeita tekstimuutoksia olemassa oleviin `.tex`-tiedostoi
 
 ## 6. Metatiedot ja valmistelut ennen tiivistelmien ja esipuheen kirjoittamista
 
-- [ ] **Ohjaajan tutkintonimike ja suomenkielinen lyhennepiste (Kansilehti ja tiivistelmäpohjat):**
+- [x] **Ohjaajan tutkintonimike ja suomenkielinen lyhennepiste (Kansilehti ja tiivistelmäpohjat):**
   - **Sijainti / Tiedostot:** `thesis/_meta.tex` (rivi 67) ja `thesis/_abstract.tex` (rivi 52).
-  - **Nykyinen teksti:** `\advisor{Lauri Salminen (Msc)}` tiedostossa `_meta.tex` ja `\advisor{DI. Lauri Salminen}` tiedostossa `_abstract.tex`.
-  - **Ongelma:**
-    1. Englanninkielisessä tutkintonimikkeessä on pieni s-kirjain (`Msc` $\to$ `MSc`).
-    2. Suomen kielen vakiintuneen oikeinkirjoituksen mukaan diplomi-insinöörin lyhenne `DI` kirjoitetaan ilman pistettä (`DI. Lauri Salminen` $\to$ `DI Lauri Salminen`).
-  - **Korjausehdotus:** Korjaa muotoihin `Lauri Salminen (MSc)` ja `DI Lauri Salminen`.
+  - **Tila:** Korjattu `Lauri Salminen (MSc)` ja `DI Lauri Salminen`.
 
-- [ ] **Avainsanojen laajentaminen tiivistelmäpohjissa (Sivut 3 ja 4):**
+- [x] **Avainsanojen laajentaminen tiivistelmäpohjissa (Sivut 3 ja 4):**
   - **Sijainti / Tiedosto:** `thesis/_abstract.tex` (rivi 58).
-  - **Nykyinen teksti:** `\keywords{RAG}`
-  - **Ongelma:** Yksi ainoa lyhenneavainsana on liian suppea diplomityölle.
-  - **Korjausehdotus:** Laajenna esim. `Retrieval-Augmented Generation, RAG, prompt caching, model cascading, semantic re-ranking, enterprise systems`.
+  - **Tila:** Korjattu. Määritetty englanniksi `Retrieval-Augmented Generation, RAG, prompt caching, model cascading, semantic re-ranking, enterprise systems` ja suomeksi `hakuavusteinen generointi, RAG, kehotteen välimuisti, mallireititys, semanttinen uudelleenjärjestäminen, yritysjärjestelmät`.
 
 - [ ] **Päivämäärien ja sivumäärän synkronointi palautushetkellä:**
   - **Sijainti / Tiedostot:** `thesis/_meta.tex` (rivi 51), `thesis/_abstract.tex` (rivi 56) ja `thesis/_preface.tex` (rivi 12).

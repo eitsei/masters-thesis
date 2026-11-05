@@ -703,8 +703,11 @@ def export_quality_enterprise_latex(
         summaries[name] = summarize_run_records(recs)
 
     n_samples = int(next(iter(summaries.values()))["count"]) if summaries and next(iter(summaries.values())) else 100
+    is_raw = "raw" in label.lower() or (target_path.parent.name == "enterprise")
+    short_target = "raw Enterprise corpus" if is_raw else "Enterprise Closed"
+    long_corpus = "unconstrained raw Enterprise Knowledge Corpus" if is_raw else "Enterprise Knowledge Corpus"
     if caption is None or "$N = 100$" in caption:
-        caption = f"Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline architectures on the Enterprise Knowledge Corpus ($N = {n_samples}$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline."
+        caption = f"Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline architectures on the {long_corpus} ($N = {n_samples}$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline."
 
     best_q = max((s["composite_q_mean"] for s in summaries.values() if s), default=0.0)
 
@@ -714,7 +717,7 @@ def export_quality_enterprise_latex(
         r"\scriptsize",
         r"\renewcommand{\arraystretch}{0.93}",
         r"\setlength{\tabcolsep}{2.2pt}",
-        f"\\caption{{{caption}}}",
+        f"\\caption[Retrieval and generation quality metrics on {short_target}]{{{caption}}}",
         f"\\label{{{label}}}",
         r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c c c @{}}",
         r"\toprule",
@@ -825,10 +828,13 @@ def export_latency_latex(
             all_ttft_zero = False
             break
 
+    is_raw = "raw" in label.lower() or (target_path.parent.name == "enterprise" and "closed" not in dataset_name.lower())
+    short_target = "raw Enterprise corpus" if is_raw else dataset_name
+    long_target = "the unconstrained raw Enterprise corpus ($N = 100$)" if is_raw else dataset_name
     if caption is None:
         caption = (
             f"End-to-end execution latency and Time-to-First-Token (TTFT) across 16 pipeline architectures "
-            f"on {dataset_name}. Statistical significance flags denote Holm-Bonferroni-adjusted paired "
+            f"on {long_target}. Statistical significance flags denote Holm-Bonferroni-adjusted paired "
             f"Wilcoxon signed-rank tests against the naive baseline."
         )
 
@@ -838,7 +844,7 @@ def export_latency_latex(
         r"\footnotesize",
         r"\renewcommand{\arraystretch}{0.93}",
         r"\setlength{\tabcolsep}{3.5pt}",
-        f"\\caption{{{caption}}}",
+        f"\\caption[Execution latency and TTFT profiles on {short_target}]{{{caption}}}",
         f"\\label{{{label}}}",
         r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l r r r r r @{}}",
         r"\toprule",
@@ -953,9 +959,12 @@ def export_cost_latex(
     base_summary = summaries.get(baseline_key) if baseline_key else None
     base_cost_1k = (base_summary["cost_mean"] * 1000.0) if base_summary else 0.0
 
+    is_raw = "raw" in label.lower() or (target_path.parent.name == "enterprise" and "closed" not in dataset_name.lower())
+    short_target = "raw Enterprise corpus" if is_raw else dataset_name
+    long_target = "the unconstrained raw Enterprise corpus ($N = 100$)" if is_raw else dataset_name
     if caption is None:
         caption = (
-            f"Operational cost and token consumption breakdown across 16 pipeline architectures on {dataset_name}. "
+            f"Operational cost and token consumption breakdown across 16 pipeline architectures on {long_target}. "
             f"Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline."
         )
 
@@ -965,7 +974,7 @@ def export_cost_latex(
         r"\footnotesize",
         r"\renewcommand{\arraystretch}{0.93}",
         r"\setlength{\tabcolsep}{3.5pt}",
-        f"\\caption{{{caption}}}",
+        f"\\caption[Operational expenditure and token dynamics on {short_target}]{{{caption}}}",
         f"\\label{{{label}}}",
         r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l r r r r r @{}}",
         r"\toprule",
@@ -1097,7 +1106,7 @@ def export_quality_musique_latex(
         r"\scriptsize",
         r"\renewcommand{\arraystretch}{0.93}",
         r"\setlength{\tabcolsep}{1.2pt}",
-        f"\\caption{{{caption}}}",
+        f"\\caption[Retrieval and generation quality metrics on {dataset_name}]{{{caption}}}",
         f"\\label{{{label}}}",
         r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c c c c @{}}",
         r"\toprule",
@@ -1215,10 +1224,13 @@ def export_pareto_latex(
         if not dominated:
             pareto_optimal_set.add(name_a)
 
+    is_raw = "raw" in label.lower() or (target_path.parent.name == "enterprise" and "closed" not in dataset_name.lower())
+    short_target = "raw Enterprise corpus" if is_raw else dataset_name
+    long_target = "the unconstrained raw Enterprise corpus ($N = 100$)" if is_raw else dataset_name
     if caption is None:
         caption = (
             f"Multi-objective Pareto efficiency and 3D non-domination trade-off metrics across "
-            f"16 pipeline architectures on {dataset_name}."
+            f"16 pipeline architectures on {long_target}."
         )
 
     latex_lines = [
@@ -1227,7 +1239,7 @@ def export_pareto_latex(
         r"\footnotesize",
         r"\renewcommand{\arraystretch}{0.93}",
         r"\setlength{\tabcolsep}{3.5pt}",
-        f"\\caption{{{caption}}}",
+        f"\\caption[Multi-objective Pareto efficiency metrics on {short_target}]{{{caption}}}",
         f"\\label{{{label}}}",
         r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c r r r r c @{}}",
         r"\toprule",

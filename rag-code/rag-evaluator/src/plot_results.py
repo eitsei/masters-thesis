@@ -519,7 +519,7 @@ def plot_latency_breakdown(
             {"key": "gen", "label": "Generation ($T_{\\text{gen}}$)", "color": "#e67e22", "values": gen_means},
         ]
 
-    fig, ax = plt.subplots(figsize=(9.0, 4.8), dpi=300)
+    fig, ax = plt.subplots(figsize=(10.6, 4.25), dpi=300)
     x = np.arange(len(configs))
     width = 0.55
 
@@ -544,18 +544,19 @@ def plot_latency_breakdown(
         ax.annotate(
             f"{tot:.0f} ms",
             xy=(x[i], tot),
-            xytext=(4, 4),
+            xytext=(-2, 5),
             textcoords="offset points",
             ha="left",
             va="bottom",
             fontsize=7.5,
             fontweight="bold",
             rotation=45,
+            bbox=dict(boxstyle="round,pad=0.12", facecolor="white", alpha=0.85, edgecolor="none"),
         )
 
     ax.set_ylabel("Execution Latency (ms)")
     title_suffix = f" for {dataset_name}" if dataset_name else ""
-    ax.set_title(f"End-to-End Latency Micro-Phase Breakdown{title_suffix}", fontweight="bold")
+    ax.set_title(f"End-to-End Latency Micro-Phase Breakdown{title_suffix}", fontweight="bold", pad=48)
     ax.set_xticks(x)
 
     display_labels = [_get_friendly_name_pr(c) for c in configs]
@@ -563,8 +564,10 @@ def plot_latency_breakdown(
 
     ax.set_ylim(0, max_tot * 1.35)
     ax.legend(
-        loc="upper left",
-        framealpha=0.92,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.02),
+        ncol=4,
+        framealpha=0.95,
         facecolor="white",
         edgecolor="#cccccc",
         fontsize=8.5,
@@ -1530,7 +1533,7 @@ def plot_cost_breakdown(
             {"key": "comp", "label": "Generation ($C_{\\text{comp}}$)", "color": "#e67e22", "values": comp_means},
         ]
 
-    fig, ax = plt.subplots(figsize=(9.0, 4.8), dpi=300)
+    fig, ax = plt.subplots(figsize=(10.6, 4.25), dpi=300)
     x = np.arange(len(configs))
     width = 0.55
 
@@ -1555,18 +1558,19 @@ def plot_cost_breakdown(
         ax.annotate(
             f"${tot:.3f}",
             xy=(x[i], tot),
-            xytext=(4, 4),
+            xytext=(-2, 5),
             textcoords="offset points",
             ha="left",
             va="bottom",
             fontsize=7.5,
             fontweight="bold",
             rotation=45,
+            bbox=dict(boxstyle="round,pad=0.12", facecolor="white", alpha=0.85, edgecolor="none"),
         )
 
     ax.set_ylabel("Operational Cost per 1,000 Queries (USD)")
     title_suffix = f" for {dataset_name}" if dataset_name else ""
-    ax.set_title(f"Operational Cost Micro-Phase Breakdown (per 1,000 Queries){title_suffix}", fontweight="bold")
+    ax.set_title(f"Operational Cost Micro-Phase Breakdown (per 1,000 Queries){title_suffix}", fontweight="bold", pad=48)
     ax.set_xticks(x)
 
     display_labels = [_get_friendly_name_pr(c) for c in configs]
@@ -1574,8 +1578,10 @@ def plot_cost_breakdown(
 
     ax.set_ylim(0, max(max_tot * 1.35, 0.01))
     ax.legend(
-        loc="upper left",
-        framealpha=0.92,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.02),
+        ncol=3,
+        framealpha=0.95,
         facecolor="white",
         edgecolor="#cccccc",
         fontsize=8.5,

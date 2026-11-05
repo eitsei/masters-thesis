@@ -1,24 +1,22 @@
 \begin{table}[htbp]
 \centering
-\caption{Operational pricing catalog and cloud tariffs for generative, re-ranking, and embedding services (verified as of September 2026). Generative model tariffs reflect standard pay-as-you-go pricing for $\le 200\text{K}$ input tokens, corresponding to all evaluated multi-hop and enterprise workload requests.}
+\caption[Operational pricing catalog and cloud tariffs]{Operational pricing catalog and cloud tariffs for generative, re-ranking, and embedding services (verified as of September 2026). Generative model tariffs reflect standard pay-as-you-go pricing for $\le 200\text{K}$ input tokens, corresponding to all evaluated multi-hop and enterprise workload requests.}
 \label{tab:pricing_catalog}
-\sffamily
-\footnotesize
 \setlength{\tabcolsep}{3pt}
 \scriptsize
 \begin{tabularx}{\linewidth}{l>{\raggedright\arraybackslash}Xrrrrc}
 \toprule
 \textbf{Model / Service} & \textbf{Pipeline Role} & \makecell[r]{\textbf{Prompt}\\\textbf{(\$/1M)}} & \makecell[r]{\textbf{Cached}\\\textbf{(\$/1M)}} & \makecell[r]{\textbf{Output}\\\textbf{(\$/1M)}} & \makecell[r]{\textbf{Auxiliary}\\\textbf{Unit Rate}} & \textbf{Source} \\
 \midrule
-Gemini 3.5 Flash & Primary Workhorse ($C_0, M_4$) & \$1.50 & \$0.15 & \$9.00 & -- & \citep{GoogleVertexAIPricing} \\
-Gemini 3.5 Flash-Lite & Router Classifier ($M_4$) & \$0.30 & \$0.03 & \$2.50 & -- & \citep{GoogleVertexAIPricing} \\
-Gemini 3.1 Pro Preview & Complex Multi-Hop ($M_4$) & \$2.00 & \$0.20 & \$12.00 & -- & \citep{GoogleVertexAIPricing} \\
+Gemini 3.5 Flash & Primary Generator ($C_0, M_4$) & \$1.50 & \$0.15 & \$9.00 & -- & \citep{GoogleVertexAIPricing} \\
+Gemini 3.5 Flash-Lite & Router / 1-Hop Generation ($M_4$) & \$0.30 & \$0.03 & \$2.50 & -- & \citep{GoogleVertexAIPricing} \\
+Gemini 3.1 Pro & Complex Multi-Hop ($M_4$) & \$2.00 & \$0.20 & \$12.00 & -- & \citep{GoogleVertexAIPricing} \\
 \midrule
 Vertex AI Ranking & Cross-Encoder Re-rank ($M_2$) & -- & -- & -- & \$0.00010/doc & \citep{GoogleVertexAIRankingPricing} \\
 Embeddings for Text & Dense Vectorization & \$0.025 & -- & -- & -- & \citep{GoogleVertexAIPricing} \\
 \midrule
-Qwen3.8-27B & Evaluation Judge (RAGAS) & \multicolumn{3}{c}{\textit{Local Execution}} & \$0.00/query & \citep{yang2025qwen3} \\
-BGE-M3 & Evaluation Embedding & \multicolumn{3}{c}{\textit{Local Execution}} & \$0.00/query & \citep{chen2024bge} \\
+Qwen3.8-27B & Evaluation Judge (RAGAS) & \multicolumn{3}{c}{\textit{Offline Execution}} & \$0.00/query & \citep{yang2025qwen3} \\
+BGE-M3 & Evaluation Embedding & \multicolumn{3}{c}{\textit{Offline Execution}} & \$0.00/query & \citep{chen2024bge} \\
 \bottomrule
 \end{tabularx}
 \vspace{0.5em}

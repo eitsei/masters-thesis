@@ -4,8 +4,8 @@ This appendix presents the comprehensive benchmark evaluation statistics across 
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.75\linewidth]{figures/enterprise/latency_breakdown_enterprise.pdf}
-\caption{Component-wise latency breakdown across all 16 pipeline configurations on the unconstrained raw enterprise corpus, detailing execution duration across retrieval, semantic re-ranking, cache management, and model tier generation phases.}
+\includegraphics[width=0.94\linewidth]{figures/enterprise/latency_breakdown_enterprise.pdf}
+\caption[Component-wise latency breakdown on raw Enterprise corpus]{Component-wise latency breakdown across all 16 pipeline configurations on the unconstrained raw enterprise corpus, detailing execution duration across retrieval, semantic re-ranking, cache management, and model tier generation phases. Stacked bars represent sample mean execution durations across queries, complementary to the median ($P_{50}$) profiles reported in Table~\ref{tab:latency_enterprise_raw}.}
 \label{fig:latency_breakdown_enterprise_raw}
 \end{figure}
 
@@ -14,8 +14,8 @@ This appendix presents the comprehensive benchmark evaluation statistics across 
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.75\linewidth]{figures/enterprise/cost_breakdown_enterprise.pdf}
-\caption{Component-wise operational expenditure breakdown per 1,000 queries across all 16 pipeline configurations on the unconstrained raw enterprise corpus, detailing monetary expenditure across uncached context prefill, context cache lookups, generative completion, and auxiliary neural re-ranking services.}
+\includegraphics[width=0.94\linewidth]{figures/enterprise/cost_breakdown_enterprise.pdf}
+\caption[Component-wise operational expenditure breakdown on raw Enterprise corpus]{Component-wise operational expenditure breakdown per 1,000 queries across all 16 pipeline configurations on the unconstrained raw enterprise corpus, detailing monetary expenditure across uncached context prefill, context cache lookups, generative completion, and auxiliary neural re-ranking services.}
 \label{fig:cost_breakdown_enterprise_raw}
 \end{figure}
 
@@ -25,7 +25,7 @@ This appendix presents the comprehensive benchmark evaluation statistics across 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/enterprise/quality_lollipop_enterprise.pdf}
-\caption{Multi-dimensional response quality profiles across architectural configurations on the unconstrained raw enterprise corpus, comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy across architectural tiers ($k=0 \dots 4$). Horizontal lollipop plots with tier-stratified background shading isolate configuration-level variations.}
+\caption[Multi-dimensional response quality profiles on raw Enterprise corpus]{Multi-dimensional response quality profiles across architectural configurations on the unconstrained raw enterprise corpus, comparing Context Precision, Context Recall, Faithfulness, and Answer Relevancy across architectural tiers ($k=0 \dots 4$). Horizontal lollipop plots with tier-stratified background shading isolate configuration-level variations.}
 \label{fig:quality_lollipop_enterprise_raw}
 \end{figure}
 
@@ -35,6 +35,6 @@ This appendix presents the comprehensive benchmark evaluation statistics across 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.90\linewidth]{figures/enterprise/pareto_frontier_enterprise.pdf}
-\caption{Empirical Pareto frontier of Composite Quality ($Q$) versus median end-to-end execution latency ($T_{\text{total}}\ P_{50}$) and operational expenditure ($\text{Cost}_{1\text{k}}$) on the unconstrained raw enterprise corpus. Solid lines delineate the non-dominated empirical Pareto frontier across configurations.}
+\caption[Empirical Pareto frontier on raw Enterprise corpus]{Empirical Pareto frontier of Composite Quality ($Q$) versus median end-to-end execution latency ($T_{\text{total}}\ P_{50}$) and operational expenditure ($\text{Cost}_{1\text{k}}$) on the unconstrained raw enterprise corpus. Solid lines delineate the non-dominated empirical Pareto frontier across configurations.}
 \label{fig:pareto_frontier_enterprise_raw}
 \end{figure}
