@@ -9,28 +9,13 @@
 %% Abstract keywords
 \keywords{Retrieval-Augmented Generation, RAG, prompt caching, model cascading, semantic re-ranking, enterprise systems}
 \begin{abstractpage}[english]
-  The abstract is a short description of the essential contents of the thesis,
-  usually in one paragraph: what was studied and how and what were the main
-  findings.
+Retrieval augmented generation is widely used method for enriching generative AI applications in enterprise context. It has couple of major disadvantages, such as hallucination and high costs. This thesis examines four distinct methods to optimize the RAG pipeline and those methods are measured against optimal combination of latency, costs and quality. Studied methods are Prompt caching, semantic re-ranking, small-to-big retireval and model cascading. 
 
-  For a Finnish thesis, the abstract should be written in both Finnish and
-  English; for a Swedish thesis, in Swedish and English. The abstracts for
-  English theses written by Finnish or Swedish speakers should be written in
-  English and either in Finnish or in Swedish, depending on the student’s
-  language of basic education. Students educated in languages other than Finnish
-  or Swedish write the abstract only in English. Students may include a second
-  or third abstract in their native language, if they wish.
+The main contribution is to test all of the tested both, in isolation, as well as in combination using enterprise ready frameworks such as Java and Spring AI. In addition, tests were ran using commercial Large Language Model API endpoints in cloud platform. All the optimization methods were ran against two distinct dataset. The first dataset is an academic benchmark for RAG applications, and the second one is curated enterprise customer support system dataset.
 
-  The abstract text of this thesis is written on the readable abstract page as
-  well as into the pdf file's metadata via the \verb+\thesisabstract+ macro
-  (see comment in this \TeX{} file above). Write here the text that goes onto
-  the readable abstract page. You can have special characters, linebreaks, and
-  paragraphs here. Otherwise, this abstract text must be identical to the
-  metadata abstract text.
-  
-  If your abstract does not contain special characters and it does not require
-  paragraphs, you may take advantage of the \verb+\abstracttext+ macro (see the
-  comment in this \TeX{} file below).
+The main cost reduction driver is prompt caching, which provides exceptional cost benefits both in isolation as well as a part of the combination. Interestingly, none of the studied methods reduced latency, but had only increasing impact. Pareto optimal combination on both quality per dollar and quality per second for both datasets is Small-to-Big retrieval combined with the prompt caching. Small-to-big drives the quality up, while the prompt caching reduces the costs.
+
+If only the costs are the only prompt caching combined with the model cascading is the most optimal strategy for enterprise dataset. Mainly, model cascading works best on enterprise dataset, where its cheaper variants can be used more often, while on more complex academic benchmark, it acted as a cost increase. The semantic re-ranking did not provide any meaningful benefits on quality per dollar or second. The findings provides useful indications for enterprise architects, when optimizing generative AI applications in enterprise systems.  
 \end{abstractpage}
 
 %% The text in the \thesisabstract macro is stored in the macro \abstractext, so
