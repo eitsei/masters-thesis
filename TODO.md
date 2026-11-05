@@ -196,3 +196,117 @@ Kaikki korjaukset ovat nopeita tekstimuutoksia olemassa oleviin `.tex`-tiedostoi
 - [ ] **Päivämäärien ja sivumäärän synkronointi palautushetkellä:**
   - **Sijainti / Tiedostot:** `thesis/_meta.tex` (rivi 51), `thesis/_abstract.tex` (rivi 56) ja `thesis/_preface.tex` (rivi 12).
   - **Huomio:** Päivitetään vastaamaan virallista jättöpäivämäärää, ja varmistetaan templateen tulostuva sivumäärä (`69+13`).
+
+---
+
+# Ohjaajan huomiot ja tarkastuslista (Advisor Feedback)
+
+Tämä osio sisältää ohjaajan lukemisen perusteella antamat huomiot ja toimenpide-ehdotukset. Aliagentit tarkastivat työn tiedostot (`thesis/`) kohta kohdalta (tilanne 5.11.2026). Alla on kunkin kohdan varmistettu nykytila ja tarkka sijainti.
+
+## 1. Kriittiset korjaukset (Showstoppers)
+
+- [ ] **Tiivistelmät ovat LaTeX-pohjan ohjetekstejä (sivut 3 & 4):**
+  - **Kuvaus:** Englanninkielinen Abstract (s. 3) ja suomenkielinen Tiivistelmä (s. 4) sisältävät Aallon LaTeX-pohjan ohjetekstit.
+  - **Sijainti:** `thesis/_abstract.tex` (rivit 11–34 ja 62–81).
+  - **Tila:** **Vaatii toimenpiteitä.** Molemmat tiivistelmät sisältävät edelleen Aallon pohjan ohjetekstin sanasta sanaan. Varsinaiset tiivistelmätekstit on kirjoitettava ennen lopullista palautusta.
+  - *Huom (Avainsanat):* Avainsanat on sen sijaan jo määritelty ja kunnossa (`_abstract.tex` rivit 10 ja 60).
+
+- [ ] **Projektin GitHub-repositorion toimimaton linkki (s. 70, alaviite):**
+  - **Kuvaus:** Alaviite viittaa osoitteeseen `https://github.com/eitsei/dippa`, joka palauttaa HTTP 404 (repo on yksityinen tai osoite puuttuu).
+  - **Sijainti:** `thesis/chapters/0A_appendix.tex` (rivi 1, Liite A; tulostuu PDF:n sivulle 70 nykyisin alaviitteenä 6).
+  - **Tila:** **Vaatii toimenpiteitä.** Osoite on edelleen `https://github.com/eitsei/dippa` ja palauttaa 404. Repositorio tulee asettaa julkiseksi tai linkki korjata ennen arkistointia.
+
+- [x] **Ohjaajan nimen ja akateemisen arvon muotoilu:**
+  - **Sijainti:** `thesis/_meta.tex` (rivi 67), `thesis/_abstract.tex` (rivi 54), `thesis/_preface.tex` (rivi 6).
+  - **Tila:** **Korjattu.**
+    - [x] Suomenkielinen arvo (`thesis/_abstract.tex#L54`): `\advisor{DI Lauri Salminen}` (ilman pistettä DI:n perässä).
+    - [x] Englanninkielinen arvo (`thesis/_meta.tex#L67`): Päivitetty muotoon `\advisor{Lauri Salminen (M.Sc. (Tech.))}`.
+    - [x] Esipuhe (`thesis/_preface.tex#L6`): Päivitetty muotoon *"my advisor Lauri Salminen"*.
+
+## 2. Sisällölliset ja faktuaaliset epäjohdonmukaisuudet (Content & Factual Inconsistencies)
+
+- [x] **Tuomarimallin (Qwen) suorituspaikka: kannettava vs. CSC-palvelimet:**
+  - **Sijainti:** `thesis/chapters/04_research_methods.tex` (rivit 82, 150, 300, 302) ja `thesis/chapters/06_discussion.tex` (rivi 60).
+  - **Tila:** **Korjattu.** Commit `c021e46` yhdenmukaisti luvun 4 luvun 6.5 kanssa. Tekstissä todetaan nyt eksplisiittisesti, että Qwen3.8-27B ajettiin vLLM:llä offline CSC:n laskentapalvelimilla, kun taas kannettavalla tietokoneella (Intel Core Ultra 7, 32 GB RAM) ajettiin vain paikallinen PostgreSQL/pgvector ja Java-testisovellus. *(Pieni tyylihuomio: Luvussa 6.5 rivillä 60 sanapari "hosting the judge locally" viittaa lokaaliin vastakohtana kaupallisille pilvi-API:lle, mutta voidaan selkeyttää muotoon "offline / on-premise".)*
+
+- [x] **Faithfulness- ja hylkäyslukujen ristiriita luvussa 6.3 vs. Taulukko 10:**
+  - **Sijainti:** `thesis/chapters/06_discussion.tex` (rivi 32) vs. `thesis/tables/enterprise_closed/tab_quality_enterprise.tex` (Taulukko 10).
+  - **Tila:** **Korjattu.** Luvun 6.3 tekstiä täsmennettiin ankkuroimalla mallikohtaiset luvut Taulukon 10 taustalla oleviin evaluointilokeihin (`query-level evaluation logs underlying Table~\ref{tab:quality_enterprise} reveal that...`). Mallikohtaiset Faithfulness-luvut (Flash-Lite 0.929 $\to$ 0.849, putken Faithfulness 0.780) ja hylkäysluvut (Pro 50.0 %, koko putken FRR 17.5 %; S2B + MC Flash-Lite 2.4 %, koko putken FRR 11.2 %) auditoitiin suoraan JSONL-raaka-ajoista ja kytkettiin eksplisiittisesti toisiinsa.
+
+- [x] **Metriikan nimen epäjohdonmukaisuus: "Answer Relevance" vs. "Answer Relevancy":**
+  - **Sijainti:** `thesis/chapters/01_introduction.tex` (rivi 150, Taulukko 1) ja `thesis/chapters/07_conclusion.tex` (rivi 13, RQ3-kappale) vs. muu teksti.
+  - **Tila:** **Korjattu.** Termi korjattiin yhtenäiseen RAGAS-muotoon "Answer Relevancy" sekä johdannon tutkimuskysymystaulukossa (`01_introduction.tex#L150`) että johtopäätöksissä (`07_conclusion.tex#L13`).
+
+- [x] **Mallien nimien täsmällisyys (Qwen ja Gemini 3.8 Flash):**
+  - **Sijainti:** `thesis/chapters/04_research_methods.tex` (rivit 84, 143, 150, 302), `thesis/chapters/06_discussion.tex` (rivi 60), `thesis/chapters/0B_appendix.tex` (Taulukko B1) ja `thesis/chapters/0A_appendix.tex` (rivi 5).
+  - **Tila:** **Korjattu.**
+    - Gemini 3.8 Flashin rooli synteettisen aineiston luonnissa ja validoinnissa täsmennettiin luvussa 4.4 (`04_research_methods.tex#L143`) korostaen sen käyttöä puhtaasti offline-vaiheessa erillään ajonaikaisista generointimalleista.
+    - Qwen3.8-27B säilytettiin nykyisellään, todettu riittäväksi.
+
+## 3. Rakenteelliset ja taitolliset korjaukset (Structural & Formatting)
+
+- [x] **Kuvaluettelon puuttuminen (\listoffigures):**
+  - **Sijainti:** `thesis/_main.tex` (rivit 364–367).
+  - **Tila:** **Korjattu.** Commit `1de2f9b` lisäsi komennon `\listoffigures` ja rekisteröinnin sisällysluetteloon välittömästi taulukkoluettelon (`\listoftables`) perään sivulle 10.
+
+- [x] **Luku- vs. alalukutermit johdannossa (Chapter vs. Section s. 14):**
+  - **Sijainti:** `thesis/chapters/01_introduction.tex` (rivi 158).
+  - **Tila:** **Korjattu.** Pääluokkiin viitataan nyt muodossa `Chapter~\ref{...}`, ja samalla lauseen puhekielinen alku ("briefly explains what LLMs and RAG are") päivitettiin akateemisen täsmälliseen muotoon.
+
+- [x] **Selittävän leipätekstin puuttuminen Liitteessä D (sivut 77–82):**
+  - **Sijainti:** `thesis/chapters/0D_appendix.tex`.
+  - **Tila:** **Korjattu.** Liitteeseen D lisättiin aliluvut (D.1 Latency, D.2 Cost, D.3 Quality, D.4 Pareto) ja selittävä leipäteksti, joka esittelee taustakohinan merkityksen ja viittaa eksplisiittisesti kaikkiin taulukoihin (D1–D4) ja kuvaajiin (D1–D4).
+
+- [x] **Puuttuvat välilyönnit kuvateksteissä ja leipätekstissä:**
+  - **Sijainti:** `thesis/chapters/0C_appendix.tex` (rivit 32, 70), `thesis/chapters/0D_appendix.tex` (rivi 28) ja lukujen leipätekstit.
+  - **Tila:** **Korjattu / Kunnossa.** Tarkastuksessa vahvistettiin, että lähdekoodi ja käännetty PDF ovat puhtaita:
+    - Figure C4: `\caption[Multi-dimensional...]{...}` tulostuu oikein välilyönnillä ("Figure C4: ").
+    - Figure D3: Tulostuu oikein välilyönnillä ("Figure D3: ").
+    - S. 74: `Figure~\ref{fig:cost_breakdown_combined} presents...` sisältää asianmukaisen välin ("Figure C2 presents...").
+    - Kaikki 13 liiteviittausta käyttävät muotoa `Appendix~\ref{...}` ("Appendix B", "Appendix C", "Appendix D").
+
+- [x] **Lähdeluettelon URL-rivitys ja \usepackage{xurl} (sivut 64–69):**
+  - **Sijainti:** `thesis/_main.tex` (rivi 214).
+  - **Tila:** **Korjattu.** `\usepackage{xurl}` siirrettiin ladattavaksi ennen `\usepackage{hyperref}` -komentoa, mikä mahdollistaa URL-osoitteiden luonnollisen katkeamisen kauttaviivoista ilman tavuviivoja.
+
+- [x] **Lähdeviitteiden korjaukset ([12], [15], [26], [44]):**
+  - **Sijainti:** `thesis/references/ai.bib`.
+  - **Tila:** **Korjattu.**
+    - [x] **[12] `asunmaa2025large`:** Kenttä `url` korvattu muodolla `note = {\url{...}}` yhteenkirjoitusongelman poistamiseksi.
+    - [x] **[15] `radford2019language`:** Lisätty `journal = {OpenAI Technical Report}`.
+    - [x] **[26] `gao2023retrieval`:** Toistuva kirjoittaja poistettu (commit `1de2f9b`).
+    - [x] **[44] `wei2025instructrag`:** Toisteinen konferenssikuvaus korjattu (commit `1de2f9b`).
+
+## 4. Matemaattiset merkinnät ja yhtälöt (Mathematical Notations & Equations)
+
+- [x] **Yhtälöt (1) & (2) vs. kehote-notaatio P(q, R_q):**
+  - **Sijainti:** `thesis/chapters/02_technical_background.tex` (rivit 31–38) ja `thesis/chapters/03_literature_review.tex` (rivi 71).
+  - **Tila:** **Päätetty pitää ennallaan.** Nykyinen notaatio $G(q, R_q) = a$ todettu riittäväksi.
+
+- [x] **Notaatiovaihdos Yhtälössä (7):**
+  - **Sijainti:** `thesis/chapters/03_literature_review.tex` (rivi 47).
+  - **Tila:** **Korjattu.** Hakuoperaattori yhtenäistettiin muotoon $\text{Ret}_{K_1}(q, D) = C_1$ luvun 2 ja alaluvun 3.2 notaation mukaisesti.
+
+- [x] **Yhtälön (14) terminologia (s. 31):**
+  - **Sijainti:** `thesis/chapters/04_research_methods.tex` (rivi 178).
+  - **Tila:** **Korjattu.** Saatesanat muotoiltiin toiston poistamiseksi muotoon *"The total monetary cost, denoted as $\text{Cost}(q)$, for processing query $q$ is formally defined as:"*.
+
+## 5. Sanasto, lyhenteet ja otsikot (Glossary, Abbreviations & Headings)
+
+- [x] **Alaluvun 2.1 otsikon yhdysviiva (sivut 7, 15):**
+  - **Sijainti:** `thesis/chapters/02_technical_background.tex` (rivi 3).
+  - **Tila:** **Korjattu.** Otsikko on `\subsection{Large Language Models}` ilman yhdysviivaa (korjattu commitissa `c021e46`).
+
+- [x] **Puuttuvat lyhenteet lyhenneluettelosta (s. 11):**
+  - **Sijainti:** `thesis/_abbreviations.tex`.
+  - **Tila:** **Korjattu.** Sivun 11 sivubudjetin ja taiton säilyttämiseksi lisättiin 7 keskeisintä tutkimusalan lyhennettä (BLEU, CSC, ICL, NDCG, NLP, PLM, ROUGE) ja karsittiin yleiset laitteistolyhenteet (SSD, NVMe, DRAM, TPU, jne.), jolloin lista mahtuu täydellisesti yhdelle sivulle (37 riviä).
+
+## 6. Kieliasu, tyyli ja akateeminen sävy (Grammar, Style & Tone)
+
+- [x] **Puhekieliset ilmaisut:**
+  - **Sijainti:** `thesis/chapters/01_introduction.tex` (rivi 158) ja `thesis/chapters/02_technical_background.tex` (rivit 1, 11, 17, 27).
+  - **Tila:** **Korjattu.** Kaikki 5 ohjaajan esille nostamaa kohtaa päivitettiin täsmälliseen akateemiseen rekisteriin (mm. "plain vanilla RAG" korvattiin työn vakiintuneella muodolla "naive RAG", "they are not perfect" muotoon "they exhibit critical architectural and operational limitations", jne.).
+
+- [x] **Subjekti-verbi -yhteensopivuus viittausten kanssa (Subject–Verb Agreement):**
+  - **Sijainti:** `thesis/chapters/03_literature_review.tex` (rivit 18, 38–39, 61).
+  - **Tila:** **Korjattu.** Kaikki 3 viittauksen verbin yhteensopivuusvirhettä korjattiin (Jeong et al. report, LogicRAG doubles, Moreira et al. report).
