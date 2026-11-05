@@ -7,15 +7,15 @@
 %% well.
 %%
 %% Abstract keywords
-\keywords{Retrieval-Augmented Generation, RAG, prompt caching, model cascading, semantic re-ranking, enterprise systems}
+\keywords{Retrieval-Augmented Generation, RAG, Small-to-Big retrieval, prompt caching, model cascading, semantic re-ranking, enterprise systems}
 \begin{abstractpage}[english]
-Retrieval augmented generation is widely used method for enriching generative AI applications in enterprise context. It has couple of major disadvantages, such as hallucination and high costs. This thesis examines four distinct methods to optimize the RAG pipeline and those methods are measured against optimal combination of latency, costs and quality. Studied methods are Prompt caching, semantic re-ranking, small-to-big retireval and model cascading. 
+Retrieval-Augmented Generation (RAG) is an established architectural paradigm for enriching generative artificial intelligence with external enterprise documentation, yet production deployments remain constrained by systemic trade-offs between operational costs, execution latency, and hallucination risks. 
 
-The main contribution is to test all of the tested both, in isolation, as well as in combination using enterprise ready frameworks such as Java and Spring AI. In addition, tests were ran using commercial Large Language Model API endpoints in cloud platform. All the optimization methods were ran against two distinct dataset. The first dataset is an academic benchmark for RAG applications, and the second one is curated enterprise customer support system dataset.
+This thesis investigates modular pipeline optimizations---specifically prompt caching, semantic re-ranking, Small-to-Big retrieval, and model cascading---benchmarking their effects both in isolation and in combination. The pipelines are implemented using enterprise frameworks with Java and Spring AI connected to commercial cloud foundation models, and evaluated on an academic multi-hop benchmark alongside a curated enterprise customer support corpus, with generation quality and contextual precision systematically evaluated using multi-dimensional retrieval metrics.
 
-The main cost reduction driver is prompt caching, which provides exceptional cost benefits both in isolation as well as a part of the combination. Interestingly, none of the studied methods reduced latency, but had only increasing impact. Pareto optimal combination on both quality per dollar and quality per second for both datasets is Small-to-Big retrieval combined with the prompt caching. Small-to-big drives the quality up, while the prompt caching reduces the costs.
+Empirical findings demonstrate that prompt caching is the primary driver of cost reduction, whereas modular optimizations generally introduce computational overhead rather than reducing median latency. Small-to-Big retrieval combined with prompt caching establishes the most balanced Pareto-optimal configuration across both environments, elevating response quality while securing substantial cost savings. 
 
-If only the costs are the only prompt caching combined with the model cascading is the most optimal strategy for enterprise dataset. Mainly, model cascading works best on enterprise dataset, where its cheaper variants can be used more often, while on more complex academic benchmark, it acted as a cost increase. The semantic re-ranking did not provide any meaningful benefits on quality per dollar or second. The findings provides useful indications for enterprise architects, when optimizing generative AI applications in enterprise systems.  
+When minimizing expenditure is the primary goal, model cascading combined with prompt caching provides the most economical strategy for enterprise queries by routing routine tasks to lightweight models, whereas complex reasoning escalates costs. Furthermore, semantic re-ranking offers limited benefit on curated data, but serves as an essential noise filter in unconstrained repositories. These findings provide practical architectural guidelines for balancing latency, cost, and output quality in production enterprise systems.
 \end{abstractpage}
 
 %% The text in the \thesisabstract macro is stored in the macro \abstractext, so
@@ -37,30 +37,19 @@ If only the costs are the only prompt caching combined with the model cascading 
 \thesistitle{Context is king - Retrieval-Augmented Generation in enterprise-ready systems}
 \supervisor{Prof. Petri Vuorimaa}
 \advisor{DI Lauri Salminen}
-\degreeprogram{Computer, Communication and Information Sciences}
-\major{Computer Science}
+\degreeprogram{Computer, Communication and Information Sciences -koulutusohjelma}
+\major{Tietotekniikka}
 \collaborativepartner{Nordea Bank Oyj}
 \date{30.6.2026}
 %% The keywords need not be separated by \spc now.
-\keywords{hakuavusteinen generointi, RAG, kehotteen välimuisti, mallireititys, semanttinen uudelleenjärjestäminen, yritysjärjestelmät}
+\keywords{hakuavusteinen generointi, RAG, Small-to-Big-haku, kehotevälimuisti, mallireititys, semanttinen uudelleenjärjestäminen, yritysjärjestelmät}
 %% Abstract text
 \begin{abstractpage}[finnish]
-Tiivistelmä on lyhyt kuvaus työn keskeisestä sisällöstä usein yhtenä kappaleena:
-mitä tutkittiin ja miten sekä mitkä olivat tärkeimmät tulokset. Suomenkielisen
-opinnäytteen tiivistelmä kirjoitetaan suomeksi ja englanniksi ja ruotsinkielisen
-vastaavasti ruotsiksi ja englanniksi. Suomen- tai ruotsinkielisten
-opiskelijoiden, joiden opinnäytteen kieli on englanti, tulee kirjoittaa
-tiivistelmänsä englanniksi ja koulusivistyskielellään. Muiden kuin
-koulusivistyskieleltään suomen- tai ruotsinkielisten tulee kirjoittaa
-tiivistelmänsä vain englanniksi. Opiskelija voi halutessaan lisätä
-opinnäytteeseensä toisen tai kolmannen tiivistelmän omalla äidinkielellään.
-Tämän opinnäytteen tiivistelmäteksti kirjoitetaan opinnäytteen luettavan osan
-lomakkeen lisäksi myös pdf-tiedoston metadataan. Kirjoita tähän metadataan
-kirjoitettavaa teksti. Metadatatekstissa ei saa olla erikoismerkkejä,
-rivinvaiho- tai kappaleenjakomerkkiä, joten näitä merkkeja ei saa käyttää tässä.
-Jos tiivistelmäsi ei sisällä erikoimerkkejä eikä kaipaa kappaleenjakoa, voit
-hyödynttää makroa abstracttext luodessasi lomakkeen tiivistelmää (katso
-kommentti tässä TeX-tiedostossa alla). Metadatatiivistelmatekstin on muuten 
-oltava sama kuin lomakkeessa oleva teksti.
+Hakuavusteinen generointi (RAG) on vakiintunut arkkitehtuurimalli, jolla generatiivista tekoälyä rikastetaan ulkoisella yritysdokumentaatiolla. Tuotantokäyttöä rajoittavat kuitenkin kustannusten, suoritusviiveen ja hallusinaatioriskin väliset ristiriidat.
 
+Tämä diplomityö tutkii RAG-putken modulaarisia optimointeja -- kehotevälimuistia, semanttista uudelleenjärjestämistä, Small-to-Big-hakua ja mallireititystä -- sekä yksittäin että yhdistelminä. Ratkaisut toteutettiin Javalla ja Spring AI -kehyksellä kaupallisia pilvikielimalleja hyödyntäen. Menetelmiä arvioidaan moniulotteisilla laatu- ja tarkkuusmittareilla sekä akateemisella monivaiheisen päättelyn aineistolla että kuratoidulla asiakastuen yritysaineistolla.
+
+Tulokset osoittavat, että kehotevälimuisti tuo suurimmat kustannussäästöt, kun taas muut optimoinnit kasvattavat laskentakuormaa lyhentämättä mediaaniviivettä. Small-to-Big-haun ja kehotevälimuistin yhdistelmä muodostaa molemmissa ympäristöissä tasapainoisimman Pareto-optimaalisen kokonaisuuden, joka parantaa vastausten laatua ja tuo merkittäviä säästöjä.
+
+Kun tavoitteena on kulujen minimointi, mallireitityksen ja kehotevälimuistin yhdistelmä on yrityskyselyissä taloudellisin ratkaisu, sillä se ohjaa rutiinikyselyt kevyille malleille ja rajaa kalliimman päättelyn vaativiin tehtäviin. Semanttinen uudelleenjärjestäminen tuo vain vähän lisäarvoa kuratoidussa datassa, mutta toimii välttämättömänä kohinasuodattimena laajoissa tietovarannoissa. Tulokset tarjoavat käytännön suuntaviivoja viiveen, kustannusten ja laadun tasapainottamiseen yritysjärjestelmissä.
 \end{abstractpage}
