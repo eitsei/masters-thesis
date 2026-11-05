@@ -1,60 +1,24 @@
-% Template notes:
-% The idea of the conclusion is the opposite of the introduction.
-% Here we literally bring the reader out of the topic, not in.
-% A good way to write conclusion is to start by reminding the reader of your research question(s) and then state how your work addressed them.
-% To finish your conclusion, consider open research questions (this can be a list for example).
+This thesis investigated how four distinct RAG optimization methods---Small-to-Big Retrieval, Semantic Re-ranking, Prompt Caching, and Model Cascading---perform in an enterprise production context using production-grade software frameworks. Each of the methods was evaluated from complete isolation to a fully compounded multi-module configuration, with a total of 16 different configurations implemented using Spring AI and the Java programming language. The evaluation was conducted on two complementary corpora: the academic multi-hop corpus MuSiQue and a proprietary enterprise knowledge corpus, capturing both rigorous academic reasoning and real-world production requirements. Pipeline performance was benchmarked across operational latency and query costs, while response quality was systematically measured using regularized RAGAS metrics alongside deterministic Exact Match, token $F_1$, refusal accuracy and false refusal rates. 
 
-% =========================================================================
-% SUOSITELTU KAPPALERAKENNE LUKUUN 7 (Ilman \subsection-otsikoita, ~1.5-2 s.)
-% =========================================================================
-%
-% -------------------------------------------------------------------------
-% 1. KOKOAVA AVAUSKAPPALE (1 kappale)
-% -------------------------------------------------------------------------
-% - Muistuttaa lukijaa työn päätavoitteesta ja kontribuutiosta: neljän
-%   modulaarisen RAG-optimoinnin (Small-to-Big Retrieval, Semantic Re-ranking,
-%   Prompt Caching ja Model Cascading) sekä niiden 16 täysfaktoriaalisen
-%   yhdistelmän (C0...C15) empiirinen arviointi tuotantotason Java / Spring AI
-%   -arkkitehtuurissa akateemisen monihyppyaineiston (MuSiQue) ja aidon
-%   yritystietokannan (Enterprise Closed & Raw) yli.
-%
-% -------------------------------------------------------------------------
-% 2. VASTAUKSET TUTKIMUSKYSYMYKSIIN RQ1–RQ4 (1–2 kappaletta tai \textbf{RQ1...})
-% -------------------------------------------------------------------------
-% - Tiivistää suorat, kvantitatiiviset vastaukset Johdannon tutkimuskysymyksiin
-%   (Table 1, 01_introduction.tex) 2–3 virkkeellä per kysymys:
-%     * RQ1 (Latency): Modulaariset optimoinnit harvoin alentavat mediaanilatenssia
-%       (poikkeuksena S2B + PC MuSiQuessa -8.0 % ja S2B:n kevyt etu yritysdatassa).
-%       PC tuo etä-KV-haun vuoksi ~300 ms mediaanilisän, mutta toimii kriittisenä
-%       P95-häntälatenssin sulakkeena (circuit-breaker, jopa -86 %). MC kasvattaa
-%       latenssia etenkin frontier-mallille reititettäessä.
-%     * RQ2 (Cost): Prompt Caching on tehokkain yksittäinen kustannusvipu
-%       (-70.7 % ... -80.0 %). Yrityskorpuksessa MC kääntää kustannukset laskuun
-%       (-34.2 %), ja yhdistelmä PC + MC saavuttaa jopa 81.3 % säästön ($2.54 / 1k)
-%       sekä kompensoi täysin monivaiheisen haun (S2B + SR) API-kustannukset.
-%     * RQ3 (Quality): Suljetuissa korpuksissa naiivi baseline on vahva, eikä
-%       yksittäinen optimointi ylitä sitä tilastollisesti merkitsevästi; S2B + PC
-%       saavuttaa korkeimman kokonaislaadun (Q = 0.6711) ja 100 % OOD-tarkkuuden.
-%       Suodattamattomassa yrityskannassa (Raw) S2B + SR -yhdistelmä tuottaa
-%       tilastollisesti merkitsevän (+28.1 % ... +28.8 %) laatuparannuksen.
-%     * RQ4 (Interaction & Pareto Equilibrium): Kolme arkkitehtuuria (Baseline,
-%       PC ja S2B + PC) pysyy Pareto-optimaalisina kaikilla korpuksilla. Moduulien
-%       välillä esiintyy vahva synergia-bifurkaatio: S2B suojaa MC:tä kontekstin
-%       pirstaloitumiselta (S2B + MC), kun taas pelkkä re-ranking yhdistettynä
-%       reititykseen (SR + MC) heikentää synteesin luotettavuutta.
-%
-% -------------------------------------------------------------------------
-% 3. JATKOTUTKIMUSAIHEET / FUTURE WORK & LOPETUS (1–2 kappaletta)
-% -------------------------------------------------------------------------
-% - Nostaa esiin keskeiset jatkotutkimussuunnat:
-%     1. Iteratiivinen ja agenttipohjainen monihyppyhaku (multi-step / agentic RAG)
-%        yksivaiheisen (single-shot) haun 3–4 hypyn laatukaton murtamiseksi.
-%     2. Kaksitasoinen välimuistiarkkitehtuuri: mallitason KV-kontekstivälimuistin
-%        (Prompt Caching) yhdistäminen sovellustason semanttiseen vastausvälimuistiin
-%        sekä kustannusten että TTFT-latenssin minimoimiseksi.
-%     3. Monikielinen yritys-RAG (cross-lingual retrieval & synthesis, esim.
-%        pohjoismaiset pankkiaineistot FI/SV/DA/NO/EN) ja dynaaminen palastelu.
-%     4. Monipilvi- ja avoimen lähdekoodin malliperheiden vertailu reitityksessä.
-% - Kokoava lopetusvirke: tasapaino operatiivisen tehokkuuden ja vastausten
-%   luotettavuuden välillä yritystason tekoälyjärjestelmissä.
+The empirical findings address the four primary research questions formulated in Chapter~\ref{sec:introduction}:
+
+\paragraph{RQ1: Latency.} \textit{How do small-to-big retrieval, semantic re-ranking, prompt caching, and model cascading affect the latency profile (specifically Time to First Token [TTFT] and overall end-to-end execution latency) of a RAG system?}
+
+Median TTFT and total latency are rarely reduced by the modular optimizations. The only statistically significant median speedup occurred in S2B + PC on MuSiQue ($-8.0\%$, $p < 0.001$), while isolated Small-to-Big retrieval and Semantic Re-ranking yielded modest, non-significant variations on the enterprise closed corpus ($-4.3\%$ and $-1.2\%$, $p \ge 0.05$). Across all other configurations, total latency increased by 2.8\% to 80.0\% on the enterprise closed corpus and 3.6\% to 118.7\% on MuSiQue. Contrary to expectations, isolated prompt caching provided no median latency benefits, primarily due to the $\approx 300\text{--}500$\,ms coordination overhead of remote KV-cache lookups. However, it operated as a crucial circuit-breaker for tail latencies, reducing worst-case cascading execution time by 26.6\,s (falling from 30.9\,s down to 4.3\,s, an 86.1\% reduction).
+
+\paragraph{RQ2: Cost.} \textit{To what extent do these optimization methods reduce the operational cost of the system, accounting for token pricing tiers, prompt caching discounts, and model cascading?}
+
+Prompt caching is the most effective mechanism for reducing operational expenditure, both in isolation and when combined with other modules, delivering a 70.7\%--80.0\% cost reduction through the 90\% cached-token tariff discount. The most economical pipeline on the enterprise closed corpus is prompt caching combined with model cascading (PC + MC), achieving an 81.3\% cost reduction (falling from \$13.580 down to \$2.543 per 1,000 queries), while in MuSiQue prompt caching alone achieved the lowest expenditure, reducing baseline costs by 80.0\% down to \$2.420 per 1,000 queries. It also neutralizes the expense of multi-stage retrieval, for example reducing the cost of S2B + SR from \$19.196 down to \$9.561 per 1,000 queries when caching is added (S2B + SR + PC). Finally, in the enterprise closed corpus, model cascading lowered expenditures by 34.2\% by resolving 49.0\% of queries on Gemini 3.5 Flash-Lite and 38.0\% on Gemini 3.5 Flash (with only 13.0\% escalated to Gemini 3.1 Pro), but it caused a 24.8\% cost inflation on MuSiQue because 77.0\% of complex multi-hop queries were escalated to the frontier tier.
+
+\paragraph{RQ3: Quality.} \textit{How do these optimizations impact retrieval and generation quality (measured by Context Precision, Context Recall, Faithfulness, and Answer Relevancy) compared to a naive RAG baseline?}
+
+In terms of composite quality ($Q$), the naive baseline RAG proves remarkably resilient in curated environments. On MuSiQue, the baseline achieved the highest composite quality overall ($Q = 0.2104$), and on the enterprise closed corpus, it remained highly competitive ($Q = 0.6209$), with none of the 15 evaluated pipelines achieving a statistically significant quality improvement over the baseline ($p \ge 0.05$) in either clean corpus. Across both enterprise corpora, S2B + PC delivered the highest absolute quality score ($Q = 0.6711$ closed, $Q = 0.6633$ raw) while maintaining 100.0\% out-of-domain refusal accuracy. Crucially, in the unconstrained raw enterprise corpus with elevated background noise, semantic re-ranking operated as an essential noise gate: combining Small-to-Big retrieval with re-ranking (S2B + SR and S2B + SR + PC) yielded statistically significant quality improvements of $+28.1\%$ to $+28.8\%$ ($p < 0.01$) over the baseline. 
+
+\paragraph{RQ4: Interaction and Equilibrium.} \textit{How do these optimization methods interact when combined, and what is the optimal equilibrium between latency, cost, and quality in an enterprise customer support system?}
+
+Across the evaluated environments, the 3D Pareto frontier is anchored by three consistently Pareto-optimal architectures: the Naive Baseline, isolated Prompt Caching (PC), and Small-to-Big retrieval with Prompt Caching (S2B + PC), with model cascading configurations (PC + MC and S2B + PC + MC) expanding the cost frontier in enterprise workloads. For enterprise customer support systems, the optimal equilibrium is established by S2B + PC, which maximizes composite quality ($Q \in [0.6633, 0.6711]$) while securing a 63.9\%--78.4\% cost reduction and stabilizing tail latencies. For high-volume deployments prioritizing maximum expenditure reduction, combining prompt caching with model cascading (PC + MC) lowers baseline costs by 81.3\% down to \$2.543 per 1,000 queries (achieving 239 quality points per dollar), provided the $\approx 600$\,ms routing delay is acceptable. Finally, multi-module interactions exhibit a critical synergy bifurcation: while isolated re-ranking compounded with cascading (SR + MC) causes context fragmentation and quality collapse ($Q = 0.5418$), pairing Small-to-Big retrieval with cascading (S2B + MC) preserves document contextual coherence, sustaining quality at $Q = 0.6587$ and protecting lightweight models from hallucinations and false refusals. 
+
+The performance limitations observed on the multi-hop MuSiQue benchmark highlight important avenues for future research. Because single-shot retrieval pipelines cannot resolve disjoint reasoning chains, iterative query decomposition and agentic RAG architectures represent a natural progression for multi-hop synthesis, provided their latency and token costs can be constrained. In addition, prompt caching can be expanded into two-tier caching architectures that combine model-level KV caching with application-level semantic response caching to eliminate both prefill delays and inference costs on recurring queries.
+
+Furthermore, while both benchmarks were evaluated monolingually---English on MuSiQue and Finnish on the enterprise corpus---production enterprise environments frequently require cross-lingual retrieval and multilingual synthesis across disparate regional documentation. Similarly, query routing can be extended beyond public cloud tiers to hybrid architectures that dynamically arbitrate between on-premises open-source models and cloud-hosted frontier LLMs to satisfy strict data sovereignty requirements. In conclusion, engineering enterprise-grade RAG systems is fundamentally an exercise in multi-objective trade-off management: rather than treating optimizations as isolated quality or cost accelerators, system architects must systematically navigate empirical Pareto frontiers to balance latency, operational expenditure, and output quality, delivering reliable and economically sustainable systems in production.
 

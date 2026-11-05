@@ -1,476 +1,61 @@
-% Template notes:
-% The idea of discussion is to bring up points that you noticed during research.
-% As a chapter, this is the most freeform one.
-% A good way to discuss the points is first to write up subtitles with clear statements and then expand on those.
-% Discussion points can occasionally be also in a question format or refer to a larger context beyond the thesis to bring in ideas from other papers to consider.
-% In case your work has limitations that you can observe, it can be a good idea to write a separate section considering those.
+Chapter~\ref{sec:results} presented empirical performance profiles across the sixteen evaluated RAG pipeline configurations. This chapter contextualizes these findings by analyzing the underlying architectural mechanisms, unexpected empirical anomalies, and systemic trade-offs governing enterprise RAG optimization. The remainder of this chapter is structured as follows: Section~\ref{subsec:disc_prompt_caching} opens by investigating prompt caching mechanics alongside observed latency trade-offs, followed by Section~\ref{subsec:disc_model_cascading}, which examines model cascading and the resulting query refusal dynamics. Multi-module synergies and pipeline interactions are subsequently analyzed in Section~\ref{subsec:disc_synergy_bifurcation}, while Section~\ref{subsec:disc_corpus_topology} evaluates corpus topology, retrieval noise thresholds, and practical deployment guidelines. Concluding the chapter, Section~\ref{subsec:disc_limitations} reflects on methodological limitations and identifies primary threats to validity.
 
-% =========================================================================
-% CHAPTER 6 INTRODUCTORY BRIDGE
-% =========================================================================
-% - Lyhyt silta Luvusta 5: Luku 5 esitti empiiriset tulokset 16 konfiguraation
-%   yli; tämä luku purkaa tulosten taustalla olevat tekniset juurisyyt,
-%   moduulien väliset synergiat ja antagonismit, tietokantojen rakenteelliset
-%   erot sekä metodologiset rajoitteet.
-
-
-\subsection{The Prompt Caching Paradox: Latency Inversion versus Tail-Latency Protection}
+\subsection{Prompt Caching Mechanics and Latency Trade-offs}
 \label{subsec:disc_prompt_caching}
 
-% -------------------------------------------------------------------------
-% RAKENNE & YDINPOINTIT (Taso 1: Infrastruktuuri- ja välimuistitason mekanismit)
-% -------------------------------------------------------------------------
-% - Empiirinen ristiriita: Miksi Prompt Caching (M3) ei nopeuttanut mediaanilatenssia
-%   yrityskorpuksessa, vaan hidasti sitä +21.8 % (T_total) ja +37.7 % (TTFT),
-%   ollen hitaampi kuin jopa S2B + SR?
-% - Tekninen juurisyy (T_prefill vs. T_stream): Striimausvaihe pysyy samana, mutta
-%   prefill-vaiheeseen syntyy kiinteä ~300-500 ms koordinointi- ja RPC-viive, kun
-%   Vertex AI hakee ja sitoo hajautetun KV-välimuistitilan TPU-kiihdyttimelle.
-% - Kontekstikoon Break-Even-kynnys: 7 157 tokenin staattinen etuliite ylittää
-%   palveluntarjoajan 4 096 tokenin alarajan, mutta on TPU:n rinnakkaiselle
-%   attention-laskennalle niin lyhyt, että sen uudelleenlaskenta tyhjästä on
-%   nopeampaa kuin etä-KV-tilan nouto (toisin kuin 32k-1M tokenin konteksteissa).
-%   Ero mallitason KV-välimuistin ja sovellustason semanttisen vastausvälimuistin välillä.
-% - Kääntöpuoli – P95-häntälatenssin sulake (Circuit-Breaker): Miksi PC kuitenkin
-%   leikkaa MuSiQuen monivaiheisissa ketjuissa P95-latenssin murto-osaan (esim.
-%   S2B + SR + MC 30.9 s -> 4.3 s, -86.1 %)? Valmiiksi varattu KV-tila eliminoi
-%   ruuhka-aikojen 20-90 s muistinvaraus- ja jonotuspiikit.
-%
-% =========================================================================
-% DRAFT NOTES 1: Prompt Caching Latency Inversion in Enterprise RAG (Nordea Closed)
+In isolation, prompt caching did not provide median execution latency benefits in either of the evaluated benchmark corpora, running contrary to the academic expectations outlined in Section~\ref{lit:caching}, and even introduced noticeable latency inflation across several configurations. Whereas prior studies operating on local GPU VRAM or host DRAM hierarchies report $4.0\times$ to $10.0\times$ TTFT speedups \citep{gim2024promptcache, jin2025ragcache} and dynamic chunk-caching frameworks demonstrate $2.2\times$ to $9.4\times$ latency reductions across long-context benchmarks \citep{lu2025turborag, yao2025cacheblend, wang2026fusionrag}, isolated prompt caching in the empirical evaluations yielded no statistically significant speedup on MuSiQue ($p \ge 0.05$) and increased median TTFT by 37.7\% (from 1,135.0\,ms to 1,562.5\,ms) and total latency by 21.8\% (from 1,407.0\,ms to 1,714.0\,ms) on the enterprise closed corpus.
 
-Promt caching did not provided any latency benefits in either of the tested corpora, which is a clearly against the acedemic expectations of the Chapter~\ref{sec:literature-review}, and even increased the latencies in some of the tested configurations. <lisää jotain lähteitä tähän ja vertaile tuloksia>
+In fact, isolated prompt caching was noticeably slower than even the more computationally demanding S2B + SR configuration (1,446.5\,ms), which performs neural re-ranking and hierarchical context expansion and was therefore expected to be slower. This counterintuitive latency inversion stems from two primary technical mechanisms. First, the prefill phase exhibited an empirical coordination overhead of approximately 300--500\,ms on the enterprise corpus, hypothesized to stem from distributed KV-cache lookups, cache state resolution, and remote procedure calls within the cloud infrastructure. Although fine-grained phase telemetry indicates that the token streaming phase ($T_{\text{stream}}$, detailed in Figure~\ref{fig:latency_breakdown_enterprise}) was slightly faster (105.0\,ms for PC versus 147.0\,ms for the baseline), this marginal saving fails to offset the substantial prefill lookup overhead. Second, the cached context was insufficiently large to reach the operational break-even threshold. While prompt caching yields dramatic latency reductions when reusing massive contexts spanning tens or hundreds of thousands of tokens, precomputing attention for the 7,157 tokens utilized in this benchmark on modern TPU hardware is faster from scratch than retrieving and binding remote KV states across the network.
 
-In the enterprise closed corpus, standalone prompt caching median latency were 21.8\% higher than more heavier S2B + SR configuration, which does computationally heavy reranking and child-to-parent expansions, and thus could be expected to be slower. There are couple of reasons for that. The first reason is that prefil phrase have extra \~500ms delay that comes from the lookup and extra network calls for the KV cache. When the streaming part is indeed faster (147ms for baseline and 105ms for prompt caching), this does not help to offset the increased latency from the prefil. The second reason is that the cached context were too small to take full advantage of if. The results would have been probably much more favorable for prompt caching if the context size would have been in the magnitude of tens or hundreds thousands tokens, instead of 7157 used in the tests.
+Conversely, severe tail latencies on the MuSiQue benchmark benefited substantially from prompt caching when integrated into multi-stage pipelines. This pattern indicates that when infrastructure resources are under peak contention, utilizing pre-allocated context prefixes prevents extreme queuing and memory allocation delays. Notably, S2B + PC was the only evaluated architecture to achieve a statistically significant median latency reduction over the baseline ($-8.0\%$, $p < 0.001$) while nearly halving $P_{95}$ tail latency (from 3,397.2\,ms to 1,745.1\,ms). Similarly, compounding prompt caching with the Small-to-Big and Model Cascading pipeline (S2B + PC + MC in Table~\ref{tab:latency_musique}) reduced $P_{95}$ tail latency from 14.2\,s down to 4.6\,s. The absolute latency reduction was even more dramatic in the four-module configuration: adding prompt caching to S2B + SR + MC reduced $P_{95}$ execution time by 26.6\,s (falling from 30.9\,s to 4.3\,s, an 86.1\% reduction). In multi-stage RAG pipelines, prompt caching effectively operates as an architectural circuit-breaker that stabilizes worst-case tail latencies.
 
-However, long tail latencies of the MuSiQue corpus seems to benefit very well from the prompt caching, indicating that when the computational resources of the LLM provider are scarce, using cached prefixes instead of recalculating it provides substantial benefit. For instance, Small-to-Big and Model cascading had a total tail latency of 14 seconds in Table~\ref{tab:latency_musique} went down to 4.6 second, when the prompt caching were included. Absolute latency drop was even higher when prompt caching was added on top of S2B + SR + MC configuration, reducing it 26.7 seconds.
+A practical implication of these findings is that enterprise system architects can implement adaptive caching policies conditioned on service provider load and traffic patterns. During off-peak periods with abundant computational headroom, context caching confers no median latency benefits. Conversely, during peak traffic surges, pre-allocated context caches become invaluable for mitigating tail latency spikes. Beyond latency considerations, the decisive operational value of prompt caching lies in monetary expenditure reduction, as detailed in Section~\ref{subsec:results_cost}, where isolated context caching delivers a 70.7\%--80.0\% cost reduction via the 90\% cached-token tariff discount \citep{GoogleVertexAIPricing} without statistically significant degradation in output quality. In production enterprise deployments, prompt caching should therefore be architected primarily as an economic efficiency mechanism and SLA circuit-breaker rather than an end-to-end latency accelerator.
 
-One indication of this finding is that enterprises could implement dynamic caching based on the current load of the LLM provider. When there are excess capacity, adding the cache does not provide any meaningful latency benefits, but during the rush hours, it is very useful. Another considerations is the costs savings, that were large when using caching, more deeply analyzed in subsections~\ref{subsubsec:cost_musique} and ~\ref{subsubsec:cost_enterprise}. To conclude, in these testing setups, prompt caching acted purely as cost saving optimization method.
+In addition, modular RAG architectures can incorporate alternative caching paradigms beyond static system-prefix context caches, such as dynamic document-chunk KV caching via RAGCache \citep{jin2025ragcache} and TurboRAG \citep{lu2025turborag}, or application-level semantic response caching via frameworks including FrugalGPT \citep{chen2023frugalgpt} and RedisVL SemanticCache \citep{RedisVLSemanticCache}, which bypasses LLM inference entirely on recurring queries. Furthermore, major cloud foundation model providers employ distinct caching mechanisms with differing hardware topologies, and the empirical findings reported here specifically reflect the managed context caching architecture implemented within Google Cloud Vertex AI.
 
-In addition, there are multiple other ways to cache the prefix instead of explicit KV cache. For example, application level semantic caching could be interesting possibility for deeper consideration (see, for example RAGCache\citet{jin2025ragcache} or Redis (https://redis.io/docs/latest/develop/ai/redisvl/api/cache/ (is this good?)). Also, all LLM providers have own implementations of caching, and the analysis provided here is only restricted the caching options that Google Vertex AI provides.
-% =========================================================================
-%
-% 1. EMPIIRINEN HAVAINTO (Latenssi-inversio Enterprise Closed -aineistossa, N=100)
-% - Vastoin intuitiota ja perusoletusta, Module M3 (Prompt Caching) ei tuo 
-%   latenssihyötyjä yrityskontekstissa, vaan nostaa kokonaislatenssia:
-%     * C0 Baseline:    T_total P50 = 1 407 ms | TTFT P50 = 1 135 ms
-%     * C3 (M3 Prompt Caching): T_total P50 = 1 714 ms (+21.8 %) | TTFT P50 = 1 563 ms (+37.7 %)
-%     * C5 (M1+M2 S2B + SR):    T_total P50 = 1 446 ms | TTFT P50 = 1 220 ms
-% - C3 on merkittävästi hitaampi kuin C0 Baseline ja jopa selvästi hitaampi kuin 
-%   C5 (S2B + SR), jonka odotettiin olevan raskas ylimääräisen semanttisen rerankkauksen 
-%   vuoksi (rerank-vaiheen P50 = 108 ms).
-%
-% 2. TEKNINEN JUURISYY: T_prefill ja etä-KV-cachen overhead
-% - Kun puretaan latenssikomponentit (context_inspector.py ja evaluoidut ajot):
-%     * T_prefill C0: median = 827 ms
-%     * T_prefill C3: median = 1 308 ms (+481 ms)
-%     * T_stream C0:  median = 147 ms
-%     * T_stream C3:  median = 105 ms
-% - Itse vastaustokenien generointi (T_stream) on C3:ssa identtinen tai jopa 
-%   aavistuksen nopeampi kuin C0:ssa. Koko latenssirangaistus syntyy mallin 
-%   prefill-vaiheessa ennen ensimmäisen tokenin tuloa (TTFT).
-% - Gemini 3.5 Flash laskee Googlen TPU-laitteistolla ~7 000 - 8 500 tokenin rinnakkaisen 
-%   prefill-huomiolaskennan (attention prefill) muutamissa kymmenissä millisekunneissa.
-% - Kun pyyntö käyttää Vertex AI explicit context cachingia (cachedContentName):
-%     1. Vertex AI -infrastruktuuri joutuu validoimaan välimuistiviitteen ja etsimään 
-%        sen hajautetusta KV-välimuistivarastosta.
-%     2. Pyyntö on reititettävä tai sarjallistettu KV-tila on ladattava verkon yli 
-%        juuri sille TPU-kiihdyttimelle, joka pyyntöä palvelee.
-%     3. Tämä etätilan sidonta ja välimuistinhaku aiheuttaa kiinteän ~300-500 ms 
-%        RPC- ja synkronointiviiveen (fixed coordination overhead).
-%
-% 3. KONTEKSTIKOON "BREAK-EVEN" -KYNNYS
-% - Välimuistiin tallennettu staattinen etuliite (järjestelmäohjeet + few-shot -kirjasto, 
-%   prompts/answer-generation.st) on tarkalleen 7 157 tokenia.
-% - Vertex AI / Gemini Context Caching on suunniteltu massiivisille konteksteille 
-%   (32k - 1M+ tokenia, esim. kirjat, koodirepot, videot). Tällöin KV-uudelleenlaskenta 
-%   kestäisi sekunteja, jolloin ~300-500 ms noutoviive tuo suuren nettovoiton.
-% - 7 000 tokenin kokoluokassa etävälimuistin noutaminen kestää pidempään kuin se aika, 
-%   joka kuluisi tokenien puhtaaseen uudelleenlaskentaan TPU:n HBM-muistissa tyhjästä.
-%   -> Yritys-RAG:ssa syntyy "latency break-even" -ongelma: konteksti on liian lyhyt 
-%      latenssisäästöille, mutta ylittää palveluntarjoajan minimivälimuistikynnyksen (4 096 tok).
-%
-% 4. KONTEKSTIVÄLIMUISTI VS. SEMANTTINEN VASTAUSVÄLIMUISTI
-% - M3 toteuttaa mallitason KV-kontekstivälimuistin (Gemini CachedContent), 
-%   EI sovellustason semanttista vastausvälimuistia (kuten GPTCache tai Redis).
-% - Vastausvälimuisti toisi osumalla 0-10 ms latenssin, mutta kontekstivälimuistissa 
-%   LLM joutuu aina suorittamaan uuden päättelyn ja generoinnin dynaamisesti 
-%   noudetuille yritysdokumenteille.
-%
-% 5. DIPLOMITYÖN TULOS & PARETO-ANALYYSI (RQ1 vs. RQ2)
-% - Prompt Caching ei toimi yritystason RAG:ssa latenssinoptimoijana, vaan puhtaana 
-%   kustannusoptimointina:
-%     * Latenssi (RQ1): T_total nousee +21.8 % (1 407 ms -> 1 714 ms).
-%     * Kustannus (RQ2): Ajokustannus putoaa -70.7 % ($13.58 -> $3.98 / 1k kyselyä; 
-%       yhdessä M4-reitityksen kanssa jopa $2.54 / 1k eli -81.3 %).
-% - Laatu (RQ3): F1 säilyy identtisenä (C0: 59.4 % vs. C3: 58.8 %).
-% - Johtopäätös: Järjestelmäarkkitehdin on tehtävä tietoinen Pareto-valinta: 
-%   ollaanko valmiita maksamaan ~300 ms lisälatenssia käyttäjälle vastineena yli 
-%   70 % operatiivisesta pilvikustannussäästöstä.
-%
-% =========================================================================
-% DRAFT NOTES 1B: Prompt Caching Häntälatenssin Sulakkeena (Circuit-Breaker)
-% =========================================================================
-% - Vaikka PC nostaa mediaanilatenssia, MuSiQuessa se toimii kriittisenä 
-%   P95-häntälatenssin leikkurina monivaiheisissa ketjuissa:
-%     * S2B + SR (C5):    P95 = 7 771 ms -> S2B + SR + PC (C11):    P95 = 2 202 ms (-71.7 %)
-%     * S2B + MC (C7):    P95 = 14 154 ms -> S2B + PC + MC (C13):   P95 = 4 644 ms (-67.2 %)
-%     * S2B + SR + MC (C12): P95 = 30 883 ms -> S2B + SR + PC + MC (C15): P95 = 4 306 ms (-86.1 %)
-%     * S2B + PC (C6):    P50 = 1 250 ms (-8.0 %, p < 0.001) ja P95 = 1 745 ms (baseline: 3 397 ms)
-% - JSONL-raakadata paljastaa: Ilman välimuistia monimutkaiset ketjut kärsivät satunnaisista 
-%   20-90 s TPU-muistinvaraus- ja jonotuspiikeistä ruuhka-aikoina (esim. C12 kyselyssä 
-%   3hop1__135793_87694_64412: T_prefill = 89.7 s).
-% - Cachen käyttö eliminoi nämä ääripiikit, koska 7 157 tokenin esilaskettu tila on jo 
-%   valmiiksi kiinnitetty TPU:n muistiin. PC toimii siis SLA-sulakkeena (Circuit-Breaker).
-%
-% -------------------------------------------------------------------------
-% PEILAUS LUVUN 3 KIRJALLISUUTEEN (03_literature_review.tex)
-% -------------------------------------------------------------------------
-% - [TUKEE]: Rivillä 78 (03_literature_review.tex) organisaatio Google Cloud ("Gemini Enterprise Agent Platform Pricing: Generative AI and Foundation Models")
-%   tarjoaa jopa 10-kertaisen (90 %) kustannusalennuksen välimuistiin tallennetuille etuliitetokeneille, mikä tukee empiiristä löydöstämme Prompt Cachingin (M3) merkittävistä operatiivisista kustannussäästöistä.
-%   Tulostemme mukaan eristetty Prompt Caching (C3) leikkaa ajokustannuksia tilastollisesti merkitsevästi -70.7 % suljetussa yrityskorpuksessa (baseline $13.580 -> $3.975 / 1 000 kyselyä, p < 0.001) ja -80.0 % MuSiQuessa ($12.082 -> $2.417 / 1 000 kyselyä, p < 0.001), sekä yhdessä Model Cascadingin kanssa jopa -81.3 % ($2.543 / 1 000 kyselyä). Välimuistiin kiinnitetty 7 157 tokenin staattinen järjestelmäkehote sai täyden 90 % alennuksen, jolloin vain dynaamiset dokumentit laskutettiin täydellä hinnalla.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citep{GoogleVertexAIPricing}
-%
-% - [RISTIRIIDASSA]: Rivillä 78 (03_literature_review.tex) tutkijat In Gim, Guojun Chen, Seung-seob Lee, Nikhil Sarda, Anurag Khandelwal ja Lin Zhong ("Prompt Cache: Modular Attention Reuse for Low-Latency Inference")
-%   löysivät 5x–10x TTFT-nopeutuksia VRAM-välimuistitetuilla GPU:illa (leikaten latenssin 900 ms -> 90 ms Llama-7B:llä 3k kontekstilla) ja 1.5x–3x DRAM-isäntämuistissa, mikä on jyrkässä ristiriidassa yritys-RAG-tulostemme kanssa, joissa eristetty Prompt Caching (C3) aiheutti latenssi-inversion: TTFT nousi +37.7 % (1 135 ms -> 1 563 ms) ja kokonaislatenssi nousi +21.8 % (1 407 ms -> 1 714 ms, p < 0.001), ollen hitaampi kuin jopa kaksi vaihetta sisältävä S2B + SR (1 446.5 ms).
-%   Gim ym. mittasivat paikallista GPU-muistia, kun taas hajautetussa Vertex AI -pilvi-infrastruktuurissa etä-KV-välimuistin nouto ja sidonta TPU-kiihdyttimelle aiheuttaa kiinteän ~300–500 ms RPC- ja koordinointiviiveen, joka 7 157 tokenin kontekstissa ylittää TPU:n rinnakkaisen huomiolaskenta-ajan tyhjästä (T_prefill kasvoi 827 ms -> 1 308 ms, +481 ms).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{gim2024promptcache}
-%
-% - [TÄYDENTÄÄ]: Rivillä 78 (03_literature_review.tex) tutkijat In Gim, Guojun Chen, Seung-seob Lee, Nikhil Sarda, Anurag Khandelwal ja Lin Zhong ("Prompt Cache: Modular Attention Reuse for Low-Latency Inference")
-%   löysivät esilaskettujen huomiotilojen uudelleenkäytön poistavan toistuvaa laskentaa, mikä täydentää löydöstämme Prompt Cachingista P95-häntälatenssin sulakkeena (Circuit-Breaker) monivaiheisissa päättelyketjuissa.
-%   Vaikka PC heikensi mediaanilatenssia yritysdatassa, MuSiQuen monihyppyketjuissa se leikkasi äärimmäiset 20–90 s TPU-muistinvaraus- ja jonotuspiikit (esim. S2B + SR + MC -putkessa P95 romahti 30 883 ms -> 4 306 ms eli -86.1 %, S2B + MC -putkessa 14 154 ms -> 4 644 ms eli -67.2 %, ja S2B + PC saavutti tilastollisesti merkitsevän nopeuden: P50 laski -8.0 %, p < 0.001, ja P95 puolittui 3 397 ms -> 1 745 ms), koska 7 157 tokenin esilaskettu tila oli valmiiksi allokoitu TPU:n muistiin.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{gim2024promptcache}
-%
-% - [RISTIRIIDASSA]: Rivillä 78 (03_literature_review.tex) tutkijat Chao Jin, Zili Zhang, Xuanlin Jiang, Fangyue Liu, Shufan Liu, Xuanzhe Liu ja Xin Jin ("RAGCache: Efficient Knowledge Caching for Retrieval-Augmented Generation")
-%   löysivät 4.0x TTFT-lyhennyksen ja 2.1x läpimenonlisäyksen suhteessa vLLM+Faiss -perustasoon hyödydyntäen moniportaista tietopuuvälimuistia GPU/isäntämuistissa, mikä on ristiriidassa tulostemme kanssa, joissa pilvitason Prompt Caching ei tuonut TTFT-nopeutusta vaan kasvatti prefill-aikaa (T_prefill kasvoi 827 ms -> 1 308 ms, +58.2 %).
-%   RAGCache optimoi paikallisen GPU/isäntämuistin hierarkiaa ja spekulatiivista noutoliukuhihnoitusta, kun taas kaupallisen pilvialustan explicit context caching tuo kiinteän verkkoylimäärän, joka syö laskennalliset säästöt alle 10 000 tokenin konteksteissa.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{jin2025ragcache}
-%
-% - [RISTIRIIDASSA]: Rivillä 78 (03_literature_review.tex) tutkijat Songshuo Lu, Hua Wang, Yutian Rong, Zhi Chen ja Yaohua Tang ("TurboRAG: Accelerating Retrieval-Augmented Generation with Precomputed KV Caches for Chunked Text")
-%   löysivät esilasketuilla tekstilohkojen KV-välimuisteilla ja RoPE-uudelleenjärjestelyllä jopa 9.4x TTFT-nopeutuksen MuSiQuessa (1 610 ms -> 171 ms) ja keskimäärin 8.6x nopeutuksen LongBenchissä, mikä on ristiriidassa tulostemme kanssa, joissa eristetty Prompt Caching ei tuonut tilastollisesti merkitsevää TTFT- tai kokonaislatenssinopeutusta MuSiQuessa (p >= 0.05) ja hidasti yrityskorpuksen kokonaislatenssia +21.8 % (1 407 ms -> 1 714 ms).
-%   TurboRAG esilaskee dynaamisia dokumenttilohkoja offline-vaiheessa, kun taas testatussa Gemini-arkkitehtuurissa välimuistissa oli vain staattinen 7 157 tokenin järjestelmäkehote ja dynaamiset dokumentit laskettiin edelleen lennossa, jolloin pilvipalvelun cachenouto muodosti ylimääräisen viiveen.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citep{lu2025turborag}
-%
-% - [RISTIRIIDASSA]: Rivillä 78 (03_literature_review.tex) tutkijat Jiayi Yao, Hanchen Li, Yuhan Liu, Siddhant Ray, Yihua Cheng, Qizheng Zhang, Kuntai Du, Shan Lu ja Junchen Jiang ("CacheBlend: Fast Large Language Model Serving for RAG with Cached Knowledge Fusion")
-%   löysivät 2.2x–3.3x TTFT-nopeutuksen ja jopa 5.0x läpimenonlisäyksen valikoivalla 15 %:n ristiin-attentionin uudelleenlaskennalla ja NVMe-siirtojen liukuhihnoituksella, mikä on ristiriidassa havaitsemamme +37.7 % TTFT-inversion (1 135 ms -> 1 563 ms) ja +21.8 % kokonaislatenssin kasvun kanssa.
-%   Yao ym. saavuttivat nopeutuksensa peittämällä isäntämuistin ja NVMe:n siirtoajat paikallisessa vLLM-moottorissa, kun taas Vertex AI:n kaupallisessa arkkitehtuurissa etäisen KV-tilan sidonta TPU:lle luo kiinteän 300–500 ms RPC-viiveen, jota ei voida peittää 7 157 tokenin maltillisella kontekstilla.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citep{yao2025cacheblend}
-%
-% - [RISTIRIIDASSA]: Rivillä 78 (03_literature_review.tex) tutkijat Jiahao Wang, Weiyu Xie, Mingxing Zhang, Boxing Zhang, Jianwei Dong, Yuening Zhu, Chen Lin, Jingqi Tang, Yaochen Han, Zhiyuan Ai, Xianglin Chen, Yongwei Wu ja Congfeng Jiang ("From Prefix Cache to Fusion RAG Cache: Accelerating LLM Inference in Retrieval-Augmented Generation")
-%   löysivät jopa 9.39x TTFT-nopeutuksen täydellä uudelleenkäytöllä ja 2.66x–3.94x nopeutuksen 15 % uudelleenlaskennalla 27 000 tokenin konteksteissa eliminoiden 82.3 % redundantista laskennasta, mikä on ristiriidassa tulostemme kanssa, joissa TTFT hidastui +37.7 % ja T_prefill kasvoi +481 ms.
-%   Wang ym. saavuttivat nopeutuksensa massiivisilla 27k tokenin konteksteilla, joissa huomiolaskennan neliöllinen kesto dominoi, kun taas yritys-RAG:ssa 7 157 tokenin staattinen etuliite alittaa TPU:n latenssin "break-even" -kynnyksen, jolloin etähaun verkkoylimäärä kestää kauemmin kuin suora rinnakkaislaskenta TPU:n HBM-muistissa tyhjästä.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citep{wang2026fusionrag}
-%
-% - [TUKEE]: Rivillä 80 (03_literature_review.tex) tutkijat Chao Jin, Zili Zhang, Xuanlin Jiang, Fangyue Liu, Shufan Liu, Xuanzhe Liu ja Xin Jin ("RAGCache: Efficient Knowledge Caching for Retrieval-Augmented Generation")
-%   löysivät prompt cachingin säilyttävän generointilaadun täysin ilman laadun heikkenemistä (zero quality loss) standardoiduilla QA-vertailutesteillä täyteen prefill-laskentaan nähden, mikä tukee havaintoamme eristetyn Prompt Cachingin (C3) laadullisesta neutraaliudesta suljetussa yrityskorpuksessa.
-%   Eristetty PC säilytti laadun lähes identtisenä perustasoon nähden (F1-score baseline C0 59.4 % vs. C3 58.8 %, ja kieltäytymistarkkuus virheettömästi 100.0 %), osoittaen että staattisen etuliitteen deterministinen KV-tila ei aiheuta semanttista tai numeerista poikkeamaa.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citep{jin2025ragcache}
-
-
-\subsection{Model Cascading and the Frontier Over-Refusal Paradox}
+\subsection{Model Cascading and Query Refusal Dynamics}
 \label{subsec:disc_model_cascading}
 
-% -------------------------------------------------------------------------
-% RAKENNE & YDINPOINTIT (Taso 1: Mallireitityksen ja päättelyn mekanismit)
-% -------------------------------------------------------------------------
-% - Reititysprofiilien peilikuvaisuus: Miksi Model Cascading (M4) kasvatti
-%   kustannuksia MuSiQuessa (+24.8 %, 77 % kyselyistä Gemini 3.1 Prolle), mutta
-%   laski niitä radikaalisti yrityskorpuksessa (-34.2 %, 49 % Flash-Litelle ja
-%   38 % Flashille)?
-% - Frontier-mallin Over-Refusal Paradox: Miksi kyvykkäin malli (Gemini 3.1 Pro)
-%   tuotti korkeimman False Refusal Raten (FRR 56.2 % - 68.8 %) vastattavissa kysymyksissä?
-% - Ehdollinen Context Recall -analyysi: Kun monihyppyhaun kontekstista puuttuu
-%   yksikin väliaskel (CR < 1.0), Flash-malli päättelee tai siltaa aukon, kun
-%   taas Pron tiukka RLHF- ja grounding-ohjeistus tulkitsee puuttuvan linkin
-%   esteeksi ja kieltäytyy vastaamasta (87-97 % ajasta) – ja jopa täydellä
-%   kontekstilla (CR = 1.0) Pro on varovaisempi monimutkaisissa synteeseissä.
-% - Turvallisuus vs. kattavuus: Tuotantoympäristössä tämä tiukka pidättyväisyys
-%   takaa 100 % OOD-kieltäytymistarkkuuden (hallucination mitigation), mutta
-%   rankaisee ankarasti epätäydellistä hakua.
-%
-% =========================================================================
-% DRAFT NOTES 2: Frontier-mallin (Gemini 3.1 Pro) Over-Refusal Paradox (RQ3 / M4)
-% =========================================================================
-% - Reititysjakautuma:
-%     * MuSiQue: Pro-dominantti (77 % Pro, 21 % Flash, 2 % Lite; 3/4-hop 100 % Pro).
-%     * Enterprise Closed: Lite/Flash-dominantti (49 % Lite, 38 % Flash, 13 % Pro; 
-%       1-hop 97.5 % Lite, 2-hop 67.5 % Flash / 30 % Pro).
-% - Paradoksi MuSiQuessa: Frontier-malli Gemini 3.1 Pro kieltäytyy vastaamasta 
-%   vastattaviin kysymyksiin huomattavasti herkemmin kuin Gemini 3.5 Flash:
-%     * C0 Baseline (Flash): FRR = 42.5 %
-%     * C4 MC (Pro-dominantti): FRR = 63.9 % (Pron oma FRR vastattavissa = 63.9 %)
-%     * C14 SR+PC+MC: FRR = 78.3 % Prolla (koko putken FRR = 68.8 %)
-% - Juurisyy JSONL-datassa (Ehdollinen Context Recall -analyysi):
-%     * Kun haettu konteksti on osittainen (CR < 1.0, eli 1 välihyppy puuttuu top-5:stä):
-%       Pro kieltäytyy 87.0 % - 96.8 % ajasta, kun taas Flash kieltäytyy vain 50.0 % - 68.6 % 
-%       ja kykenee päättelemään puuttuvan askeleen.
-%     * Täydelläkin kontekstilla (CR = 1.0) Pro kieltäytyy 42.3 % - 58.6 % ajasta monimutkaisissa 
-%       monihyppytehtävissä tulkiten synteesin epävarmaksi (Flash kieltäytyy vain 0 - 22 %).
-% - Johtopäätös: Pron tiukka RLHF- ja grounding-ohjeistus tekee siitä tuotantoon turvallisen 
-%   (100 % OOD Refusal Accuracy), mutta se rankaisee monihyppyhaun osittaista osumatarkkuutta.
-%
-% -------------------------------------------------------------------------
-% PEILAUS LUVUN 3 KIRJALLISUUTEEN (03_literature_review.tex)
-% -------------------------------------------------------------------------
-% - [TÄYDENTÄÄ / RISTIRIIDASSA]: Rivillä 5 (03_literature_review.tex) tutkijat Soyeong Jeong, Jinheon Baek, Sukmin Cho, Sung Ju Hwang ja Jong C. Park ("Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity") sekä Lingjiao Chen, Matei Zaharia ja James Zou ("FrugalGPT: How to Use Large Language Models While Reducing Cost and Improving Performance")
-%   löysivät, että staattinen "one-size-fits-all" -arkkitehtuuri on tuotantojärjestelmissä epäoptimaalinen, koska se ylivaraa kalliita laskentaresursseja triviaaleille kysymyksille mutta voi toisaalta olla riittämätön monimutkaisten kyselyjen päättelyyn, mikä täydentää yrityskorpuksen (Enterprise Closed) havaintoamme (jossa 49 % kyselyistä ohjattiin kevyelle Flash-Litelle ja 1-hop -kyselyistä peräti 97.5 % leikaten kustannuksia -34.2 % eli $13.58 -> $8.94 / 1k ilman laadun heikkenemistä, Q = 0.5974 vs 0.6209 ns), mutta on ristiriidassa monihyppytehtävän (MuSiQue) tuloksen kanssa: 77 % kyselyistä ohjattiin kalleimmalle Gemini 3.1 Prolle (3- ja 4-hop 100 %), mutta se ei parantanut päättelykykyä vaan laukaisi Frontier Over-Refusal Paradox -ilmiön, jossa Pro kieltäytyi vastaamasta 56.2 %:ssa vastattavista kyselyistä (FRR, baseline Flashilla 42.5 %) ja nosti kustannuksia +24.8 % ($12.08 -> $15.08 / 1k) ilman laatuetua (Q = 0.1789 ns vs 0.2104).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{jeong2024adaptive, chen2023frugalgpt}
-%
-% - [TÄYDENTÄÄ / RISTIRIIDASSA]: Rivillä 5 (03_literature_review.tex) tutkijat Isaac Ong, Amjad Almahairi, Vincent Wu, Wei-Lin Chiang, Tianhao Wu, Joseph E. Gonzalez, M Waleed Kadous ja Ion Stoica ("RouteLLM: Learning to Route LLMs with Preference Data")
-%   löysivät, että kyselyreitityksellä syötteet voidaan dynaamisesti ohjata sopivan kokoiseen RAG-konfiguraatioon (yksinkertaiset kevyelle LLM:lle ja monimutkaiset laajennettuun putkeen kyvykkäämmälle mallille), mikä täydentää yritysdatan profiilijakaumaa (1-hop 97.5 % Lite, 2-hop 67.5 % Flash / 30 % Pro), mutta on ristiriidassa monihyppyisen MuSiQuen käyttäytymisen kanssa: monimutkaisten kyselyiden ohjaaminen kyvykkäimmälle frontier-mallille (Gemini 3.1 Pro) ei parantanut synteesilaatua vaan romahdutti Answer Relevancyn (0.242 -> 0.187) kohonneen virheellisen kieltäytymisen (FRR 56.2 %) vuoksi. Syynä on Pron tiukka grounding-ohjeistus, joka tulkitsee osittaisen haun (CR < 1.0) esteeksi vastaamiselle (87.0–96.8 % hylkäyksiä), kun taas kevyempi Flash kykenee päättelemään puuttuvan askeleen yli.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{ong2025routellm}
-%
-% - [TUKEE / RISTIRIIDASSA]: Rivillä 16 (03_literature_review.tex) tutkijat Lingjiao Chen, Matei Zaharia ja James Zou ("FrugalGPT: How to Use Large Language Models While Reducing Cost and Improving Performance")
-%   löysivät, että kaskadoimalla pyyntöjä kevyiltä malleilta raskaammille luotettavuuspisteiden avulla saavutetaan jopa 98.3 % kustannussäästö homogeeniseen GPT-4-baselineen nähden vasteen laadun kärsimättä, mikä tukee yritysaineiston tuloksiamme (pelkkä MC laski kustannuksia -34.2 % tasolle $8.942 / 1k ja yhdessä välimuistin kanssa PC + MC toi -81.3 % säästön eli $2.543 / 1k säilyttäen laadun Q = 0.6085 vs 0.6209), mutta on suorassa ristiriidassa MuSiQue-tulosten kanssa, joissa Model Cascading kasvatti kustannuksia +24.8 % ($12.082 -> $15.079 / 1k, p < 0.001) ja S2B + SR + MC -putkessa jopa +68.4 % ($20.346 / 1k), koska kyselyjakauma ohjasi 77 % pyynnöistä kalliille Gemini 3.1 Prolle laadun silti heikentyessä (Answer Relevancy 0.187, FRR 56.2 %).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{chen2023frugalgpt}
-%
-% - [TUKEE / RISTIRIIDASSA]: Rivillä 16 (03_literature_review.tex) tutkijat Isaac Ong, Amjad Almahairi, Vincent Wu, Wei-Lin Chiang, Tianhao Wu, Joseph E. Gonzalez, M Waleed Kadous ja Ion Stoica ("RouteLLM: Learning to Route LLMs with Preference Data")
-%   löysivät, että reitittämällä kyselyjä dynaamisesti halvan ja kalliin mallin välillä saavutetaan 1.14x - 3.66x kustannussäästö säilyttäen ~95 % vahvan mallin laadusta, mikä tukee yrityskorpuksen tuloksiamme (MC toi 1.52x kustannussäästön eli -34.2 % säilyttäen 96.2 % laadusta Q = 0.5974 vs 0.6209; PC + MC toi 5.34x säästön eli -81.3 % säilyttäen 98.0 % laadusta Q = 0.6085), mutta on ristiriidassa MuSiQuen tulosten kanssa: kustannussäästön sijaan kulu kasvoi 1.25x (+24.8 %, $12.082 -> $15.079 / 1k) ja laatu laski (Answer Relevancy putosi 0.242 -> 0.187, FRR nousi 42.5 % -> 56.2 %). Kustannushyöty kääntyy siis negatiiviseksi, jos tehtävän kompleksisuus ohjaa valtaosan liikenteestä kalliille mallille.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{ong2025routellm}
-%
-% - [TÄYDENTÄÄ / RISTIRIIDASSA]: Rivillä 16 (03_literature_review.tex) tutkijat Soyeong Jeong, Jinheon Baek, Sukmin Cho, Sung Ju Hwang ja Jong C. Park ("Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity") sekä Minghao Guo, Qingcheng Zeng, Xujiang Zhao, Yanchi Liu, Wenchao Yu, Mengnan Du, Haifeng Chen ja Wei Cheng ("DeepSieve: Information Sieving via LLM-as-a-Knowledge-Router")
-%   löysivät samankaltaisia 60–90 % kustannus- ja token-vähennyksiä adaptiivisissa RAG-kehyksissä, mikä täydentää tulostamme yritysdatassa (kustannus -34.2 % ja tulostokenit 75 -> 66, koska 49 % ohjautui Flash-Litelle), mutta on ristiriidassa MuSiQuen kanssa, jossa MC lisäsi kustannuksia +24.8 % ja token-kulutus säilyi ennallaan (tulostokenit 9 -> 10, syötetokenit 8 001). Tämä osoittaa, että kustannussäästömallit eivät yleisty universaalisti, vaan kääntyvät kustannusinflaatioksi monihyppytehtävissä, joissa kyselyt luokitellaan kalliille frontier-mallille.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{jeong2024adaptive, guo2026deepsieve}
-%
-% - [RISTIRIIDASSA / TÄYDENTÄÄ]: Rivillä 18 (03_literature_review.tex) tutkijat Jiarui Zhang, Xiangyu Liu, Yong Hu, Chaoyue Niu, Fan Wu ja Guihai Chen ("RAGRouter: Learning to Route Queries to Multiple Retrieval-Augmented Language Models")
-%   löysivät, että reitityspäätöksen laskennallinen lisäviive on minimaalinen (noin 11 ms per kysely GPU:lla), mikä on ristiriidassa kaskadoinnin todellisen järjestelmätason latenssivaikutuksen kanssa: vaikka itse reitittimen luokitteluviive oli meilläkin pieni (~10-20 ms), Model Cascading kaksinkertaisti mediaanikokonaislatenssin MuSiQuessa (+104.2 %, T_total P50 nousi 1 359.0 ms -> 2 775.0 ms, p < 0.001) ja nosti P95-häntälatenssin 3 397 ms:sta 11 986 ms:iin. Myös yrityskorpuksessa mediaaniviive kasvoi +38.1 % (1 407.0 ms -> 1 943.5 ms, p < 0.001) ja TTFT +51.1 % (1 135 ms -> 1 715 ms). Tämä johtuu siitä, että raskaamman mallin (Gemini 3.1 Pro) inferenssi ja TTFT ovat moninkertaiset Flashiin verrattuna, jolloin pelkän 11 ms reitityslaskennan raportointi antaa harhaanjohtavan kuvan kaskadoinnin latenssikustannuksesta.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{zhang2025ragrouter}
-%
-% - [TUKEE / TÄYDENTÄÄ]: Rivillä 18 (03_literature_review.tex) tutkijat Isaac Ong, Amjad Almahairi, Vincent Wu, Wei-Lin Chiang, Tianhao Wu, Joseph E. Gonzalez, M Waleed Kadous ja Ion Stoica ("RouteLLM: Learning to Route LLMs with Preference Data")
-%   löysivät, että reitittimen suora kustannuslisä on alle 0.4 % verrattuna GPT-4-generointiin, mikä tukee mittauksiamme (reitittimen oma luokittelukustannus oli alle 0.1 % API-kustannuksista), mutta täydentää kuvaa osoittamalla, että reitityksen epäsuora kustannusvaikutus voi olla hallitseva: MuSiQuessa 77 % ohjauksista Gemini 3.1 Prolle nosti kokonaiskustannusta +24.8 % ($12.082 -> $15.079 / 1k) ja S2B + SR + MC:ssä +68.4 % ($20.346 / 1k). Reitityksen oma halpa hinta ei siten suojaa putkea kalliin kohdemallin aiheuttamalta budjettiylitykseltä.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{ong2025routellm}
-%
-% - [RISTIRIIDASSA / TÄYDENTÄÄ]: Rivillä 18 (03_literature_review.tex) tutkijat Soyeong Jeong, Jinheon Baek, Sukmin Cho, Sung Ju Hwang ja Jong C. Park ("Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity")
-%   löysivät, että noudon ohittaminen (no retrieval) yksinkertaisissa kyselyissä pudottaa generointilatenssin 3.08 ja 27.18 sekunnista aina 0.35 sekuntiin, mikä on ristiriidassa yritystason RAG-vaatimustemme kanssa: tuotantojärjestelmässä hakua ei voida ohittaa kokonaan, koska auditoitavuus ja faktuaalisuus vaativat aina lähdeviitteet (100.0 % OOD Refusal Accuracy), minkä vuoksi noutoviivettä (~300-600 ms) ei poistettu. Lisäksi keveimmällekin mallille (Flash-Lite) ohjatut kyselyt vaativat yritysdatassa mediaanina 1 715 ms TTFT-viiveen ja 1 943.5 ms kokonaislatenssin (+38.1 % kasvu baselineen 1 407 ms nähden), joten 0.35 sekunnin vasteajat eivät toteudu yrityskontekstissa ilman luopumista grounded-vastauksista.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{jeong2024adaptive}
-%
-% - [RISTIRIIDASSA / TÄYDENTÄÄ]: Rivillä 20 (03_literature_review.tex) tutkijat Soyeong Jeong, Jinheon Baek, Sukmin Cho, Sung Ju Hwang ja Jong C. Park ("Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity")
-%   löysivät, että kyselyreititys säilyttää F1-tuloksen käytännössä muuttumattomana (50.91 % vs 50.87 % monivaiheisella baselinella GPT-3.5:llä) saavuttaen samalla ~56 % latenssin ja 63 % token-kulutuksen pienenemisen, mikä on jyrkässä ristiriidassa MuSiQue-tulostemme kanssa: Model Cascading ei nopeuttanut suoritusta vaan kaksinkertaisti latenssin (+104.2 %, 1 359 ms -> 2 775 ms, p < 0.001) eikä token-kulutus laskenut (tulostokenit 9 -> 10). Vaikka Token F1 näennäisesti säilyi (45.6 % vs baseline 45.1 %) ja EM nousi (42.0 % vs 41.0 %), tämä oli vain hylkäysten pisteytysharha (oikea unanswerable-kieltäytyminen = 1.0); todellinen vastauslaatu romahti (Answer Relevancy putosi 0.242 -> 0.187 ja FRR nousi 42.5 % -> 56.2 %). Yritysdatassa token-säästö sen sijaan toteutui (tulostokenit 75 -> 66, kustannus -34.2 %), mutta latenssi nousi silti +38.1 % (1 407 ms -> 1 943.5 ms), toisin kuin Jeong et al.:lla.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{jeong2024adaptive}
-%
-% - [RISTIRIIDASSA / TÄYDENTÄÄ]: Rivillä 20 (03_literature_review.tex) tutkijat Minghao Guo, Qingcheng Zeng, Xujiang Zhao, Yanchi Liu, Wenchao Yu, Mengnan Du, Haifeng Chen ja Wei Cheng ("DeepSieve: Information Sieving via LLM-as-a-Knowledge-Router")
-%   löysivät, että reititys vähentää token-kulutusta jopa ~90 % menettäen vain 0.8 pistettä F1:stä ja tuottaa 20.7 ja 15.5 prosenttiyksikön parannukset F1- ja EM-tuloksiin verrattuna naiiviin RAG:iin, mikä on ristiriidassa MuSiQue-tulostemme kanssa: pelkkä staattinen generointimallin kaskadointi ei saavuttanut tilastollista laatuetua baselineen (Composite Quality Q = 0.1789 ns vs baseline 0.2104; EM 42.0 % vs 41.0 % ja F1 45.6 % vs 45.1 % johtuivat pelkistä kieltäytymispisteistä), samalla kun Answer Relevancy putosi 0.242 -> 0.187 ja virheelliset kieltäytymiset nousivat 42.5 % -> 56.2 %. DeepSieven valtavat laatuvoitot perustuivat kyselyn purkamiseen (DAG decomposition) ja tietolähdereititykseen, kun taas pelkkä valmiin kontekstin ohjaaminen frontier-mallille aiheuttaa over-refusalin.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{guo2026deepsieve}
+In the enterprise closed corpus, model cascading delivered substantial operational expenditure reductions aligned with findings from prior cascading literature \citep{chen2023frugalgpt, ong2025routellm}. Because most enterprise inquiries were resolved without escalating to the frontier tier, the router directed 49.0\% of all queries to Gemini 3.5 Flash-Lite (including 97.5\% of single-hop queries) and 38.0\% to Gemini 3.5 Flash, with only 13.0\% escalated to Gemini 3.1 Pro. As shown in Table~\ref{tab:cost_enterprise}, isolated model cascading lowered median cost by 34.2\% (from \$13.580 to \$8.942 per 1,000 queries) while preserving 96.2\% of baseline composite quality ($Q = 0.5974$ versus $0.6209$). Combining model cascading with prompt caching (PC + MC) yielded an 81.3\% cost reduction down to \$2.543 per 1,000 queries, achieving an optimal trade-off of 239 quality points per dollar.
 
+Conversely, model cascading triggered significant cost inflation on the multi-hop MuSiQue benchmark. Because complex multi-hop inquiries demanded cross-document reasoning, the classifier escalated 77.0\% of queries directly to Gemini 3.1 Pro, including 100.0\% of three-hop and four-hop tasks. This routing profile increased baseline expenditure by 24.8\% (from \$12.082 to \$15.079 per 1,000 queries, $p < 0.001$, Table~\ref{tab:cost_musique}), reaching \$20.346 in S2B + SR + MC, running counter to the cost-reduction trajectories reported in adaptive RAG studies \citep{jeong2024adaptive, guo2026deepsieve}. Escalating to the premium tier also failed to improve generation accuracy. Instead, it triggered the Frontier Over-Refusal Paradox: Gemini 3.1 Pro refused 87.0\%--96.8\% of answerable questions whenever retrieved context was incomplete ($CR < 1.0$), artificially inflating abstention metrics while depressing Answer Relevancy.
 
-\subsection{Multi-Module Interactions: Synergy Bifurcation and Attention Anchoring}
+This hyper-conservative behavior of the frontier model introduces a fundamental operational trade-off for enterprise production environments. While reliable abstention is an indispensable prerequisite for hallucination mitigation in regulated domains---reflected in the perfect 100.0\% out-of-domain refusal accuracy across the enterprise evaluations (Table~\ref{tab:quality_enterprise})---enforcing it indiscriminately severely impairs system utility. In complex multi-hop scenarios, even when the retrieved context provided complete evidentiary support ($CR = 1.0$), Gemini 3.1 Pro rejected 42.3\%--58.6\% of queries, interpreting intricate cross-document syntheses as insufficiently grounded. Conversely, the workhorse Gemini 3.5 Flash exhibited far greater resilience under imperfect retrieval. In scenarios with partial context ($CR < 1.0$), Flash maintained substantially lower refusal rates (50.0\%--68.6\%) and successfully bridged missing intermediate reasoning steps, whereas Pro refused in up to 96.8\% of instances. This pattern indicates that the frontier tier is substantially more sensitive to missing intermediate premises, interpreting partial retrieval as an absence of proof, whereas the smaller model is more permissive when synthesizing answers from incomplete context.
+
+Prior cascading literature often reported negligible quality degradation when evaluated on traditional lexical overlap metrics such as Exact Match and token $F_1$ \citep{jeong2024adaptive, guo2026deepsieve}. On MuSiQue (Table~\ref{tab:quality_musique}), Exact Match marginally increased (42.0\% versus 41.0\%) and token $F_1$ remained stable (45.6\% versus 45.1\%), yet semantic Answer Relevancy dropped sharply from 0.242 to 0.187. This divergence illustrates a scoring artifact where correct abstentions on unanswerable questions receive maximum points, masking the loss of informative answers on valid queries. Traditional lexical overlap metrics alone are therefore insufficient for evaluating cascading RAG pipelines.
+
+Systemic latency represents another critical constraint in model cascading. While local routing classifiers incur negligible latency ($\approx 11$\,ms as reported by \citet{zhang2025ragrouter}), cloud API routing via Gemini 3.5 Flash-Lite introduced a 550--650\,ms coordination delay in the benchmark pipeline ($P_{50} \approx 600$\,ms). Compounding this overhead with slower frontier-tier generation doubled median execution latency across every configuration on MuSiQue ($+89.6\%$ to $+118.7\%$, $p < 0.001$, Table~\ref{tab:latency_musique}), transforming an insignificant $+12.0\%$ latency delta in SR + PC into a $+115.7\%$ inflation in SR + PC + MC. Similarly, median latency on the enterprise closed corpus increased by 38.1\% (from 1,407.0\,ms to 1,943.5\,ms). Enterprise architects must therefore recognize that model cascading is fundamentally an economic optimization mechanism rather than a quality enhancer for complex reasoning, delivering its greatest value in high-volume workloads where the majority of queries can be safely resolved by lightweight model tiers.
+
+\subsection{Multi-Module Synergies and Pipeline Interactions}
 \label{subsec:disc_synergy_bifurcation}
 
-% -------------------------------------------------------------------------
-% RAKENNE & YDINPOINTIT (Taso 2: Moduulien väliset yhteisvaikutukset, RQ4)
-% -------------------------------------------------------------------------
-% - Synergia-bifurkaatio (S2B + MC vs. SR + MC): Miksi SR + MC (C9) romahtaa
-%   yrityskorpuksen huonoimmaksi kokoonpanoksi (Q = 0.5418, -12.7 %), vaikka
-%   sillä on koko testin korkein Context Precision (0.683), kun taas S2B + MC (C7)
-%   on toiseksi paras (Q = 0.6587)?
-% - Kontekstin pirstaloituminen vs. vanhempidokumentin suojakilpi: Ilman
-%   S2B-laajennusta ristiinkooderi (SR) karsii pois reunaehdot ja taustakappaleet
-%   (konteksti putoaa 8.1k -> 4.5k merkkiin), jolloin Flash-Lite hallusinoi
-%   puuttuvia ehtoja ja Pro kieltäytyy vastaamasta (50 % FRR). S2B:n 1 024 tokenin
-%   vanhempidokumentti säilyttää eheyden kevyille malleille.
-% - S2B:n yllättävä latenssietu: Miksi S2B ei hidastanut hakua yrityskorpuksessa
-%   (-4.3 % Closed, -2.4 % Raw)? Pienempi 128 tokenin lapsi-indeksi puolittaa
-%   vektorihaun P95-häntälatenssin, PostgreSQL-avainhaku vie vain 1-2 ms, ja
-%   eheä konteksti nopeuttaa LLM:n generointia (T_stream).
-% - Prompt Cachingin Attention Anchoring -synergia: Miksi S2B + PC (C6) saavuttaa
-%   globaalin laatuennätyksen (Q = 0.6711, Faithfulness 0.886 vs. S2B:n 0.863)?
-%   Staattisen ohjeistuksen ja CoT-esimerkkien kiinnittäminen KV-välimuistiin
-%   ankkuroi mallin huomion, kun dynaaminen konteksti kasvaa suureksi S2B:n myötä.
-%
-% =========================================================================
-% DRAFT NOTES 3: Synergia-bifurkaatio: SR + MC (C9) romahdus vs. S2B + MC (C7) menestys
-% =========================================================================
-% - Enterprise Closedissa havaitaan jyrkkä laatuero:
-%     * S2B + MC (C7):  Q = 0.6587 (toiseksi paras), Faith = 0.858, FRR = 11.2 %
-%     * SR + MC (C9):   Q = 0.5418 (koko testin huonoin, -12.7 %), Faith = 0.780, FRR = 17.5 %
-%     * Huom: C9:llä on silti koko testin KORKEIN Context Precision (0.683 vs. C7:n 0.661)!
-% - Juurisyy JSONL-datasta (Kyselyt 1hop__nordea_0030, 2hop__nordea_0009, 0019, 0020, 0040):
-%     * Re-ranker ilman S2B-laajennusta karsii pois reunaehtojen ja 2-hypyn taustakappaleet 
-%       (kontekstin pituus putoaa 4.5k merkkiin vs. C7:n 8.1k merkkiin).
-%     * Flash-Lite ei kykene rekonstruoimaan puuttuvia ehtoja kapeista paloista: se kieltäytyy 
-%       tai hallusinoi ehtoja (Faithfulness putoaa Litellä 0.906 -> 0.849, esim. kysely 0040: Faith = 0.50).
-%     * Pro kieltäytyy herkästi puutteellisella kontekstilla (Pron FRR C9:ssä peräti 50.0 %!).
-%     * C7:ssä S2B:n 1 024 tokenin vanhempidokumentti toimii suojakilpenä: Litellä FRR on 
-%       vain 2.4 % ja Faithfulness 0.906. S2B suojaa kevyitä ja tiukkoja malleja pirstaloitumiselta.
-%
-% =========================================================================
-% DRAFT NOTES 6: Poikkileikkaavat Havainnot (PC Attention Anchoring & S2B Latenssi)
-% =========================================================================
-% - PC:n huomion ankkurointivaikutus (Attention Anchoring):
-%     * C6 (S2B + PC) saavuttaa korkeamman Faithfulnessin (0.886) kuin C1 S2B (0.863).
-%     * Staattisen kehotteen ja CoT-esimerkkien jäädyttäminen KV-cacheen ankkuroi huomion, 
-%       estäen tarkkaavaisuuden hajoamista (attention dilution / drift) pitkissä 1 024 tokenin ikkunoissa.
-% - Small-to-Bigin negatiivinen latenssidelta yritysaineistoissa (-4.3 % Closed, -2.4 % Raw):
-%     * PostgreSQL:n parent-laajennus vie vain 1-2 ms (T_expand).
-%     * Kompaktimpi 128 tokenin lapsi-indeksi leikkaa noudon P95-häntälatenssin puoleen (674 -> 317 ms).
-%     * Eheä parent-konteksti nopeuttaa LLM:n striimausta (T_stream P50: 147 -> 131.5 ms), koska 
-%       malli vastaa varmemmin ilman epävarmuuden kiertelyä.
-%
-% -------------------------------------------------------------------------
-% PEILAUS LUVUN 3 KIRJALLISUUTEEN (03_literature_review.tex)
-% -------------------------------------------------------------------------
-% - [TUKEE]: Rivillä 25 (03_literature_review.tex) tutkijat Paulo Roberto de Moura J{\'u}nior, Jean Lelong ja Annabelle Blangero ("Adaptive Chunking: Optimizing Chunking-Method Selection for {RAG}")
-%   löysivät, että pienillä tekstipaloilla on korkea kappaleensisäinen koheesio (ICC), mutta heikko dokumentin kontekstuaalinen koherenssi (DCC) semanttisen pirstaloitumisen vuoksi, mikä tukee löydöstä synergiabifurkaation juurisyistä: SR+MC-yhdistelmässä (C9) re-ranker ilman S2B-laajennusta karsii pois reunaehdot ja taustakappaleet supistaen kontekstin 8.1k merkistä 4.5k merkkiin, jolloin DCC romahtaa: keveämpi Flash-Lite ei kykene rekonstruoimaan ehtoja ja hallusinoi pudottaen Faithfulnessin 0.906:sta 0.849:ään, ja Gemini 3.1 Pro kieltäytyy vastaamasta 50.0 % ajasta nostaen FRR:n 17.5 %:iin ja romahduttaen laadun Q = 0.5418:aan (-12.7 %); sen sijaan S2B+MC-putkessa (C7) S2B:n 1 024 tokenin vanhempidokumentti palauttaa DCC:n ja toimii suojakilpenä kevyille malleille saavuttaen Q = 0.6587, Faithfulnessin 0.858 ja FRR:n 11.2 % (Litellä FRR vain 2.4 % ja Faithfulness 0.906).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{demourajunior2026adaptive}
-%
-% - [TUKEE]: Rivillä 25 (03_literature_review.tex) tutkijat Elias Lumer, Matt Melich, Olivia Zino, Elena Kim, Sara Dieter, Pradeep Honaganahalli Basavaraju, Vamse Kumar Subbiah, James A. Burke ja Roberto Hernandez ("Rethinking Retrieval: From Traditional Retrieval Augmented Generation to Agentic and Non-Vector Reasoning Systems in the Financial Domain for Large Language Models")
-%   löysivät, että naapuripalojen laajennus liukuvilla ikkunoilla palauttaa rakenteellisen jatkuvuuden erottamalla nouto- ja generointi-ikkunat toisistaan, mikä tukee S2B + MC -yhdistelmän (C7) menestystä suhteessa SR + MC -putken (C9) romahdukseen: S2B:n 1 024 tokenin vanhempilaajennus estää monimutkaisten sääntöjen pirstaloitumisen, mikä pitää Flash-Liten virheellisen kieltäytymisasteen (FRR) vain 2.4 %:ssa ja Faithfulnessin 0.906:ssa, toisin kuin erillisiin karsittuihin paloihin perustuvassa C9:ssä.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{lumer2025rethinking}
-%
-% - [TÄYDENTÄÄ]: Rivillä 5 (03_literature_review.tex) tutkijat Isaac Ong, Amjad Almahairi, Vincent Wu, Wei-Lin Chiang, Tianhao Wu, Joseph E. Gonzalez, M Waleed Kadous ja Ion Stoica ("RouteLLM: Learning to Route LLMs with Preference Data") ja rivillä 20 tutkijat Minghao Guo, Qingcheng Zeng, Xujiang Zhao, Yanchi Liu, Wenchao Yu, Mengnan Du, Haifeng Chen ja Wei Cheng ("DeepSieve: Information Sieving via LLM-as-a-Knowledge-Router")
-%   löysivät, että reititys ohjaa yksinkertaiset kyselyt kevyille malleille ja parantaa laatua leikkaamalla tokeneita, mikä täydentää synergia-bifurkaatiohavaintoa: pelkkä mallin skaalaaminen yhdistettynä suoraan re-rankeraukseen (SR + MC, C9) tuottaa tuhoisan laatuantagonismin (Q = 0.5418, -12.7 %), ellei kontekstin koheesiota suojata S2B-hierarkialla (S2B + MC, C7: Q = 0.6587).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{ong2025routellm}, \citet{guo2026deepsieve}
-%
-% - [TÄYDENTÄÄ]: Rivillä 16 (03_literature_review.tex) tutkijat Lingjiao Chen, Matei Zaharia ja James Zou ("FrugalGPT: How to Use Large Language Models While Reducing Cost and Improving Performance")
-%   löysivät, että mallikaskadointi tuo merkittäviä kustannussäästöjä, mikä täydentää monimoduulisen kustannussynergian havaintoamme: vaikka pelkkä MC toi yritysdatassa -34.2 % säästön ($8.942 / 1k), yhdessä Prompt Cachingin kanssa (PC + MC, C10) saavutettiin globaali säästöennätys -81.3 % ($2.543 / 1k, QPD = 239) lähes nollalaatuvaikutuksella (Q = 0.6085 vs baseline 0.6209). Lisäksi MC kompensoi kalliin S2B + SR -putken API-kuluja pudottaen kustannukset $19.196:sta $14.082:een (-26.6 %) ja S2B + SR + PC + MC:ssä edelleen $7.922:een (-58.7 %).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{chen2023frugalgpt}
-%
-% - [RISTIRIIDASSA]: Rivillä 59 ja 61 (03_literature_review.tex) tutkijat Zihan Wang, Zihan Liang, Zhou Shao, Yufei Ma, Huangyu Dai, Ben Chen, Lingtao Mao, Chenyi Lei, Yuqing Ding ja Han Li ("InfoGain-RAG: Boosting Retrieval-Augmented Generation through Document Information Gain-based Reranking and Filtering") sekä Yue Yu, Wei Ping, Zihan Liu, Boxin Wang, Jiaxuan You, Chao Zhang, Mohammad Shoeybi ja Bryan Catanzaro ("RankRAG: Unifying Context Ranking with Retrieval-Augmented Generation in LLMs")
-%   löysivät, että hyödyttömien dokumenttien suodattaminen ja lopullisen konteksti-ikkunan pienentäminen parantaa tarkkuutta (EM +17.4–17.8 pp) ja säästää tokeneita laadun kärsimättä, mikä on ristiriidassa monimoduulisen SR + MC (C9) -löydöksemme kanssa: re-rankerin tekemä karsinta ilman S2B-laajennusta nosti kyllä Context Precisionin testin korkeimmaksi (0.683), mutta leikkasi pois 2-hypyn reunaehdot (konteksti putosi 8.1k -> 4.5k merkkiin), jolloin Faithfulness putosi 0.780:aan, FRR kasvoi 17.5 %:iin ja laatu putosi testin huonoimmaksi (Q = 0.5418, -12.7 %).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{wang2025infogain}, \citep{wang2025infogain}, \citep{yu2024rankrag}
-%
-% - [TÄYDENTÄÄ]: Rivillä 38 (03_literature_review.tex) tutkijat Elias Lumer, Matt Melich, Olivia Zino, Elena Kim, Sara Dieter, Pradeep Honaganahalli Basavaraju, Vamse Kumar Subbiah, James A. Burke ja Roberto Hernandez ("Rethinking Retrieval: From Traditional Retrieval Augmented Generation to Agentic and Non-Vector Reasoning Systems in the Financial Domain for Large Language Models")
-%   löysivät, että asynkroninen rinnakkaishaku naapuripaloille minimoi viiveen lisäten vain mitättömän ~0.17 s (170 ms) latenssiylijäämän, mikä täydentää ja ylittää löydöksemme S2B:n negatiivisesta latenssideltasta yrityskorpuksissa: kokeissamme S2B nopeutti kokonaissuoritusaikaa Enterprise Closedissa -4.3 % (1 347.0 ms vs. baseline 1 407.0 ms) ja Enterprise Rawissa -2.4 % (1 621.0 ms vs. 1 660.5 ms), koska kompaktimpi 128 tokenin lapsi-indeksi puolittaa vektorihaun P95-häntälatenssin (674 ms -> 317 ms), PostgreSQL-avainhaku vie vain 1-2 ms (T_expand) ja eheä vanhempikonteksti nopeuttaa generointia (T_stream P50: 147.0 ms -> 131.5 ms).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{lumer2025rethinking}
-%
-% - [TUKEE]: Rivillä 38 (03_literature_review.tex) tutkijat Shengyuan Chen, Chuang Zhou, Zheng Yuan, Qinggang Zhang, Zeyang Cui, Hao Chen, Yilin Xiao, Jiannong Cao ja Xiao Huang ("LogicRAG: Retrieval Augmented Generation with Adaptive Reasoning Structures") ja rivillä 61 tutkijat Yue Yu et al. ("RankRAG: Unifying Context Ranking with Retrieval-Augmented Generation in LLMs")
-%   löysivät, että monimutkaiset päättelyrakenteet yli kaksinkertaistavat viiveen (4.28 s -> 9.83 s) ja uudelleenjärjestäminen lisää 0.9x–6.0x viiveylijäämän, mikä tukee havaintoa monivaiheisten ketjujen latenssin kumuloitumisesta (MuSiQuessa MC +104.2 % ja S2B+SR+MC P95 30.9 s; Enterprise Closedissa SR+MC +49.6 %).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{chen2026logicrag}, \citep{yu2024rankrag}
-%
-% - [TÄYDENTÄÄ / RISTIRIIDASSA]: Rivillä 43 (03_literature_review.tex) tutkijat Nelson F. Liu, Kevin Lin, John Hewitt, Ashwin Paranjape, Michele Bevilacqua, Fabio Petroni ja Percy Liang ("Lost in the middle: How language models use long contexts") sekä rivillä 80 tutkijat Chao Jin et al. ("RAGCache: Efficient Knowledge Caching for Retrieval-Augmented Generation"), Jiayi Yao et al. ("CacheBlend: Fast Large Language Model Serving for RAG with Cached Knowledge Fusion") ja Jiahao Wang et al. ("From Prefix Cache to Fusion RAG Cache: Accelerating LLM Inference in Retrieval-Augmented Generation")
-%   löysivät, että pitkissä konteksteissa tarkkaavaisuus heikkenee keskellä (LitM) ja että KV-välimuisti parhaimmillaan säilyttää täyden laskennan laadun (zero quality loss tai 99 % palautus 15 % uudelleenlaskennalla), mikä täydentyy ja on osin ristiriidassa Attention Anchoring -löydöksemme kanssa: kun Prompt Caching yhdistettiin Small-to-Big -hakuun (C6: S2B + PC), se YLITTI täyden laskennan laadun saavuttaen yrityskorpuksen globaalin huippulaadun (Q = 0.6711 vs baseline 0.6209, +8.1 %) ja nosti Faithfulnessin korkeammaksi (0.886) kuin pelkkä S2B (0.863). Staattisen ohjeistuksen ja CoT-esimerkkien lukitseminen KV-välimuistiin toimii huomioankkurina, joka estää tarkkaavaisuuden hajoamisen (attention drift) pitkissä 1 024 tokenin ikkunoissa.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citep{liu2024lost}, \citep{jin2025ragcache}, \citep{yao2025cacheblend}, \citep{wang2026fusionrag}
-%
-% - [TUKEE]: Rivillä 78 (03_literature_review.tex) tutkijat Songshuo Lu, Hua Wang, Yutian Rong, Zhi Chen ja Yaohua Tang ("TurboRAG: Accelerating Retrieval-Augmented Generation with Precomputed KV Caches for Chunked Text") ja organisaatio Google Cloud ("Gemini Enterprise Agent Platform Pricing: Generative AI and Foundation Models")
-%   löysivät tekstilohkojen esilaskettujen KV-välimuistien ja 10x välimuistialennusten tuovan etuja monihyppyisessä päättelyssä ja kustannuksissa, mikä tukee S2B + PC -synergiaa (C6): MuSiQuessa S2B + PC oli ainoa arkkitehtuuri, joka saavutti tilastollisesti merkitsevän latenssinopeutuksen (-8.0 %, p < 0.001, P95 3 397.2 ms -> 1 745.1 ms), ja yrityskorpuksessa PC leikkasi S2B + SR -putken kustannuksia -51.0 % ($19.196 -> $9.412 / 1k).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citep{lu2025turborag}, \citep{GoogleVertexAIPricing}
+When evaluated on the enterprise closed corpus, compounding semantic re-ranking with model cascading (SR + MC) resulted in an unexpected quality collapse, yielding the lowest composite quality across the entire benchmark ($Q = 0.5418$, a 12.7\% drop relative to the baseline, Table~\ref{tab:quality_enterprise}). This collapse occurred despite SR + MC achieving the highest Context Precision of all evaluated pipelines ($CP = 0.683$). The root cause of this synergy bifurcation lies in context fragmentation: isolated cross-encoder re-ranking prunes contiguous background chunks and peripheral boundary conditions, contracting the retrieved context from approximately 8,100 characters down to 4,500 characters. Consequently, query-level evaluation logs underlying Table~\ref{tab:quality_enterprise} reveal that the lightweight tier (Gemini 3.5 Flash-Lite) failed to reconstruct omitted premises and hallucinated missing conditions (depressing its tier-specific Faithfulness from 0.929 down to 0.849, driving overall pipeline Faithfulness to 0.780), while the frontier tier (Gemini 3.1 Pro) interpreted the partial retrieval as an absence of proof, driving its tier-specific false refusal rate to 50.0\% (against an aggregate pipeline FRR of 17.5\%). This fragmentation directly challenges the prevailing assumption in retrieval-filtering literature that aggressively pruning peripheral context strictly enhances downstream accuracy \citep{wang2025infogain, yu2024rankrag}. Instead, these empirical dynamics directly corroborate \citet{demourajunior2026adaptive}, who demonstrated that while granular chunks exhibit high intrachunk cohesion (ICC), isolated retrieval severely compromises document contextual coherence (DCC). In contrast, the 1,024-token parent document in S2B + MC preserved contextual coherence, acting as a protective shield that sustained composite quality at $Q = 0.6587$, held overall FRR at the baseline 11.2\%, and limited tier-specific Flash-Lite refusals to merely 2.4\%.
 
+From a latency perspective, Small-to-Big retrieval serves as a primary architectural enabler in multi-module pipelines because it introduces virtually no computational bottleneck. On the enterprise closed corpus, it even yielded a modest, albeit statistically insignificant, latency reduction ($-4.3\%$, falling from 1,407.0\,ms to 1,347.0\,ms, Table~\ref{tab:latency_enterprise}). Whereas prior implementations of dynamic context expansion report runtime coordination overheads exceeding 170\,ms when retrieving neighboring segments \citep{lumer2025rethinking}, the deterministic relational architecture implemented in this study via PostgreSQL primary-key lookups ($T_{\text{expand}}$) incurred merely 1--2\,ms of overhead. This negligible expansion cost allows Small-to-Big retrieval to be compounded with prompt caching and model cascading without introducing cumulative latency penalties. Furthermore, as detailed in the component breakdowns in Appendix~\ref{sec:appendix_breakdowns}, indexing compact 128-token child representations halved vector retrieval $P_{95}$ tail latency (from 674.0\,ms to 317.0\,ms) and eliminated hedging tokens during downstream generation, shaving median streaming duration ($T_{\text{stream}}$) from 147.0\,ms down to 131.5\,ms. Even when compounded with neural re-ranking (S2B + SR), the smaller child vectors kept retrieval latency low. On the multi-hop MuSiQue benchmark, however, this latency advantage vanished: parent expansion increased median execution latency by 23.9\% over the naive baseline (1,684.0\,ms versus 1,359.0\,ms, $p < 0.01$, Table~\ref{tab:latency_musique}), as assembling multi-hop evidentiary chains requires expanding multiple disjoint parent passages.
 
-\subsection{Corpus Topology, the Retrieval Noise Threshold, and Enterprise Deployment}
+Compounding prompt caching with Small-to-Big retrieval (S2B + PC) emerged as the overall quality peak on the enterprise closed corpus. This synergy produced the highest composite quality score ($Q = 0.6711$ versus $0.6209$ baseline), Faithfulness ($0.886$ versus $0.844$), and Answer Relevancy ($0.693$ versus $0.666$). While dynamic chunk-caching architectures often suffer from cross-attention degradation across concatenated KV states \citep{yao2025cacheblend, wang2026fusionrag}, precomputing immutable system instructions sidesteps representation mismatch entirely. Instead, the cached prefix operates as an architectural attention anchor, mitigating the attention dilution and ``lost-in-the-middle'' decay \citep{liu2024lost} that commonly occur when dynamic prompts expand to 1,024-token parent windows. On MuSiQue, this configuration remained competitive as the third-highest-performing pipeline overall while stabilizing execution tail latency.
+
+Finally, the suboptimal performance of the fully compounded four-module architecture (S2B + SR + PC + MC) highlights a cumulative ``serialization tax'', where stacking multiple distinct optimizations simultaneously erodes the performance dividends gained in isolated or pairwise configurations. In the enterprise closed corpus, the benchmark-topping composite quality achieved by S2B + PC ($Q = 0.6711$) is first diluted to $0.6411$ upon incorporating model cascading (S2B + PC + MC), and subsequently drops to $0.6050$ when neural re-ranking is introduced (Table~\ref{tab:quality_enterprise}). A corresponding regression occurs on the multi-hop MuSiQue benchmark, where the four-module pipeline ranks second-lowest overall ($Q = 0.1486$), with only SR + PC + MC exhibiting worse performance ($Q = 0.1209$, Table~\ref{tab:quality_musique}). This degradation demonstrates an architectural redundancy: sequentially chaining multiple distributed API calls and local expansion phases introduces compound latency friction ($P_{50} = 2{,}532.5$\,ms, $P_{95} = 6{,}531.1$\,ms on the enterprise closed corpus) while re-ranking coherent 1,024-token parent contexts provides no discriminative benefit, rendering the fully compounded four-module configuration strictly dominated on the Pareto frontier.
+
+\subsection{Corpus Topology, Noise Thresholds, and Deployment Guidelines}
 \label{subsec:disc_corpus_topology}
 
-% -------------------------------------------------------------------------
-% RAKENNE & YDINPOINTIT (Taso 3: Datan topologia ja käytännön suositukset)
-% -------------------------------------------------------------------------
-% - Hakukohinan kynnysarvo (Retrieval Noise Threshold): Miksi S2B + SR ei
-%   parantanut laatua tilastollisesti suljetussa yrityskorpuksessa (Enterprise Closed),
-%   mutta tuotti tilastollisesti merkitsevän +28.1-28.8 % laatuhypyn (p_adj < 0.01)
-%   avoimessa raakakorpuksessa (Enterprise Raw)?
-% - Re-ranking kohinasuodattimena (Noise Gate): Esisuodatetuissa tai pienissä
-%   tietokannoissa re-ranking on kallis redundanssi, joka voi rikkoa peräkkäisten
-%   lapsipalojen koheesion. Suodattamattomassa tuotantokannassa (PDF-ehdot,
-%   verkkosivut, distraktorit) se on välttämätön portinvartija ennen S2B-laajennusta
-%   (pudottaen 2-hop FRR:n 27.5 % -> 7.5 %).
-% - Käytännön valintamatriisi yritysarkkitehdeille:
-%     * Kustannus- ja laatuoptimi (yleissuositus): S2B + PC (Pareto-optimaalinen
-%       kaikissa ympäristöissä, paras laatu ja -70 % kustannus).
-%     * Maksimisäästö korkealla volyymillä: PC + MC tai S2B + PC + MC (jopa -81.3 %
-%       kustannussäästö, kunhan ~300-500 ms lisälatenssi hyväksytään).
-%     * Suodattamaton / kohinainen yritystietokanta: S2B + SR + PC (laatu varmistetaan
-%       re-rankingilla, ja PC kompensoi ristiinkooderin API-kulut).
-%
-% =========================================================================
-% DRAFT NOTES 4: Hakukohinan Kynnysarvo (Retrieval Noise Threshold) & Korpusten Inversio
-% =========================================================================
-% - Suljetussa korpuksessa (Enterprise Closed, 20 kandidaattia / kysely, 1 701 palaa):
-%     * C1 S2B pärjää yksin erinomaisesti (Q = 0.6449 ns).
-%     * Re-rankingin lisääminen (C5 S2B + SR) LASKEE laatua (Q = 0.5813 ns), koska puhdas 
-%       kanta ei tarvitse karsintaa ja re-ranker rikkoo peräkkäisten lapsipalojen koheesion.
-% - Avoimessa raakakorpuksessa (Enterprise Raw, 2 420 uniikkia palaa, PDF-ehdot ja web):
-%     * Baseline C0 romahtaa (Q = 0.5022, 2-hop FRR hyppää 12.5 % -> 27.5 %).
-%     * Re-ranking toimii välttämättömänä kohinasuodattimena (Noise Gate), joka siivoaa distraktorit 
-%       ennen S2B-laajennusta:
-%         - S2B + SR (C5):    Q = 0.6433** (p_adj = 0.0077, +28.1 % parannus baselineen)
-%         - S2B + SR + PC (C11): Q = 0.6466** (p_adj = 0.0029, +28.8 % parannus)
-%         - S2B + SR + MC (C12): Q = 0.6162*  (p_adj = 0.0470, +22.7 % parannus)
-%         - Context Precision paranee tilastollisesti merkitsevästi (p_adj < 0.05) peräti 7 S2B-putkessa.
-%         - 2-hop FRR putoaa 27.5 %:sta 7.5 %:iin!
-% - Johtopäätös: Re-ranking tuo tilastollisesti vahvistetun hyödyn vasta, kun hakukohina 
-%   ylittää kriittisen kynnysarvon. Kuratoidussa kannassa se on redundanssi.
-%
-% -------------------------------------------------------------------------
-% PEILAUS LUVUN 3 KIRJALLISUUTEEN (03_literature_review.tex)
-% -------------------------------------------------------------------------
-% - [TUKEE]: Rivillä 36 (03_literature_review.tex) tutkijat Elias Lumer, Matt Melich, Olivia Zino, Elena Kim, Sara Dieter, Pradeep Honaganahalli Basavaraju, Vamse Kumar Subbiah, James A. Burke ja Roberto Hernandez ("Rethinking Retrieval: From Traditional Retrieval Augmented Generation to Agentic and Non-Vector Reasoning Systems in the Financial Domain for Large Language Models")
-%   löysivät, että kontekstin laajentaminen naapuripaloihin nosti voittoprosentin 65 %:iin erillisiin paloihin verrattuna finanssiteksteissä, mikä tukee S2B:n erinomaista suorituskykyä suodattamattomassa Enterprise Raw -korpuksessa (S2B yksin nosti laadun Q = 0.6368:aan vs. baseline 0.5022, +26.8 % parannus, ja Closed-korpuksessa Q = 0.6449:ään vs. 0.6209).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{lumer2025rethinking}
-%
-% - [TUKEE]: Rivillä 36 (03_literature_review.tex) tutkijat Paulo Roberto de Moura J{\'u}nior, Jean Lelong ja Annabelle Blangero ("Adaptive Chunking: Optimizing Chunking-Method Selection for {RAG}")
-%   löysivät, että dokumentin rakenteeseen mukautuva paloittelu nostaa loppupään vastaustarkkuutta 8–10 prosenttiyksikköä ilman kehotemuutoksia, mikä tukee empiirisiä tuloksiamme suodattamattomassa Enterprise Raw -korpuksessa: S2B:n hierarkkinen vanhempilaajennus nosti Faithfulness-tulosta tasan 10.0 prosenttiyksikköä suhteessa perusviivaan (0.756 -> 0.856) ilman muutoksia kehotteisiin tai malleihin.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{demourajunior2026adaptive}
-%
-% - [TUKEE]: Rivillä 39 (03_literature_review.tex) tutkijat Mateusz {\'{S}}migielski, Micha{\l} Rajkowski, Mateusz Zbrocki, Micha{\l} Bernacki-Janson, Karol Kunicki, Julianna Godziszewska, Maciej Piasecki ja Konrad Wojtasik ("Chunking Methods on Retrieval-Augmented Generation -- Effectiveness Evaluation Against Computational Cost and Limitations") sekä Elias Lumer et al. ("Rethinking Retrieval: From Traditional Retrieval Augmented Generation to Agentic and Non-Vector Reasoning Systems in the Financial Domain for Large Language Models")
-%   löysivät, että malliohjatut paloittelumenetelmät voivat viedä kymmeniä tunteja kiinteän paloittelun valmistuessa alle sekunnissa ja että hierarkkisten solmutiivistelmien luominen nostaa esikäsittelykustannuksia moninkertaisesti ($1.19 -> $6.12 per raportti), mikä tukee yritysarkkitehtuurimme valintaa käyttää determinististä lapsi-vanhempipaloittelua (128 -> 1 024 tokenia) ja PostgreSQL-osoitinlaajennusta ilman LLM-pohjaisia esilaskentakuluja.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{smigielski2026chunking}, \cite{lumer2025rethinking}
-%
-% - [TÄYDENTÄÄ]: Rivillä 43 ja 59 (03_literature_review.tex) tutkijat Gabriel de Souza P. Moreira, Ronay Ak, Benedikt Schifferer, Mengyao Xu, Radek Osmulski ja Even Oldridge ("Enhancing {Q\&A} Text Retrieval with Ranking Models: Benchmarking, fine-tuning and deploying Rerankers for {RAG}") sekä Zhiyuan Cheng, Longying Lai, Yue Liu, Kai Cheng ja Xiaoxi Qi ("Enhancing Financial Report Question-Answering: A Retrieval-Augmented Generation System with Reranking Analysis")
-%   löysivät, että kaksivaiheinen haku ristiinkooderilla parantaa noudon relevanssia (14 % suhteellinen ja 9 pp absoluuttinen parannus NDCG@10-metriikkaan BEIR QA -aineistoissa), mikä täydentää havaintoamme hakukohinan kynnysarvosta (Retrieval Noise Threshold): esisuodatetussa kannassa (Enterprise Closed) re-ranking nostaa kyllä Context Precisionia (0.676), mutta on loppupään laadulle redundanssi (S2B+SR Q = 0.5813 vs. S2B 0.6449); sen sijaan suodattamattomassa tuotantokannassa (Enterprise Raw) se toimii välttämättömänä kohinasuodattimena (Noise Gate), jolloin S2B+SR tuottaa tilastollisesti merkitsevän +28.1 % laatuhypyn (Q = 0.6433**, p_adj = 0.0077) ja S2B+SR+PC +28.8 % hypyn (Q = 0.6466**, p_adj = 0.0029).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citep{moreira2024enhancing, cheng2026enhancing}, \citet{moreira2024enhancing}
-%
-% - [TUKEE]: Rivillä 59 (03_literature_review.tex) tutkijat Zhepei Wei, Wei-Lin Chen ja Yu Meng ("InstructRAG: Instructing Retrieval-Augmented Generation via Self-Synthesized Rationales") sekä Zhiyuan Cheng, Longying Lai, Yue Liu, Kai Cheng ja Xiaoxi Qi ("Enhancing Financial Report Question-Answering: A Retrieval-Augmented Generation System with Reranking Analysis")
-%   löysivät, että eksplisiittinen kohinanpoisto (denoising) nostaa tarkkuutta 8.3 % kandidaattimäärän kasvaessa ja että finanssiraporteissa ristiinkooderi nosti korkean oikeellisuuden vastausten osuutta 33.5 % -> 49.0 % ja vähensi vakavia hallusinaatioita 35.3 % -> 22.5 %, mikä tukee suoraan löydöksiämme Enterprise Raw -korpuksessa, jossa S2B+SR (C5) pudotti 2-hypyn virheelliset kieltäytymiset (FRR) 27.5 %:sta 7.5 %:iin ja nosti Composite Qualityn Q = 0.5022:sta arvoon 0.6433** (+28.1 %).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{wei2025instructrag}, \cite{cheng2026enhancing}
-%
-% - [TÄYDENTÄÄ]: Rivillä 61 (03_literature_review.tex) tutkijat Gabriel de Souza P. Moreira, Ronay Ak, Benedikt Schifferer, Mengyao Xu, Radek Osmulski ja Even Oldridge ("Enhancing {Q\&A} Text Retrieval with Ranking Models: Benchmarking, fine-tuning and deploying Rerankers for {RAG}")
-%   löysivät, että karsittu 4 miljardin parametrin rerankeri lisää keskimäärin noin 266 ms viivettä, mikä täydentää yrityskäyttöönoton kustannus- ja latenssianalyysiä: pilvipohjainen Vertex AI Ranking lisäsi latenssia maltillisesti (rerank-vaiheen P50 = 108 ms), mutta sen suora API-kustannus ($0.00010 per dokumentti) nostaa S2B+SR-putken kulut $19.196:een / 1k (+41.4 %), mikä tekee yhdistelmästä S2B+SR+PC ($9.412 / 1k) tai S2B+SR+PC+MC ($7.922 / 1k) välttämättömän taloudellisesti kestävälle tuotantokäytölle kohinaisissa korpuksissa.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{moreira2024enhancing}
+In pre-filtered and structurally constrained benchmarks---specifically MuSiQue and the enterprise closed corpus---semantic re-ranking acts primarily as an expensive distractor. In these clean settings, cross-encoder scoring depresses composite quality, exhibiting severe antagonism when compounded with Small-to-Big retrieval (dropping $Q$ from $0.6449$ in S2B down to $0.5813$ in S2B + SR, Table~\ref{tab:quality_enterprise}). Conversely, in the unconstrained raw enterprise corpus, which presents a broader document topology containing complex tabular clauses and noisy web documentation, the empirical dynamic inverts completely. In this uncurated setting, S2B + SR yields the fourth-highest composite quality overall ($Q = 0.6433$, a statistically significant $+28.1\%$ gain over the baseline, $p < 0.01$, Table~\ref{tab:quality_enterprise_raw}) while suppressing the false refusal rate to merely 7.5\% (falling from 27.5\% to 7.5\% on two-hop queries). Furthermore, compounding prompt caching into this pipeline (S2B + SR + PC) delivers the third-highest quality across the raw benchmark ($Q = 0.6466$, $+28.8\%$, $p < 0.01$), trailing only S2B + PC ($0.6633$) and S2B + MC ($0.6492$), where S2B + SR provides discriminative accuracy while prompt caching fully neutralizes the cross-encoder API tariff.
 
+The primary mechanism governing this cross-corpus inversion is the retrieval noise threshold. In curated corpora with high signal-to-noise ratios, dense semantic retrieval already concentrates gold-standard context within top ranks. In these environments, cross-encoders disrupt intra-document ordering and prematurely prune adjacent child chunks necessary for procedural synthesis. In contrast, in uncurated production corpora, dense vector embeddings frequently retrieve semantically adjacent but factually irrelevant distractors. In such environments, the cross-encoder operates as an indispensable noise gate \citep{moreira2024enhancing, cheng2026enhancing}, filtering out distractors prior to relational parent expansion. These findings indicate that semantic re-ranking delivers actionable enterprise utility only when corpus noise exceeds a critical threshold---represented empirically in this study by the transition from the isolated candidate pools of the closed corpus (1,701 chunks) to the unconstrained document corpus (2,420 chunks with raw background noise).
 
-\subsection{Methodological Reflections and Limitations}
+These empirical dynamics yield three actionable architectural recommendations for enterprise system architects, conditioned on operational constraints and corpus characteristics. First, the general recommendation across environments is to deploy Small-to-Big retrieval with prompt caching (S2B + PC), which establishes the Pareto-optimal benchmark by maximizing composite quality ($Q \in [0.6633, 0.6711]$) while securing a 63.9\%--78.4\% operational cost reduction. Second, for high-volume deployments prioritizing maximum expenditure reduction, combining prompt caching with model cascading (PC + MC or S2B + PC + MC) provides the greatest economic efficiency, slashing baseline expenditures by up to 81.3\% with QPD values reaching 200--239, provided that the cloud API routing delay (550--650\,ms, $P_{50} \approx 600$\,ms) is acceptable. Finally, as document repositories expand into uncurated enterprise corpora with elevated retrieval noise, integrating semantic re-ranking alongside Small-to-Big retrieval and prompt caching (S2B + SR + PC) transitions from an expensive computational redundancy into an indispensable prerequisite for suppressing hallucinations and false refusals.
+
+\subsection{Methodological Limitations and Threats to Validity}
 \label{subsec:disc_limitations}
 
-% -------------------------------------------------------------------------
-% RAKENNE & YDINPOINTIT (Taso 4: Mittausmetodologian kritiikki ja rajoitteet)
-% -------------------------------------------------------------------------
-% - Harmonisen keskiarvon (Q, eps = 10^-4) "heikoimman lenkin rangaistus":
-%   Miksi yksittäinen nollametriikka (CP, CR, Faith tai AR = 0) pudottaa koko
-%   kyselyn Q-arvon tasolle <= 0.0004?
-% - Vaikutus tilastolliseen voimaan: MuSiQuessa 68.8-77.5 % kyselyistä sisältää
-%   vähintään yhden nollan, mikä lukitsee mediaani-Q:n arvoon 0.0002 ja luo
-%   sidoksia (ties), jotka heikentävät parametrittoman Wilcoxon-testin
-%   erottelukykyä. Miksi Q on silti perusteltu teollinen SLA-mittari
-%   (nollatoleranssi yksittäisen vaiheen pettämiselle), mutta vaatii rinnalleen
-%   osatekijäkohtaisen tarkastelun.
-% - Muut tutkimuksen rajoitteet (Threats to Validity):
-%     * Yhden pilviekosysteemin (Google Cloud Vertex AI & Gemini 3.x -malliperhe)
-%       infrastruktuurisidonnaisuus (esim. KV-välimuistin toteutus voi poiketa
-%       muilla pilvialustoilla).
-%     * Staattinen yksivaiheinen (single-shot) haku vs. iteratiivinen/agenttipohjainen
-%       monihyppyhaku (selittää MuSiQuen 3-4 hypyn laatukaton).
-%     * LLM-as-a-Judge (RAGAS) -arvioinnin luontaiset rajoitteet.
-%
-% =========================================================================
-% DRAFT NOTES 5: Harmonisen Keskiarvon Q (eps = 10^-4) "Heikoimman Lenkin Rangaistus"
-% =========================================================================
-% - Säännöllistetyn harmonisen keskiarvon kaava (Eq. 4.25):
-%     * Jos YKSIKIN neljästä metriikasta (CP, CR, Faith, AR) on 0.0:
-%       nimittäjään tulee 1/10^-4 = 10 000, jolloin Q(q) romahtaa välittömästi arvoon <= 0.0004.
-% - Empiirinen todiste: MuSiQuessa 68.8 % - 77.5 % vastattavista kyselyistä sisältää vähintään 
-%   yhden nollametristen (useimmiten FRR:n aiheuttama Faith=0, AR=0 tai noudon CR=0).
-% - Tilastollinen seuraus: Koska yli puolet otoksesta on nollassa, mediaani-Q naulautuu arvoon 
-%   0.0002 kaikilla putkilla, ja parittainen mediaaniero muuttuu muotoon mu_delta = 0.0000.
-% - Tämä nollaa parametrittoman Wilcoxon-testin tilastollisen voiman (sidokset / ties).
-% - Metodologinen opetus: Harmoninen Q on ankara teollinen luotettavuusmittari (penalizes single-point-of-failure), 
-%   mutta tilastolliseen hypoteesitestaukseen se vaatii suuren otoskoon tai jatkuvamman metriikan.
-%
-% -------------------------------------------------------------------------
-% PEILAUS LUVUN 3 KIRJALLISUUTEEN (03_literature_review.tex)
-% -------------------------------------------------------------------------
-% - [TÄYDENTÄÄ]: Rivillä 1 (03_literature_review.tex) tutkijat Hao Yu, Aoran Gan, Kai Zhang, Shiwei Tong, Qi Liu ja Zhaofeng Liu ("Evaluation of Retrieval-Augmented Generation: A Survey"), Yunfan Gao, Yun Xiong, Xinyu Gao, Kangxiang Jia, Jinliu Pan, Yuxi Bi, Yixin Dai, Jiawei Sun, Haofen Wang ja muut ("Retrieval-augmented generation for large language models: A survey"), sekä Shangyu Wu, Ying Xiong, Yufei Cui, Haolun Wu, Can Chen, Ye Yuan, Lianming Huang, Xue Liu, Tei-Wei Kuo, Nan Guan ja Chun Jason Xue ("Retrieval-Augmented Generation for Natural Language Processing: A Survey") sekä Claes Wohlin ("Guidelines for snowballing in systematic literature studies and a replication in software engineering")
-%   jäsensivät RAG-järjestelmät modulaarisiin paradigmoihin ja esittivät suorituskyvyn arvioinnin toisistaan riippumattomina osametriikoina, mikä täydentää ja kritisoi arviointimetodologiaa harmonisen keskiarvon (Q) "heikoimman lenkin rangaistuksen" kautta: osametriikoiden erillinen tarkastelu peittää tuotantojärjestelmien kriittiset vikapisteet, kun taas säännöllistetyssä harmonisessa keskiarvossa yksikin nolla (CP, CR, Faith tai AR = 0) pudottaa koko kyselyn Q-arvon tasolle <= 0.0004 (lukiten MuSiQuen mediaani-Q:n arvoon 0.0002 ja luoden sidoksia Wilcoxon-testiin).
-%   -> Suora viite (täsmälleen kuten luvussa 3): \cite{gan2025rag, gao2023retrieval, wu2025ragnlp}, \cite{guidelines}
-%
-% - [TÄYDENTÄÄ]: Rivillä 18 (03_literature_review.tex) tutkijat Jaewan Park, Solbee Cho ja Jay-Yoon Lee ("Stop-RAG: Value-Based Retrieval Control for Iterative RAG") sekä Soyeong Jeong et al. ("Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity")
-%   löysivät, että arvo-ohjattu adaptiivinen pysäytysmekanismi karsii tarpeettomia iteratiivisia noutosilmukoita 14–49 % ja että moniaskelisen haun dynaaminen valinta optimoi monihyppypäättelyä, mikä täydentää metodologista rajoitettamme: benchmarkimme käytti staattista yhden vaiheen (single-shot) hakua kiinteällä top-5-ikkunalla, mikä muodosti laatukaton MuSiQuen 3- ja 4-hypyn kyselyille (Q = 0.15–0.21, p >= 0.05), joissa väliaskeleita ei voitu hakea iteratiivisesti.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{park2025stoprag}, \citet{jeong2024adaptive}
-%
-% - [TÄYDENTÄÄ / RISTIRIIDASSA]: Rivillä 20 (03_literature_review.tex) tutkijat Minghao Guo et al. ("DeepSieve: Information Sieving via LLM-as-a-Knowledge-Router"), rivillä 25 ja 36 tutkijat Zihang Li et al. ("Bridge-RAG: An Abstract Bridge Tree-Based Retrieval Augmented Generation Algorithm"), rivillä 36 tutkijat Shengyuan Chen et al. ("LogicRAG: Retrieval Augmented Generation with Adaptive Reasoning Structures") sekä Minsang Kim, Cheoneum Park ja Seungjun Baek ("QPaug: Question and Passage Augmentation for Open-Domain Question Answering of LLMs")
-%   löysivät, että kyselyn dynaaminen purkaminen alikyselyiden verkoksi (DAG / CoT) tai hierarkkisiksi abstraktiopuiksi nostaa monihyppytarkkuutta merkittävästi (+14.7 pp LogicRAG, +44 % BLEU Bridge-RAG, +34 % F1 QPaug, +20.7 pp F1 DeepSieve), mikä täydentää ja selittää, miksi staattinen yhden askeleen S2B ja monoliittinen mallireititys eivät yksin rikkoneet MuSiQuen monihyppykattoa (EM 33.0–42.0 %, F1 36.8–46.3 %): erillisten välihyppyjen yhdistäminen vaatii kyselyn dekompositiota eikä pelkkää vanhempikontekstin laajennusta.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{guo2026deepsieve}, \cite{li2026bridgerag}, \cite{chen2026logicrag}, \cite{kim2024qpaug}
-%
-% - [TÄYDENTÄÄ]: Rivillä 59 (03_literature_review.tex) tutkijat Yue Yu, Wei Ping, Zihan Liu, Boxin Wang, Jiaxuan You, Chao Zhang, Mohammad Shoeybi ja Bryan Catanzaro ("RankRAG: Unifying Context Ranking with Retrieval-Augmented Generation in LLMs")
-%   löysivät monitehtävämallin saavuttavan 50.6–82.9 % EM-tarkkuuden lyhyiden faktojen QA-aineistoissa (NaturalQA, TriviaQA, PopQA), mikä täydentää arviointimittareiden metodologista kritiikkiä: MuSiQuessa MC:n korkein EM (42.0 %) oli osin kieltäytymispisteytyksen artefakti (oikea abstention = 1.0), kun taas yritysaineiston monivirkkeisissä proseduraalisissa vastauksissa (62–86 tokenia) pintatason EM/F1 putoaa nollaan, mikä tekee semanttisesta RAGAS-arvioinnista välttämättömän.
-%   -> Suora viite (täsmälleen kuten luvussa 3): \citet{yu2024rankrag}
+Rapid technological advancement in retrieval-augmented generation and large language model architectures represents an inherent temporal limitation of this study. Frontier foundation models evolve at an extraordinary pace, making it challenging to benchmark fixed model checkpoints across prolonged evaluation cycles. For instance, at the inception of this benchmark, the state of the art within Google's ecosystem was Gemini 3.5 Flash, released in May 2026 \citep{GoogleCloudModelVersions}. Over the course of this research, subsequent iterations were rapidly introduced---including Gemini 3.5 Flash-Lite, Gemini 3.6 Flash, 3.7 Flash, and 3.8 Flash, as well as the Gemini 4 series (Argon and Carbon). Furthermore, providers such as OpenAI and Anthropic represent merely a fraction of an expanding ecosystem that includes diverse proprietary and open-weight model families. Because each generation delivers enhanced parameter efficiency, reduced token tariffs, and improved instruction compliance, empirical metrics inevitably capture a temporal snapshot of cloud API capabilities rather than an immutable performance ceiling.
 
+Furthermore, academic research has increasingly shifted from naive single-shot dense retrieval toward structured and agentic paradigms, such as GraphRAG \citep{edge2024localglobalgraphrag, procko2024graphrag} and autonomous agentic workflows \citep{lumer2025rethinking, singh2025agentic}. This architectural divide directly explains the depressed performance observed on the academic MuSiQue benchmark. Because MuSiQue is explicitly constructed to evaluate multi-hop reasoning over disjoint graph-like entities, resolving its complex chains requires iterative query decomposition and dynamic intermediate hops that exceed the scope of single-step retrieval pipelines. Achieving parity on such benchmarks would necessitate autonomous agentic loops. However, as demonstrated in Chapter~\ref{sec:results}, deterministic and low-latency modular pipelines retain an indispensable operational role in production enterprise environments, particularly high-volume customer service and conversational AI systems. In interactive customer support where users expect near-instantaneous responses and SLAs demand strict sub-second latencies, multi-agent loops and graph extraction frameworks face severe operational scalability bottlenecks, suffering from compounding execution latencies ($>10$\,s) and prohibitive token consumption costs \citep{chen2026logicrag, lumer2025rethinking}.
 
+From an architectural scope perspective, the evaluated optimizations---Small-to-Big retrieval, semantic re-ranking, prompt caching, and model cascading---represent only a targeted subset of paradigms surveyed in contemporary literature \citep{gao2023retrieval, wu2025ragnlp, gan2025rag}. As outlined in Chapter~\ref{sec:introduction}, this selection was deliberate: rather than isolating and evaluating multiple algorithmic variants within a single pipeline stage, the objective of this thesis was to select complementary methods targeting four distinct, consecutive phases of the RAG lifecycle: indexing context expansion, post-retrieval filtering, prefill attention reuse, and generation-tier routing. While this cross-pipeline breadth was essential for analyzing systemic multi-module interactions and Pareto equilibria, it inherently restricted the depth of exploration regarding intra-module variations within each individual phase (such as dynamic LLM chunking, learned neural routers, or in-memory vector databases), as surveyed in Chapter~\ref{sec:literature-review}. This structural trade-off also contextualizes why empirical results in industrial environments frequently diverge from published academic gains: whereas literature often benchmarks isolated, in-memory prototypes under idealized conditions, production customer-facing deployments must reconcile managed cloud APIs, network serialization, and strict latency-cost budgets.
+
+The chosen aggregation method, the regularized harmonic mean (Equation~\ref{eq:composite_quality}, with $\epsilon = 10^{-4}$), is inherently strict. It combines the four quality dimensions defined by the RAGAS framework \citep{es2024ragas}---Context Precision, Context Recall, Faithfulness, and Answer Relevancy---evaluated via an automated LLM judge. By design, the harmonic mean heavily penalizes the weakest metric: if any single dimension drops to zero, the composite score for that query drops to $Q(q) \le 0.0004$. On the multi-hop MuSiQue benchmark, query-level evaluation logs underlying Table~\ref{tab:quality_musique} reveal that 68.8\%--77.5\% of answerable queries contained at least one zero across configurations, primarily attributable to model refusals or missing intermediate retrieval context. This penalty limits the median composite quality on MuSiQue to $P_{50} \approx 0.0002$, creating numerous tied scores that reduce the statistical power of paired Wilcoxon signed-rank tests. In enterprise production, however, this strict behavior is often desirable, as organizations have near-zero tolerance for complete failures in customer-facing assistants. Furthermore, because RAGAS relies on a non-deterministic LLM judge, composite quality scores should be paired with objective, deterministic evaluation metrics. Examples evaluated in this benchmark include Exact Match, token $F_1$, and false refusal rates (FRR), but organizations can also adopt additional deterministic methods, such as rule-based pattern matching or regular expression validators, to provide a more complete assessment of system reliability.
+
+Finally, the evaluation was conducted using the open-source model Qwen3.8-27B \citep{yang2025qwen3}, running on servers hosted by CSC\footnote{CSC -- IT Center for Science, \url{https://csc.fi}.} as batch jobs via vLLM. Although CSC provides computing resources comparable to commercial data centers, relying on a 27-billion-parameter open-weight model as an automated judge presents an inherent threat to validity. While deterministic evaluation (zero temperature) prevents random score variance and avoids vendor self-preference bias toward proprietary model families, a 27B model may exhibit scoring calibration differences compared to human domain experts or frontier judges, particularly when evaluating nuanced Finnish banking expressions or complex multi-hop reasoning chains. Nevertheless, hosting the judge locally provides critical methodological advantages: it removes external network jitter, public cloud queuing delays, and third-party API changes that could alter evaluation behavior across runs. Although customer-facing enterprise RAG systems must respond to users under strict latency requirements, evaluation pipelines do not share these real-time constraints. Organizations can therefore run evaluation offline during off-peak hours using open-source models, avoiding the high token costs of commercial APIs.
 

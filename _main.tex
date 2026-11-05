@@ -211,13 +211,13 @@
 %%
 \usepackage{graphicx}
 \usepackage{subcaption}
+\usepackage{xurl}
 \usepackage{hyperref}
 \usepackage{tabularx}
 \usepackage{booktabs}
 \usepackage{pdflscape}
 \usepackage{makecell}
 \usepackage{placeins}
-\usepackage{xurl}
 \usepackage[numbers]{natbib}
 \usepackage{parskip}
 
@@ -360,6 +360,11 @@
 \phantomsection
 \addcontentsline{toc}{section}{\listtablename}
 \listoftables
+
+\clearpage
+\phantomsection
+\addcontentsline{toc}{section}{\listfigurename}
+\listoffigures
 
 \input{_abbreviations}
 
