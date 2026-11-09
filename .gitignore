@@ -17,6 +17,7 @@ rag-code/rag-evaluator/figure_testing/
 
 # LaTeX compilation auxiliary files
 thesis/*.aux
+thesis/chapters/*.aux
 thesis/*.bbl
 thesis/*.blg
 thesis/*.fdb_latexmk
@@ -30,3 +31,22 @@ thesis/*.xmpdata
 thesis/*.xmpi
 thesis/pdfa.xmpi
 thesis/*.synctex.gz
+
+# Agent configurations, skills, and internal docs
+.agents/
+.gemini/
+.skills_dev/
+.scratch/
+.claude/
+skills-lock.json
+GEMINI.md
+CLAUDE.md
+AGENTS.md
+rag-code/rag-benchmark/AGENTS.md
+docs/agents/
+TODO.md
+rag-code/rag-benchmark/TODO.md
+ARXIV_SOURCES_AUDIT.md
+LLM_wiki/
+thesis/research-notes/
+thesis/research-plan/
