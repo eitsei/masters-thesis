@@ -111,7 +111,7 @@ Mikäli hakumäärää $k$ muutettaisiin (esim. $k=5 \to 8$), seuraavat kohdat t
    - *Päivitys:* `...reranked context: top-$k = 8$...`
 4. **Kappale $C_0$, Rivi 124:**
    - *Nykyinen:* `In addition, dense vector retrieval of $\text{top-}k = 5$ is chosen as the baseline configuration, reflecting standard experimental benchmarks in recent literature~\citep{smigielski2026chunking, lewis2020rag}.`
-   - *Päivitys:* Täydennetään viitteet: `~\citep{smigielski2026chunking, lewis2020rag, yu2024rankrag, lumer2025rethinking}`.
+   - *Päivitys:* Täydennetään viitteet: `~\citep{smigielski2026chunking, lewis2020rag, yu2024rankrag, lumer2026rethinking}`.
 5. **Kappale $M_1$, Rivi 127:**
    - Päivitetään teoreettinen yläraja ($k \times 1024$ tokenia) ja korostetaan deduplikoinnin kriittisyyttä kontekstiräjähdyksen estäjänä.
 6. **Kappale $M_2$, Rivi 130:**
@@ -238,7 +238,7 @@ A potential confounding factor in multi-tier model evaluations ($M_4$) and laten
 | **Output Tokenit ($N_{\text{comp}}$)** | **20–30 tokenia** / kysely | **280–540 tokenia** / kysely | Empiiriset MuSiQue-tulokset (`tab_cost_musique.tex`). |
 | **1k Kyselyn Kustannus ($C_3$ PC)** | **\$3.411** ($-71{,}5\ \%$ säästö) | **\$8.019** (Säästö supistuu $-33\ \%$:iin) | GCP Vertex AI: Output-tokenit \$9.00/1M vs. Cached \$0.15/1M. |
 | **Päättelyn Amortisointi** | **\$1.07 / 1k kyselyä** (ICL CoT välimuistissa) | **\$4.61 / 1k kyselyä** (ajonaikaiset tokenit) | *InstructRAG* \citep{wei2025instructrag}: staattiset perustelut poistavat ajonaikaisen kulun. |
-| **Faktoriaalinen Kontrolli ($M_4$)** | **Täydellinen:** sama prompti, $T=0.0$, 0 ajattelutokenia kaikilla malleilla. | **Vääristynyt:** Lite, Flash ja Pro reagoivat ajattelubudjettiin eri tavoin eri hinnoilla. | *FrugalGPT* \citep{chen2023frugalgpt}, *RouteLLM* \citep{ong2025routellm}. |
+| **Faktoriaalinen Kontrolli ($M_4$)** | **Täydellinen:** sama prompti, $T=0.0$, 0 ajattelutokenia kaikilla malleilla. | **Vääristynyt:** Lite, Flash ja Pro reagoivat ajattelubudjettiin eri tavoin eri hinnoilla. | *FrugalGPT* \citep{chen2024frugalgpt}, *RouteLLM* \citep{ong2025routellm}. |
 | **Kieltäytymistarkkuus (RQ3)** | **100 % kanoninen:** 8-shot opettaa tarkan sanamuodon. | Riski, että ajattelu "vuotaa" selitykseksi kiellettyjen lauseiden säännön ohi. | MuSiQue & Enterprise Grounding Directives. |
 
 ---
@@ -246,7 +246,7 @@ A potential confounding factor in multi-tier model evaluations ($M_4$) and laten
 # Lähdeviitteet (BibTeX-avaimet)
 
 - `yu2024rankrag`: Yu et al. (2024), *RankRAG: Unifying Context Ranking with Retrieval-Augmented Generation in LLMs*.
-- `lumer2025rethinking`: Lumer et al. (2025), *Rethinking Retrieval: From Traditional Retrieval Augmented Generation to Agentic and Non-Vector Reasoning Systems in the Financial Domain for Large Language Models*.
+- `lumer2026rethinking`: Lumer et al. (2025), *Rethinking Retrieval: From Traditional Retrieval Augmented Generation to Agentic and Non-Vector Reasoning Systems in the Financial Domain for Large Language Models*.
 - `demourajunior2026adaptive`: de Moura Júnior et al. (2026), *Adaptive Chunking: Optimizing Chunking Method Selection for RAG*.
 - `smigielski2026chunking`: Śmigielski et al. (2026), *Chunking Methods on Retrieval-Augmented Generation: Effectiveness Evaluation Against Computational Cost and Limitations*.
 - `wei2025instructrag`: Wei et al. (2025) / Hu et al. (2024), *InstructRAG: Instructing Retrieval-Augmented Generation via Self-Synthesized Rationales*.
@@ -255,5 +255,5 @@ A potential confounding factor in multi-tier model evaluations ($M_4$) and laten
 - `trivedi2022musique`: Trivedi et al. (2022), *MuSiQue: Multihop Questions via Single-hop Question Composition*.
 - `trivedi2023ircot`: Trivedi et al. (2023), *Interleaving Retrieval with Chain-of-Thought Reasoning for Knowledge-Intensive Multi-Step Problems*, ACL 2023.
 - `park2025stoprag`: Park et al. (2025), *Stop-RAG: Value-based Retrieval Control for Iterative RAG*.
-- `chen2023frugalgpt`: Chen et al. (2023), *FrugalGPT: How to Use Large Language Models While Reducing Cost and Improving Performance*.
+- `chen2024frugalgpt`: Chen et al. (2023), *FrugalGPT: How to Use Large Language Models While Reducing Cost and Improving Performance*.
 - `ong2025routellm`: Ong et al. (2025), *RouteLLM: Learning to Route LLMs with Preference Data*, ICLR 2025.
