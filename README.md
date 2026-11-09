@@ -1,63 +1,45 @@
-# Masters Thesis & LLM_Wiki
+# Context is King: Retrieval-Augmented Generation in Enterprise-Ready Systems
 
-Tämä repositorio sisältää diplomityöprosessin tutkimuksen, koodit ja itse diplomityön dokumentaation.
+This repository contains the source code, evaluation harness, and LaTeX manuscript for the Master's Thesis *"Context is king - Retrieval-Augmented Generation in enterprise-ready systems"* (Aalto University, School of Science, 2026).
 
-## 📂 Projektirakenne
+The project empirically evaluates a $2^4 = 16$ full-factorial design across four RAG optimization modules—Small-to-Big Hierarchical Retrieval ($M_1$), Two-Stage Neural Re-ranking ($M_2$), Prompt & Context Caching ($M_3$), and Dynamic Complexity Model Routing ($M_4$)—analyzing the trade-offs between operational efficiency (latency, cost) and output quality.
 
-*   **`LLM_wiki/`**: LLM-tutkimukseen liittyvät lähdeartikkelit (`sources/`), markdown-muotoinen wiki (`wiki/`), BibTeX-viitteet (`bib/`) sekä Java/Spring AI -testauskoodi (`code/`).
-*   **`thesis/`**: Overleaf-projektin Git Subtree -alikansio, joka sisältää diplomityön LaTeX-tiedostot.
-*   **`GEMINI.md`**: Työnkulun säännöt, ohjeet ja valitut tutkimuskysymykset kirjallisuuskatsauksen tekoon.
+## Repository Structure
 
----
-
-## 🔄 Overleaf Git Subtree -työnkulku
-
-Diplomityön kirjoitus tapahtuu `thesis/`-kansiossa, joka on linkitetty Overleafiin käyttäen `git subtree` -mekanismia. Alla on ohjeet muutosten hallintaan ja synkronointiin.
-
-### 1. Määritä Overleaf-etärepositorio (Tehdään vain kerran)
-
-Jotta komentojen kirjoittaminen on helpompaa ja lyhyempää, lisää Overleaf etäosoitteeksi nimellä `overleaf` suorittamalla seuraava komento projektin juuressa:
-
-```bash
-git remote add overleaf https://git@git.overleaf.com/69e3841827002aeac06eb2e8
+```text
+.
+├── rag-code/
+│   ├── rag-benchmark/       # Java 21 / Spring Boot 3.3 / Spring AI RAG backend & ingestion pipelines
+│   └── rag-evaluator/       # Python evaluation harness (RAGAS, statistical tests, LaTeX/figure exporters)
+├── thesis/
+│   ├── _main.tex            # Master's thesis LaTeX entrypoint
+│   ├── _main.pdf            # Compiled Master's thesis manuscript
+│   ├── chapters/            # Thesis chapters and appendices
+│   ├── figures/             # Generated empirical figures (PDF)
+│   ├── tables/              # Generated empirical tables (LaTeX)
+│   └── references/          # Bibliography (BibTeX)
+├── CSC_SETUP.md             # HPC environment & Slurm batch execution guide (CSC Roihu)
+└── context_inspector.py     # CLI utility for inspecting retrieved contexts and benchmark JSONL runs
 ```
 
-> [!NOTE]
-> Kun teet haku- (pull) tai puskutoimintoja (push) Overleafiin, Git kysyy salasanaa. Käytä Overleafin luomaa henkilökohtaista Git-tokenia (esim. `olp_...`).
+## Components & Usage
 
----
+Detailed setup and execution instructions are provided in each component's documentation:
 
-### 2. Muutosten tallentaminen paikallisesti (Commit)
+- **RAG Benchmark Backend ([`rag-code/rag-benchmark/`](rag-code/rag-benchmark/README.md)):** Spring Boot service implementing the modular RAG pipeline ($M_1$–$M_4$), PostgreSQL/pgvector storage, and corpus ingestion endpoints.
+- **Evaluation & Analysis Suite ([`rag-code/rag-evaluator/`](rag-code/rag-evaluator/scripts/README.md)):** Python CLI and benchmark orchestration scripts for running the 16-configuration factorial matrix, LLM-as-a-Judge evaluation, Wilcoxon signed-rank tests, and generating publication figures and tables.
+- **HPC Evaluation Guide ([`CSC_SETUP.md`](CSC_SETUP.md)):** Instructions for provisioning local LLM/embedding weights and running GPU evaluation jobs on the CSC Roihu supercomputer.
+- **Thesis Manuscript (`thesis/`):** LaTeX source files built using the Aalto University thesis class (`latexmk -pdf _main.tex`).
 
-Kaikki muutokset, joita teet `thesis/`-kansion tiedostoihin, tallennetaan osana tämän repositorion normaalia git-historiaa:
+## Citation
 
-```bash
-# 1. Lisää muuttuneet tiedostot
-git add thesis/
-
-# 2. Tee commit päärepositorioon
-git commit -m "kirjoita: johdannon luonnostelua ja viitteiden lisäys"
+```bibtex
+@mastersthesis{asunmaa2026context,
+  author  = {Asunmaa, Antti-Jussi},
+  title   = {Context is king - Retrieval-Augmented Generation in enterprise-ready systems},
+  school  = {Aalto University, School of Science},
+  year    = {2026},
+  address = {Espoo, Finland},
+  type    = {Master's thesis}
+}
 ```
-
----
-
-### 3. Paikallisten muutosten puskeminen Overleaf-pilveen (Push)
-
-Kun olet tallentanut muutokset paikallisesti ja haluat synkronoida ne Overleafin verkkoympäristöön, käytä seuraavaa komentoa:
-
-```bash
-git subtree push --prefix=thesis overleaf master
-```
-
----
-
-### 4. Uusien muutosten hakeminen Overleaf-pilvestä (Pull)
-
-Jos kirjoitat työtä suoraan Overleafin nettiselaimessa, sinun on haettava uudet muutokset paikalliseen työskentely-ympäristöösi. Suorita silloin:
-
-```bash
-git subtree pull --prefix=thesis overleaf master --squash
-```
-
-> [!IMPORTANT]
-> Tee aina paikallinen commit (kohta 2) ennen kuin suoritat `pull`-haun Overleafista, jotta git voi yhdistää (merge) muutokset puhtaasti.

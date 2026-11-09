@@ -7,7 +7,7 @@
 # executes parallel RAGAS evaluation on offline JSONL runs, and generates publication tables/figures.
 # ==============================================================================
 #SBATCH --job-name=eval-musique
-#SBATCH --account=project_2021509
+#SBATCH --account=project_xxxxxxx  # Set your CSC project account here (e.g. project_20xxxxx) or pass sbatch --account=$CSC_PROJECT
 #SBATCH --partition=gpumedium
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -26,6 +26,9 @@ module load python-vllm/0.29.0
 set -euo pipefail
 
 # 2. Project Directory Setup
+CSC_PROJECT="${CSC_PROJECT:-project_xxxxxxx}"
+SCRATCH_BASE="${SCRATCH_BASE:-/scratch/${CSC_PROJECT}/${USER}}"
+
 if [ -d "${SLURM_SUBMIT_DIR:-}/src" ]; then
     PROJECT_DIR="$SLURM_SUBMIT_DIR"
 elif [ -d "$(pwd)/src" ]; then
@@ -33,7 +36,7 @@ elif [ -d "$(pwd)/src" ]; then
 elif [ -d "$(dirname "${BASH_SOURCE[0]}")/../../src" ]; then
     PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 else
-    PROJECT_DIR="/scratch/project_2021509/asunmaa/rag-evaluator"
+    PROJECT_DIR="${SCRATCH_BASE}/rag-evaluator"
 fi
 cd "$PROJECT_DIR"
 mkdir -p logs
@@ -49,7 +52,7 @@ echo "========================================================================"
 # Prevent telemetry, offline stalls, and ignore conflicting user site-packages (~/.local)
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
-export HF_HOME="${HF_HOME:-/scratch/project_2021509/asunmaa/huggingface_cache}"
+export HF_HOME="${HF_HOME:-${SCRATCH_BASE}/huggingface_cache}"
 export RAGAS_DO_NOT_TRACK=true
 export LANGCHAIN_TRACING_V2=false
 export LANGSMITH_TRACING=false
@@ -66,7 +69,7 @@ export no_proxy="localhost,127.0.0.1"
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 
 # Activate virtual environment
-VENV_PATH="${VENV_PATH:-/scratch/project_2021509/asunmaa/venv-roihu}"
+VENV_PATH="${VENV_PATH:-${SCRATCH_BASE}/venv-roihu}"
 if [ -f "${VENV_PATH}/bin/activate" ]; then
     echo "Activating Python virtual environment: ${VENV_PATH}"
     # shellcheck disable=SC1090
@@ -77,7 +80,7 @@ else
 fi
 
 # 3. Configuration & Paths
-SCRATCH_DIR="${SCRATCH_DIR:-/scratch/project_2021509/asunmaa}"
+SCRATCH_DIR="${SCRATCH_DIR:-${SCRATCH_BASE}}"
 MODEL_DIR="${MODEL_DIR:-${SCRATCH_DIR}/models/Qwen3.8-27B}"
 EMBED_DIR="${EMBED_DIR:-${SCRATCH_DIR}/models/bge-m3}"
 

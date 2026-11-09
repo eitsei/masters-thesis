@@ -1,15 +1,18 @@
 token.txt
-CSC_ROIHU_GUIDE.md
 certificate-helper-tool/
 .env
 *.env
 target/
 .idea/
 *.iml
-data/
+/data/
 rag-benchmark/data/
 rag-code/rag-benchmark/data/
-rag-code/rag-evaluator/data/nordea/
+rag-code/rag-evaluator/data/*
+!rag-code/rag-evaluator/data/musique/
+rag-code/rag-evaluator/data/musique/*
+!rag-code/rag-evaluator/data/musique/musique_100_final.jsonl
+rag-code/rag-evaluator/logs/
 
 # Figure testing sandbox (not tracked in git; only thesis/figures/ is canonical)
 figure_testing/

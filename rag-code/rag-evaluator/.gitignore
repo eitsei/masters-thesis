@@ -9,5 +9,9 @@ build/
 .coverage
 htmlcov/
 .env
-data/nordea/
+data/*
+!data/musique/
+data/musique/*
+!data/musique/musique_100_final.jsonl
+logs/
 figure_testing/
