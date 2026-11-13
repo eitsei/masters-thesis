@@ -1,9 +1,14 @@
 token.txt
 certificate-helper-tool/
 .env
+.env*
+!.env.example
 *.env
 target/
+target_cp.txt
+*_cp.txt
 .idea/
+.vscode/
 *.iml
 /data/
 rag-benchmark/data/

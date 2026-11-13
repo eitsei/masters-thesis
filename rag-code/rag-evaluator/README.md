@@ -1,62 +1,102 @@
 # RAG Efficiency & Quality Evaluator (`rag-evaluator`)
 
-The quantitative benchmarking, statistical analysis, and reporting suite for the Master's thesis:
+Quantitative benchmarking, statistical analysis, and thesis artifact generation suite for the Master's thesis:
+
 > *"Context is King — Optimizing Retrieval-Augmented Generation in Enterprise-Ready Systems"*
 
-This tool integrates directly with the enterprise Spring Boot / Java 21 RAG service (`rag-benchmark`) and Google Cloud Platform (GCP) infrastructure. It measures operational efficiency (latency, token costs) and response quality (RAGAS, EM, F1) across the full factorial matrix ($2^4 = 16$ configurations) on the MuSiQue multi-hop reasoning dataset.
+This tool integrates with the Spring Boot / Java 21 RAG service (`rag-benchmark`) and evaluation backends (local vLLM on CSC Roihu GPU, Google Cloud Vertex AI, or Ollama). It measures operational efficiency (latency, TTFT, token consumption, USD cost) and response quality (Exact Match, Token $F_1$, RAGAS, Composite $Q$) across the $2^4 = 16$ full-factorial configuration matrix ($C_0$–$C_{15}$) on the MuSiQue and Enterprise datasets.
 
 ---
 
-## 📐 Implemented Thesis Equations (Chapter 4)
+## Architecture & Directory Layout
 
-### 1. RQ1 Latency Formulations (§4.5.1)
+The benchmarking pipeline follows a decoupled two-stage workflow:
+
+1. **Stage 1 — Raw Query Collection (`runs/raw/`):** Executes queries against the `rag-benchmark` Spring Boot service (`--judge none`) with cache pre-flight verification and JVM warm-up, recording raw responses, retrieved chunks, micro-phase timings, and token usage to `runs/raw/<dataset>/`.
+2. **Stage 2 — Offline Evaluation & Export (`runs/evaluated/`):** Computes deterministic lexical metrics, operational costs, and LLM-as-a-judge RAGAS scores (`evaluate`), outputting enriched records to `runs/evaluated/<dataset>/`, followed by paired statistical tests (`compare`) and publication-ready LaTeX/PDF generation (`export-thesis`).
+
+```text
+rag-evaluator/
+├── data/
+│   ├── enterprise/          # Enterprise 100-question benchmark, 10-sample, and source CSVs
+│   └── musique/             # MuSiQue 100-question canonical sample and 10-sample
+├── runs/
+│   ├── raw/                 # Stage 1 raw JSONL logs (musique/, enterprise_closed/, enterprise_raw/)
+│   └── evaluated/           # Stage 2 RAGAS-scored JSONL logs (musique/, enterprise_closed/, enterprise_raw/)
+├── scripts/
+│   ├── benchmarks/          # Stage 1 full-16 factorial runner scripts
+│   ├── roihu/               # Stage 2 CSC Roihu Slurm batch jobs (vLLM Qwen3.8-27B + BGE-M3)
+│   └── utils/               # Helper scripts for single-run evaluation
+├── src/                     # Core Python package (CLI, client, metrics, stats, judge, exporters)
+├── tests/                   # Pytest unit and integration test suite
+├── pytest.ini
+├── requirements.txt
+├── requirements-roihu.txt
+└── setup_env.sh
+```
+
+---
+
+## Implemented Thesis Equations (Chapter 4)
+
+### 1. RQ1: Latency Formulations (§4.5.1)
+
 - **Total Latency ($T_{\text{total}}$):**
   $$T_{\text{total}}(q) = T_{\text{embed}}(q) + T_{\text{route}}(q) + T_{\text{ret}}(q) + T_{\text{rerank}}(q) + T_{\text{expand}}(q) + T_{\text{cache}}(q) + T_{\text{prefill}}(q) + T_{\text{stream}}(q)$$
 - **Time to First Token ($\text{TTFT}$):**
   $$\text{TTFT}(q) = T_{\text{total}}(q) - T_{\text{stream}}(q)$$
 - **Percentiles:** Steady-state median ($P_{50}$) and tail SLA compliance ($P_{95}$).
 
-### 2. RQ2 Operational Cost Accounting (Thesis Eq. 178 / 181)
-$$\text{Cost}(q) = N_{\text{prompt}} \cdot P_{\text{prompt}}^{(m(q))} + N_{\text{comp}} \cdot P_{\text{comp}}^{(m(q))} + N_{\text{cached}} \cdot P_{\text{cached}}^{(m(q))} + N_{\text{rerank}} \cdot P_{\text{rerank}} + N_{\text{embed}} \cdot P_{\text{embed}}$$
-- Configurable pricing tiers:
-  - **Gemini 2.5 Flash / 3.7 Flash:** Prompt: $0.15/1M, Comp: $0.60/1M, Cached: $0.0375/1M (75% context caching discount).
-  - **Gemini 3.5 Flash-Lite:** Prompt: $0.075/1M, Comp: $0.30/1M, Cached: $0.01875/1M.
-  - **Gemini 3.1 Pro:** Prompt: $1.25/1M, Comp: $5.00/1M, Cached: $0.3125/1M.
-  - **Claude Sonnet 5:** Prompt: $3.00/1M, Comp: $15.00/1M, Cached: $0.30/1M.
-  - **Ollama / Local:** $0.00 / 1M.
+### 2. RQ2: Operational Cost Accounting (§4.5.2)
 
-### 3. RQ3 Quality Metrics (§4.5.3)
+$$\text{Cost}(q) = N_{\text{prompt}} \cdot P_{\text{prompt}}^{(m(q))} + N_{\text{comp}} \cdot P_{\text{comp}}^{(m(q))} + N_{\text{cached}} \cdot P_{\text{cached}}^{(m(q))} + N_{\text{rerank}} \cdot P_{\text{rerank}} + N_{\text{embed}} \cdot P_{\text{embed}}$$
+
+Configurable pricing tiers defined in `src/metrics.py` (`PRICING_CATALOG`):
+- **`gemini-3.8-flash`** (default generation tier): Prompt `$0.75/1M`, Completion `$3.75/1M`, Cached `$0.075/1M` (90% context caching discount).
+- **`gemini-3.5-flash`**: Prompt `$1.50/1M`, Completion `$9.00/1M`, Cached `$0.15/1M`.
+- **`gemini-3.5-flash-lite`** (routing / lightweight tier): Prompt `$0.30/1M`, Completion `$2.50/1M`, Cached `$0.03/1M`.
+- **`gemini-3.7-flash` / `gemini-2.5-flash`**: Prompt `$0.15/1M`, Completion `$0.60/1M`, Cached `$0.0375/1M`.
+- **`gemini-3.1-pro`** (complex multi-hop tier): Prompt `$2.00/1M`, Completion `$12.00/1M`, Cached `$0.20/1M`.
+- **`claude-sonnet-5`**: Prompt `$3.00/1M`, Completion `$15.00/1M`, Cached `$0.30/1M`.
+- **`ollama` / `local`**: `$0.00/1M`.
+
+### 3. RQ3: Quality Metrics (§4.5.3)
+
 - **Deterministic Lexical Overlap:**
-  - Standard QA normalization (lowercase, punctuation splitting, article removal).
-  - **Exact Match ($\text{EM}$):** Binary indicator against gold standard ground truth and known aliases.
+  - Standard QA normalization (lowercase, punctuation removal, article stripping).
+  - **Exact Match ($\text{EM}$):** Binary indicator against ground truth and known aliases.
   - **Token $F_1$:** Harmonic mean of token-level precision and recall maximized over aliases.
-- **RAGAS Core Evaluation:**
+- **RAGAS Core Evaluation (Answerable Queries):**
   - Context Precision ($\text{CP}$)
   - Context Recall ($\text{CR}$)
   - Faithfulness ($\text{Faith}$)
   - Answer Relevancy ($\text{AR}$)
-- **Composite Quality Score $Q(q)$ (Thesis Eq. 238):**
+- **Composite Quality Score $Q(q)$:**
   $$Q(q) = \frac{4}{\frac{1}{\text{CP}(q) + \epsilon} + \frac{1}{\text{CR}(q) + \epsilon} + \frac{1}{\text{Faith}(q) + \epsilon} + \frac{1}{\text{AR}(q) + \epsilon}}$$
-  with numerical smoothing parameter $\epsilon = 10^{-6}$, guaranteeing stability and severely penalizing single-dimension failure modes.
+  with numerical smoothing parameter $\epsilon = 10^{-6}$, penalizing single-dimension failure modes.
+- **Unanswerable / Out-of-Domain Queries:** Evaluated via refusal accuracy and false refusal rate without invoking RAGAS.
 
-### 4. RQ4 Trade-off Ratios & Pareto Frontier (§4.5.4)
-- **Quality per Dollar ($\text{QPD}$, Eq. 250):**
+### 4. RQ4: Trade-off Ratios & Pareto Frontier (§4.5.4)
+
+- **Quality per Dollar ($\text{QPD}$):**
   $$\text{QPD}(q) = \frac{Q(q)}{\text{Cost}(q)}$$
-- **Quality per Second ($\text{QPS}$, Eq. 255):**
+- **Quality per Second ($\text{QPS}$):**
   $$\text{QPS}(q) = \frac{Q(q)}{T_{\text{total}}(q) / 1000}$$
-- **Pareto Dominance ($\succ$):** A configuration $C_a \succ C_b$ iff $Q(C_a) \ge Q(C_b)$, $\text{Cost}(C_a) \le \text{Cost}(C_b)$, and $T(C_a) \le T(C_b)$ with at least one strict inequality.
+- **Pareto Dominance ($\succ$):** Configuration $C_a \succ C_b$ iff $Q(C_a) \ge Q(C_b)$, $\text{Cost}(C_a) \le \text{Cost}(C_b)$, and $T(C_a) \le T(C_b)$ with at least one strict inequality.
 
-### 5. Non-Parametric Significance Testing (§4.1, Table 4.2)
-- Two-tailed **Wilcoxon signed-rank test** across paired queries ($C_k$ vs $C_0$).
-- **Holm-Bonferroni step-down correction** to control Family-Wise Error Rates (FWER) across the 15 pairwise comparisons:
+### 5. Non-Parametric Significance Testing (§4.1)
+
+- Two-tailed **Wilcoxon signed-rank test** across paired queries ($C_k$ vs. $C_0$).
+- **Holm-Bonferroni step-down correction** controlling Family-Wise Error Rate (FWER) across $m = 15$ pairwise comparisons:
   $$p^{\text{adj}}_{(i)} = \min\left(1.0, \max_{j \le i} \left((m - j + 1) \cdot p_{(j)}\right)\right)$$
 - Significance flags: $^{***}\,(p < 0.001)$, $^{**}\,(p < 0.01)$, $^{*}\,(p < 0.05)$, $\text{ns}\,(p \ge 0.05)$.
 
 ---
 
-## 🚀 Quickstart
+## Quickstart
 
 ### 1. Setup Virtual Environment
+
 ```bash
 cd rag-code/rag-evaluator
 ./setup_env.sh
@@ -64,6 +104,7 @@ source venv/bin/activate
 ```
 
 Or manually:
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
@@ -71,177 +112,215 @@ pip install -r requirements.txt
 ```
 
 ### 2. Environment Configuration
-Copy `.env.example` to `.env`:
+
+Copy `.env.example` to `.env` and adjust for your target backend and judge:
+
 ```bash
 cp .env.example .env
 ```
-Edit `.env` to configure your RAG service URL and Judge model:
+
+Example `.env` configurations:
+
 ```env
 # Spring Boot RAG service URL
 RAG_APP_URL=http://localhost:8080
 
-# Judge Provider (claude, vertex, gemini, or ollama)
-JUDGE_PROVIDER=claude
-JUDGE_MODEL=claude-sonnet-5
-JUDGE_EMBEDDING_MODEL=text-embedding-004
+# Judge Provider: vllm, gemini, vertex, ollama, claude, or none
+JUDGE_PROVIDER=vllm
+JUDGE_MODEL=qwen3.8-27b
+JUDGE_EMBEDDING_MODEL=bge-m3
 
-# Google Cloud Vertex AI Configuration (Claude Sonnet 5 & Gemini on Vertex AI)
-GOOGLE_CLOUD_PROJECT_ID=your_gcp_project_here
-GOOGLE_CLOUD_LOCATION=us-east5
-ANTHROPIC_VERTEX_LOCATION=us-east5
+# Local vLLM OpenAI-compatible endpoints (e.g. CSC Roihu GPU node)
+VLLM_BASE_URL=http://127.0.0.1:8000/v1
+VLLM_EMBEDDING_BASE_URL=http://127.0.0.1:8001/v1
 
-# Optional direct API keys / local Ollama
-OLLAMA_BASE_URL=http://localhost:11434
-GOOGLE_AI_API_KEY=your_gemini_key_here
-ANTHROPIC_API_KEY=your_anthropic_key_here
+# Google Cloud Vertex AI (Gemini 3.x requires location=global; text-embedding-004 uses regional e.g. us-central1)
+# GOOGLE_CLOUD_PROJECT_ID=your-project-id
+# GOOGLE_CLOUD_LOCATION=global
+# GOOGLE_CLOUD_EMBEDDING_LOCATION=us-central1
 ```
 
-### 3. Verify Judge Connectivity (Smoke Test)
+### 3. Verify Judge Connectivity
+
 ```bash
-venv/bin/python src/cli.py test-judge --judge claude --judge-model claude-sonnet-5
+# Local vLLM judge
+venv/bin/python src/cli.py test-judge --judge vllm --judge-model qwen3.8-27b
+
+# Vertex AI Gemini judge
+venv/bin/python src/cli.py test-judge --judge gemini --judge-model gemini-3.5-flash-lite
 ```
 
 ---
 
-## 💻 Execution Commands
+## Execution Workflows
 
-### Local Ollama Evaluation
+### Stage 1: Raw Benchmark Collection (`runs/raw/`)
+
+Run individual configurations or full 16-configuration sweeps with `--judge none` against the local Spring Boot service:
+
 ```bash
-# Baseline (C0) evaluation on 100-question benchmark sample
+# Baseline (C0) on canonical 100-question sample
 venv/bin/python src/cli.py run \
   --url http://localhost:8080 \
   --sample \
   --warmup 2 \
-  --judge ollama \
-  --output runs/run_C0_baseline.jsonl
+  --judge none \
+  --output runs/raw/musique/run_C0_baseline.jsonl
 
-# Small-to-Big Retrieval (C1: S2B)
-venv/bin/python src/cli.py run \
-  --url http://localhost:8080 \
-  --sample \
-  --modules M1 \
-  --warmup 2 \
-  --judge ollama \
-  --output runs/run_C1_S2B.jsonl
-
-# Small-to-Big + Semantic Re-ranking (C5: S2B+SR)
+# Small-to-Big + Semantic Re-ranking (C5: M1+M2)
 venv/bin/python src/cli.py run \
   --url http://localhost:8080 \
   --sample \
   --modules M1,M2 \
   --warmup 2 \
-  --judge ollama \
-  --output runs/run_C5_S2B_SR.jsonl
-```
-
-### GCP Cloud Run / Cloud SQL Evaluation
-```bash
-# Run against deployed Cloud Run service using Gemini 2.5 Flash judge
-venv/bin/python src/cli.py run \
-  --url https://rag-benchmark-service-xyz.run.app \
-  --sample \
-  --warmup 2 \
-  --judge gemini \
-  --judge-model gemini-2.5-flash \
-  --debug \
-  --output runs/run_C15_FullStack.jsonl
-```
-
-### Offline / Rapid Smoke Test (No Judge LLM)
-```bash
-venv/bin/python src/cli.py run \
-  --url http://localhost:8080 \
-  --limit 10 \
-  --modules M1 \
   --judge none \
-  --output runs/smoke_test.jsonl
+  --output runs/raw/musique/run_C5_M1_M2.jsonl
+```
+
+Or execute the full $2^4 = 16$ factorial sweep via the provided runner scripts (see [scripts/README.md](scripts/README.md)):
+
+```bash
+./scripts/benchmarks/run_musique_all16.sh
+./scripts/benchmarks/run_enterprise_closed_all16.sh
+./scripts/benchmarks/run_enterprise_raw_all16.sh
+```
+
+### Stage 2: Offline RAGAS Evaluation (`runs/evaluated/`)
+
+Score raw runs in `runs/raw/<dataset>/` and write evaluated records to `runs/evaluated/<dataset>/`:
+
+```bash
+# Evaluate a full directory using local vLLM (16 parallel workers)
+venv/bin/python src/cli.py evaluate \
+  --input runs/raw/musique \
+  --output runs/evaluated/musique \
+  --judge vllm \
+  --judge-model qwen3.8-27b \
+  --workers 16
+
+# Evaluate a single run using Vertex AI Gemini
+venv/bin/python src/cli.py evaluate \
+  --input runs/raw/musique/run_C0_baseline.jsonl \
+  --output runs/evaluated/musique/run_C0_baseline.jsonl \
+  --judge gemini \
+  --judge-model gemini-3.5-flash-lite
+```
+
+### Stage 3: Statistical Comparison & Thesis Export
+
+```bash
+# Paired Wilcoxon signed-rank comparison
+venv/bin/python src/cli.py compare \
+  --baseline runs/evaluated/musique/run_C0_baseline.jsonl \
+  --treatment runs/evaluated/musique/run_C5_M1_M2.jsonl \
+  --config-name "C5: M1+M2" \
+  --output-latex ../../thesis/tables/musique/wilcoxon_tests.tex
+
+# Export all thesis LaTeX tables and vector PDF figures
+venv/bin/python src/cli.py export-thesis \
+  --input runs/evaluated/musique \
+  --subfolder musique \
+  --dataset-name "MuSiQue"
 ```
 
 ---
 
-## 📊 CLI Command Reference
+## CLI Command Reference
 
 ### `run`
-Executes an end-to-end benchmark run against the Spring Boot service:
-```
+
+Executes an end-to-end benchmark run against the Spring Boot RAG service:
+
+```text
 Options:
-  --url          TEXT     Spring Boot service base URL
-  --limit, -l    INTEGER  Number of questions to evaluate
-  --hops, -h     INTEGER  Filter questions by hop count (2, 3, or 4)
-  --sample, -s            Use canonical 100-question benchmark sample
-  --modules, -m  TEXT     Optimization modules comma-separated (e.g. M1,M2)
-  --table-name   TEXT     Vector store pgvector table override
-  --judge, -j    TEXT     Judge provider: claude, vertex, gemini, ollama, none [default: none]
-  --judge-model  TEXT     Judge model identifier
-  --warmup, -w   INTEGER  Number of unmeasured warm-up queries [default: 2]
-  --debug, -d             Enable detailed client payload and timing logs
-  --output, -o   TEXT     Path to output JSONL file
-  --top-k        INTEGER  Retrieval top-k candidate override
+  --url              TEXT     RAG service URL (default: RAG_APP_URL or http://localhost:8080)
+  --limit, -l        INTEGER  Number of benchmark questions to evaluate
+  --hops, -h         INTEGER  Filter by hop count (e.g. 2, 3, 4)
+  --sample, -s                Use canonical 100-question sample
+  --modules, -m      TEXT     Comma-separated optimization modules (e.g. M1,M2)
+  --table-name       TEXT     Vector store table name override
+  --judge, -j        TEXT     Judge provider: vllm, gemini, vertex, claude, ollama, none [default: none]
+  --judge-model      TEXT     Judge model identifier
+  --warmup, -w       INTEGER  Number of unmeasured warm-up queries [default: 2]
+  --debug, -d                 Enable verbose debug logging
+  --output, -o       TEXT     Path to save evaluation results JSONL
+  --top-k            INTEGER  Retrieval top-k override
+  --stream                    Use streaming query collector with real-time JSONL checkpointing
+  --judge-delay      FLOAT    Pacing delay (seconds) between judge calls (default: 1.5s cloud, 0s local)
+  --timeout          FLOAT    Request timeout in seconds [default: 300.0]
+  --skip-cache-check          Skip pre-flight prompt cache verification
 ```
 
 ### `test-judge`
-Tests connectivity and latency to the LLM judge:
+
+Tests connectivity, responsiveness, and latency of the configured evaluation judge and embeddings:
+
 ```bash
-venv/bin/python src/cli.py test-judge --judge gemini --judge-model gemini-2.5-flash
+venv/bin/python src/cli.py test-judge --judge vllm --judge-model qwen3.8-27b
 ```
 
+### `test-cache`
+
+Verifies prompt cache isolation, explicit prewarming, and cache hit integrity (`--url`, `--models`, `--table-name`, `--timeout`, `--debug`).
+
 ### `evaluate`
-Re-scores or attaches RAGAS evaluation to an existing raw JSONL run:
-```bash
-venv/bin/python src/cli.py evaluate \
-  --input runs/raw_run.jsonl \
-  --judge gemini \
-  --output runs/run_evaluated.jsonl
+
+Computes EM, $F_1$, operational cost, RAGAS metrics, and Composite $Q$ on existing raw JSONL run(s):
+
+```text
+Options:
+  --input, -i        PATH     Input JSONL file or directory containing run JSONL files [required]
+  --judge, -j        TEXT     Judge provider: vllm, gemini, vertex, claude, ollama, none [default: claude]
+  --judge-model      TEXT     Judge model identifier
+  --output, -o       PATH     Output JSONL path (or directory if input is a directory)
+  --inplace                   Update input file(s) in place
+  --resume/--no-resume        Skip samples that already have RAGAS scores [default: True]
+  --force, -f                 Force re-evaluation of all samples
+  --judge-delay      FLOAT    Pacing delay (seconds) between judge calls
+  --pricing-tier     TEXT     Default pricing tier for cost calculations [default: gemini-3.8-flash]
+  --workers, -w      INTEGER  Concurrent worker threads for parallel evaluation [default: 1]
 ```
 
 ### `compare`
-Performs paired Wilcoxon signed-rank tests and Holm-Bonferroni step-down correction:
-```bash
-venv/bin/python src/cli.py compare \
-  --baseline runs/run_C0_baseline.jsonl \
-  --treatment runs/run_C1_S2B.jsonl \
-  --config-name "C1: S2B" \
-  --output-latex ../../thesis/tables/wilcoxon_tests.tex
-```
+
+Performs paired Wilcoxon signed-rank tests with Holm-Bonferroni correction (`--baseline`/`-b`, `--treatment`/`-t`, `--output-latex`, `--config-name`).
 
 ### `export-thesis`
-Generates all publication-grade LaTeX tables and vector PDF figures:
+
+Generates publication-ready LaTeX tables and vector PDF figures (`--input`/`-i`, `--tables-dir`, `--figures-dir`, `--subfolder`/`-s`, `--dataset-name`/`-d`, `--family-scope`).
+
+### `query` & `run-questions`
+
+- `query`: Executes and evaluates a single ad-hoc query against a specified `--table-name`.
+- `run-questions`: Runs a batch of questions from a JSON/JSONL file (`--input`) against a `--table-name` with retry handling (`--max-retries`) and incremental checkpointing.
+
+### `build-enterprise-musique-dataset`
+
+Constructs a MuSiQue-schema enterprise benchmark JSONL dataset from Finnish question CSVs and crawled markdown corpus documents.
+
+---
+
+## Generated Output Artifacts
+
+1. **Benchmark Run Logs (`runs/raw/<dataset>/*.jsonl`, `runs/evaluated/<dataset>/*.jsonl`):**
+   Records containing `questionId`, `question`, `groundTruthAnswer`, `groundTruthAliases`, `hopCount`, `generatedAnswer`, `retrievedChunks`, `timings`, `total_latency_ms`, `ttft_ms`, `tokenUsage`, `cost_usd`, `exact_match`, `token_f1`, `faithfulness`, `answer_relevancy`, `context_precision`, `context_recall`, `composite_quality`, `qpd`, and `qps`.
+2. **LaTeX Tables (`thesis/tables/<subfolder>/*.tex`):**
+   Includes `benchmark_summary.tex`, `hop_breakdown.tex`, `wilcoxon_tests.tex`, `wilcoxon_rq*.tex`, and dataset-specific `tab_latency_*.tex`, `tab_cost_*.tex`, `tab_quality_*.tex`, and `tab_pareto_*.tex`.
+3. **Vector PDF Figures (`thesis/figures/<subfolder>/*.pdf`):**
+   Includes `pareto_frontier*.pdf`, `pareto_frontier_3d*.pdf`, `latency_breakdown*.pdf`, `cost_breakdown*.pdf`, `quality_lollipop*.pdf` (primary), `quality_radar*.pdf`, and `quality_delta_matrix*.pdf`.
+
+---
+
+## Testing Suite
+
+Run the full test suite (177 tests across 11 modules in `tests/`):
+
 ```bash
-venv/bin/python src/cli.py export-thesis \
-  --input runs/ \
-  --tables-dir ../../thesis/tables \
-  --figures-dir ../../thesis/figures
+venv/bin/pytest
 ```
 
----
+Or run targeted test modules:
 
-## 📦 Generated Output Artifacts
-
-### 1. Benchmark Run Logs (`runs/*.jsonl`)
-Contains JSON-lines records for every evaluated query, including:
-- `questionId`, `question`, `groundTruthAnswer`, `groundTruthAliases`, `hopCount`
-- `generatedAnswer`, `supportingEvidenceFound`, `retrievedChunks`
-- `timings` (`retrievalMs`, `generationMs`), `totalLatencyMs`
-- `tokenUsage` (`promptTokens`, `completionTokens`, `cachedTokens`, `totalTokens`)
-- `cost_usd`, `exact_match`, `token_f1`
-- `faithfulness`, `answer_relevancy`, `context_precision`, `context_recall`
-- `composite_quality`, `qpd`, `qps`
-
-### 2. Publication-Ready LaTeX Tables (`thesis/tables/*.tex`)
-- `thesis/tables/benchmark_summary.tex`: Comprehensive comparison table with $P_{50}, P_{95}$ latency, tokens, cost, EM, F1, RAGAS scores, and Composite $Q$. Ready for `\input{tables/benchmark_summary.tex}`.
-- `thesis/tables/hop_breakdown.tex`: Performance and quality stratified by 2-hop, 3-hop, and 4-hop query complexity tiers.
-- `thesis/tables/wilcoxon_tests.tex`: Formatted Table 4.2 with $\tilde{\mu}_\Delta$, $W$-statistic, $p_{\text{raw}}$, $p_{\text{adj}}$, and significance stars.
-
-### 3. Vector PDF Figures (`thesis/figures/*.pdf`)
-- `thesis/figures/pareto_frontier.pdf`: Dual-panel figure showing Quality vs. Latency and Quality vs. Cost with empirical Pareto frontier curves ($\mathcal{P}$).
-- `thesis/figures/latency_breakdown.pdf`: Stacked bar chart isolating Retrieval ($T_{\text{ret}}$) and Generation ($T_{\text{gen}}$) micro-phases.
-- `thesis/figures/ragas_metrics_radar.pdf`: Polar radar chart comparing configurations across the 4 core RAGAS dimensions.
-
----
-
-## 🧪 Testing Suite
-
-Run the complete test suite with 100% coverage across metrics, statistics, LaTeX export, and CLI commands:
 ```bash
 venv/bin/pytest tests/test_metrics.py tests/test_stats.py tests/test_export.py tests/test_cli.py
 ```

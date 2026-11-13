@@ -9,7 +9,7 @@ The project empirically evaluates a $2^4 = 16$ full-factorial design across four
 ```text
 .
 ├── rag-code/
-│   ├── rag-benchmark/       # Java 21 / Spring Boot 3.3 / Spring AI RAG backend & ingestion pipelines
+│   ├── rag-benchmark/       # Java 21 / Spring Boot 4.1 / Spring AI 2.0 RAG backend & ingestion pipelines
 │   └── rag-evaluator/       # Python evaluation harness (RAGAS, statistical tests, LaTeX/figure exporters)
 ├── thesis/
 │   ├── _main.tex            # Master's thesis LaTeX entrypoint
@@ -27,7 +27,7 @@ The project empirically evaluates a $2^4 = 16$ full-factorial design across four
 Detailed setup and execution instructions are provided in each component's documentation:
 
 - **RAG Benchmark Backend ([`rag-code/rag-benchmark/`](rag-code/rag-benchmark/README.md)):** Spring Boot service implementing the modular RAG pipeline ($M_1$–$M_4$), PostgreSQL/pgvector storage, and corpus ingestion endpoints.
-- **Evaluation & Analysis Suite ([`rag-code/rag-evaluator/`](rag-code/rag-evaluator/scripts/README.md)):** Python CLI and benchmark orchestration scripts for running the 16-configuration factorial matrix, LLM-as-a-Judge evaluation, Wilcoxon signed-rank tests, and generating publication figures and tables.
+- **Evaluation & Analysis Suite ([`rag-code/rag-evaluator/`](rag-code/rag-evaluator/README.md)):** Python CLI and benchmark orchestration scripts for running the 16-configuration factorial matrix, LLM-as-a-Judge evaluation, Wilcoxon signed-rank tests, and generating publication figures and tables.
 - **HPC Evaluation Guide ([`CSC_SETUP.md`](CSC_SETUP.md)):** Instructions for provisioning local LLM/embedding weights and running GPU evaluation jobs on the CSC Roihu supercomputer.
 - **Thesis Manuscript (`thesis/`):** LaTeX source files built using the Aalto University thesis class (`latexmk -pdf _main.tex`).
 
