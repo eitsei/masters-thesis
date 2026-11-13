@@ -11,7 +11,7 @@
 \begin{abstractpage}[english]
 Retrieval-Augmented Generation (RAG) is an established architectural paradigm for enriching generative artificial intelligence with external enterprise documentation, yet production deployments remain constrained by systemic trade-offs between operational costs, execution latency, and hallucination risks. 
 
-This thesis investigates modular pipeline optimizations---specifically prompt caching, semantic re-ranking, Small-to-Big retrieval, and model cascading---benchmarking their effects both in isolation and in combination. The pipelines are implemented using enterprise frameworks with Java and Spring AI connected to commercial cloud foundation models, and evaluated on an academic multi-hop benchmark alongside a curated enterprise customer support corpus, with generation quality and contextual precision systematically evaluated using multi-dimensional retrieval metrics.
+This thesis investigates modular pipeline optimizations---specifically prompt caching, semantic re-ranking, Small-to-Big retrieval, and model cascading---benchmarking their effects both in isolation and in combination. The pipelines are implemented using enterprise frameworks with Java and Spring AI connected to commercial cloud foundation models, and evaluated on an academic multi-hop benchmark alongside a curated enterprise customer support corpus, with generation quality and contextual precision systematically assessed using multi-dimensional RAG evaluation metrics.
 
 Empirical findings demonstrate that prompt caching is the primary driver of cost reduction, whereas modular optimizations generally introduce computational overhead rather than reducing median latency. Small-to-Big retrieval combined with prompt caching establishes the most balanced Pareto-optimal configuration across both environments, elevating response quality while securing substantial cost savings. 
 
@@ -35,12 +35,12 @@ When minimizing expenditure is the primary goal, model cascading combined with p
 %% Respecify those fields that differ from the earlier specification or simply
 %% respecify all fields.
 \thesistitle{Context is king - Retrieval-Augmented Generation in enterprise-ready systems}
-\supervisor{Prof. Petri Vuorimaa}
+\supervisor{Prof.\ Petri Vuorimaa}
 \advisor{DI Lauri Salminen}
 \degreeprogram{Computer, Communication and Information Sciences -koulutusohjelma}
 \major{Tietotekniikka}
 \collaborativepartner{Nordea Bank Oyj}
-\date{12.11.2026}
+\date{13.11.2026}
 %% The keywords need not be separated by \spc now.
 \keywords{hakuavusteinen generointi, RAG, Small-to-Big-haku, kehotevälimuisti, mallireititys, semanttinen uudelleenjärjestäminen, yritysjärjestelmät}
 %% Abstract text

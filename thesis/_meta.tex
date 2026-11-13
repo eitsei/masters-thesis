@@ -48,7 +48,7 @@
 
 %% The date for the bachelor's thesis is the day it is presented
 %%
-\date{12 November 2026}
+\date{13 November 2026}
 %%
 
 %% Thesis supervisor
@@ -87,3 +87,7 @@
 %\uselogo{aalto'}
 %\uselogo{}
 %%
+
+\thesisabstract{Retrieval-Augmented Generation (RAG) is an established architectural paradigm for enriching generative artificial intelligence with external enterprise documentation, yet production deployments remain constrained by systemic trade-offs between operational costs, execution latency, and hallucination risks. This thesis investigates modular pipeline optimizations, specifically prompt caching, semantic re-ranking, Small-to-Big retrieval, and model cascading, benchmarking their effects both in isolation and in combination. The pipelines are implemented using enterprise frameworks with Java and Spring AI connected to commercial cloud foundation models, and evaluated on an academic multi-hop benchmark alongside a curated enterprise customer support corpus, with generation quality and contextual precision systematically assessed using multi-dimensional RAG evaluation metrics. Empirical findings demonstrate that prompt caching is the primary driver of cost reduction, whereas modular optimizations generally introduce computational overhead rather than reducing median latency. Small-to-Big retrieval combined with prompt caching establishes the most balanced Pareto-optimal configuration across both environments, elevating response quality while securing substantial cost savings. When minimizing expenditure is the primary goal, model cascading combined with prompt caching provides the most economical strategy for enterprise queries by routing routine tasks to lightweight models, whereas complex reasoning escalates costs. Furthermore, semantic re-ranking offers limited benefit on curated data, but serves as an essential noise filter in unconstrained repositories. These findings provide practical architectural guidelines for balancing latency, cost, and output quality in production enterprise systems.}
+
+\keywords{Retrieval-Augmented Generation\spc RAG\spc Small-to-Big retrieval\spc prompt caching\spc model cascading\spc semantic re-ranking\spc enterprise systems}
