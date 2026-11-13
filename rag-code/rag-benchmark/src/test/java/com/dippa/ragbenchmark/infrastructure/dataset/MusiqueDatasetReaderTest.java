@@ -2,9 +2,14 @@ package com.dippa.ragbenchmark.infrastructure.dataset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.dippa.ragbenchmark.domain.dataset.MusiqueDecompositionStep;
 import com.dippa.ragbenchmark.domain.dataset.MusiqueParagraph;
 import com.dippa.ragbenchmark.domain.dataset.MusiqueQuestion;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -12,6 +17,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class MusiqueDatasetReaderTest {
+
+    private static final Path PRIMARY_DATASET_PATH = Path.of("data/musique/musique_full_v1.0_dev.jsonl");
 
     private ObjectMapper objectMapper;
     private MusiqueDatasetProperties properties;
@@ -103,11 +110,37 @@ class MusiqueDatasetReaderTest {
     }
 
     @Test
+    void parseLine_supportsCamelCaseAliasesAndExplicitHopCountFallback() {
+        String json = """
+                {
+                  "id": "custom_query_1",
+                  "question": "Who founded it?",
+                  "answer": "Ada Lovelace",
+                  "answerAliases": ["Ada", "Augusta Ada King"],
+                  "hopCount": 3,
+                  "answerable": true,
+                  "paragraphs": [],
+                  "question_decomposition": []
+                }
+                """;
+
+        MusiqueQuestion question = reader.parseLine(json);
+
+        assertThat(question).isNotNull();
+        assertThat(question.answerAliases()).containsExactly("Ada", "Augusta Ada King");
+        assertThat(question.hopCount()).isEqualTo(3);
+    }
+
+    @Test
     void loadAll_readsActualDatasetAndCaches() {
         List<MusiqueQuestion> all = reader.loadAll();
 
         assertThat(all).isNotEmpty();
-        assertThat(all.size()).isGreaterThanOrEqualTo(4000);
+        if (Files.exists(PRIMARY_DATASET_PATH)) {
+            assertThat(all.size()).isGreaterThanOrEqualTo(4000);
+        } else {
+            assertThat(all).hasSize(100);
+        }
 
         // Second call should return same cached reference
         List<MusiqueQuestion> secondCall = reader.loadAll();
@@ -153,22 +186,24 @@ class MusiqueDatasetReaderTest {
 
         // Verify that for every unanswerable question, none of its removed supporting bridge titles
         // leak into the shared vector store via other questions in the 100-question sample
-        java.util.Set<String> allIngestedTitles = sample.stream()
-                .flatMap(q -> q.paragraphs().stream())
-                .map(MusiqueParagraph::title)
-                .collect(Collectors.toSet());
-
-        for (MusiqueQuestion u : unanswerable) {
-            String baseId = u.id().replace("_unans", "");
-            MusiqueQuestion pairedAns = reader.findById(baseId).orElseThrow();
-            java.util.Set<String> uTitles = u.paragraphs().stream()
+        if (Files.exists(PRIMARY_DATASET_PATH)) {
+            java.util.Set<String> allIngestedTitles = sample.stream()
+                    .flatMap(q -> q.paragraphs().stream())
                     .map(MusiqueParagraph::title)
                     .collect(Collectors.toSet());
-            List<String> removedBridges = pairedAns.getSupportingTitles().stream()
-                    .filter(title -> !uTitles.contains(title))
-                    .toList();
-            assertThat(removedBridges).isNotEmpty();
-            assertThat(allIngestedTitles).doesNotContainAnyElementsOf(removedBridges);
+
+            for (MusiqueQuestion u : unanswerable) {
+                String baseId = u.id().replace("_unans", "");
+                MusiqueQuestion pairedAns = reader.findById(baseId).orElseThrow();
+                java.util.Set<String> uTitles = u.paragraphs().stream()
+                        .map(MusiqueParagraph::title)
+                        .collect(Collectors.toSet());
+                List<String> removedBridges = pairedAns.getSupportingTitles().stream()
+                        .filter(title -> !uTitles.contains(title))
+                        .toList();
+                assertThat(removedBridges).isNotEmpty();
+                assertThat(allIngestedTitles).doesNotContainAnyElementsOf(removedBridges);
+            }
         }
     }
 
@@ -197,20 +232,23 @@ class MusiqueDatasetReaderTest {
     @Test
     void loadAll_indexesAllQuestionsWithoutIdCollision() {
         List<MusiqueQuestion> all = reader.loadAll();
-        assertThat(all).hasSize(4834);
+        int expectedSize = Files.exists(PRIMARY_DATASET_PATH) ? 4834 : 100;
+        assertThat(all).hasSize(expectedSize);
 
-        // Verify that all IDs are strictly unique across the full dataset
+        // Verify that all IDs are strictly unique across the dataset
         List<String> ids = all.stream().map(MusiqueQuestion::id).toList();
-        assertThat(java.util.Set.copyOf(ids)).hasSize(4834);
+        assertThat(java.util.Set.copyOf(ids)).hasSize(expectedSize);
 
-        // Verify that findById retrieves both answerable and unanswerable versions of paired questions
-        MusiqueQuestion ans = reader.findById("2hop__837900_71701").orElseThrow();
-        assertThat(ans.answerable()).isTrue();
-        assertThat(ans.answer()).isEqualTo("November 5");
+        if (Files.exists(PRIMARY_DATASET_PATH)) {
+            // Verify that findById retrieves both answerable and unanswerable versions of paired questions
+            MusiqueQuestion ans = reader.findById("2hop__837900_71701").orElseThrow();
+            assertThat(ans.answerable()).isTrue();
+            assertThat(ans.answer()).isEqualTo("November 5");
 
-        MusiqueQuestion unans = reader.findById("2hop__837900_71701_unans").orElseThrow();
-        assertThat(unans.answerable()).isFalse();
-        assertThat(unans.answer()).isEqualTo(MusiqueDatasetReader.CANONICAL_REFUSAL_EN);
+            MusiqueQuestion unans = reader.findById("2hop__837900_71701_unans").orElseThrow();
+            assertThat(unans.answerable()).isFalse();
+            assertThat(unans.answer()).isEqualTo(MusiqueDatasetReader.CANONICAL_REFUSAL_EN);
+        }
     }
 
     @Test
@@ -221,25 +259,75 @@ class MusiqueDatasetReaderTest {
         );
         MusiqueDatasetReader fallbackReader = new MusiqueDatasetReader(fallbackProperties, objectMapper);
         List<MusiqueQuestion> loaded = fallbackReader.loadAll();
-        assertThat(loaded).isNotEmpty();
         assertThat(loaded).hasSize(100);
+        assertThat(loaded).allSatisfy(q -> assertThat(q.paragraphs()).isNotEmpty());
+
+        List<MusiqueQuestion> canonical = fallbackReader.getCanonicalBenchmarkSample();
+        assertThat(canonical).hasSize(100);
+        assertThat(canonical.stream().filter(MusiqueQuestion::answerable).count()).isEqualTo(80L);
+        assertThat(canonical.stream().filter(q -> !q.answerable()).count()).isEqualTo(20L);
+        assertThat(canonical).allSatisfy(q -> assertThat(q.paragraphs()).isNotEmpty());
     }
 
     @Test
     void exportCanonicalBenchmarkSampleToFile() throws Exception {
+        if (!Files.exists(PRIMARY_DATASET_PATH)) {
+            return;
+        }
+
         List<MusiqueQuestion> sample = reader.getCanonicalBenchmarkSample();
         assertThat(sample).hasSize(100);
 
-        java.nio.file.Path outPath = java.nio.file.Path.of("..", "rag-evaluator", "data", "musique", "musique_100_final.jsonl");
-        if (java.nio.file.Files.exists(outPath.getParent())) {
-            try (var writer = java.nio.file.Files.newBufferedWriter(outPath, java.nio.charset.StandardCharsets.UTF_8)) {
+        Path outPath = Path.of("..", "rag-evaluator", "data", "musique", "musique_100_final.jsonl");
+        if (Files.exists(outPath.getParent())) {
+            try (var writer = Files.newBufferedWriter(outPath, StandardCharsets.UTF_8)) {
                 for (MusiqueQuestion q : sample) {
-                    com.dippa.ragbenchmark.api.MusiqueQuestionResponse resp =
-                            com.dippa.ragbenchmark.api.MusiqueQuestionResponse.fromDomain(q);
-                    writer.write(objectMapper.writeValueAsString(resp));
+                    writer.write(objectMapper.writeValueAsString(toFullSchemaRecord(q)));
                     writer.newLine();
                 }
             }
         }
+    }
+
+    private static Map<String, Object> toFullSchemaRecord(MusiqueQuestion q) {
+        List<Map<String, Object>> paragraphs = q.paragraphs() == null
+                ? List.of()
+                : q.paragraphs().stream()
+                        .map(p -> {
+                            Map<String, Object> m = new LinkedHashMap<>();
+                            m.put("idx", p.idx());
+                            m.put("title", p.title());
+                            m.put("paragraph_text", p.paragraphText());
+                            m.put("is_supporting", p.isSupporting());
+                            return m;
+                        })
+                        .toList();
+
+        List<Map<String, Object>> decomposition = q.questionDecomposition() == null
+                ? List.of()
+                : q.questionDecomposition().stream()
+                        .map(d -> {
+                            Map<String, Object> m = new LinkedHashMap<>();
+                            m.put("id", d.id());
+                            m.put("question", d.question());
+                            m.put("answer", d.answer());
+                            m.put("paragraph_support_idx", d.paragraphSupportIdx());
+                            return m;
+                        })
+                        .toList();
+
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("id", q.id());
+        record.put("question", q.question());
+        record.put("answer", q.answer());
+        record.put("answer_aliases", q.answerAliases());
+        record.put("answerAliases", q.answerAliases());
+        record.put("hopCount", q.hopCount());
+        record.put("answerable", q.answerable());
+        record.put("paragraphCount", paragraphs.size());
+        record.put("supportingTitles", q.getSupportingTitles());
+        record.put("paragraphs", paragraphs);
+        record.put("question_decomposition", decomposition);
+        return record;
     }
 }

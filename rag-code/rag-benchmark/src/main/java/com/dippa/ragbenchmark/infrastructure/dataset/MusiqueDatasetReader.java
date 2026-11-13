@@ -352,6 +352,12 @@ public class MusiqueDatasetReader {
 
             List<String> aliases = new ArrayList<>();
             JsonNode aliasesNode = root.path("answer_aliases");
+            if (!aliasesNode.isArray() || aliasesNode.isEmpty()) {
+                JsonNode camelAliasesNode = root.path("answerAliases");
+                if (camelAliasesNode.isArray()) {
+                    aliasesNode = camelAliasesNode;
+                }
+            }
             if (aliasesNode.isArray()) {
                 for (JsonNode alias : aliasesNode) {
                     aliases.add(alias.asText());
@@ -390,7 +396,8 @@ public class MusiqueDatasetReader {
                 }
             }
 
-            int hopCount = extractHopCount(id, decomposition);
+            Integer explicitHopCount = root.hasNonNull("hopCount") ? root.get("hopCount").asInt() : null;
+            int hopCount = extractHopCount(id, decomposition, explicitHopCount);
 
             return new MusiqueQuestion(id, question, answer, aliases, hopCount, answerable, paragraphs, decomposition);
         } catch (Exception e) {
@@ -399,7 +406,7 @@ public class MusiqueDatasetReader {
         }
     }
 
-    private int extractHopCount(String id, List<MusiqueDecompositionStep> decomposition) {
+    private int extractHopCount(String id, List<MusiqueDecompositionStep> decomposition, Integer explicitHopCount) {
         if (id != null) {
             if (id.startsWith("2hop")) return 2;
             if (id.startsWith("3hop")) return 3;
@@ -407,6 +414,9 @@ public class MusiqueDatasetReader {
         }
         if (decomposition != null && !decomposition.isEmpty()) {
             return decomposition.size();
+        }
+        if (explicitHopCount != null && explicitHopCount > 0) {
+            return explicitHopCount;
         }
         return 2;
     }
