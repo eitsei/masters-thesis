@@ -1,0 +1,55 @@
+
+%% Abstract text
+%% All the details (name, title, etc.) on the abstract page appear as specified
+%% above. Add your abstarct text with paragraphs here to have paragraphs in the
+%% visible abstract page. Nonetheless, write the abstarct text without
+%% paragraphs in the macro \thesismacro so that it is added to the metadata as
+%% well.
+%%
+%% Abstract keywords
+\keywords{Retrieval-Augmented Generation, RAG, Small-to-Big retrieval, prompt caching, model cascading, semantic re-ranking, enterprise systems}
+\begin{abstractpage}[english]
+Retrieval-Augmented Generation (RAG) is an established architectural paradigm for enriching generative artificial intelligence with external enterprise documentation, yet production deployments remain constrained by systemic trade-offs between operational costs, execution latency, and hallucination risks. 
+
+This thesis investigates modular pipeline optimizations---specifically prompt caching, semantic re-ranking, Small-to-Big retrieval, and model cascading---benchmarking their effects both in isolation and in combination. The pipelines are implemented using enterprise frameworks with Java and Spring AI connected to commercial cloud foundation models, and evaluated on an academic multi-hop benchmark alongside a curated enterprise customer support corpus, with generation quality and contextual precision systematically assessed using multi-dimensional RAG evaluation metrics.
+
+Empirical findings demonstrate that prompt caching is the primary driver of cost reduction, whereas modular optimizations generally introduce computational overhead rather than reducing median latency. Small-to-Big retrieval combined with prompt caching establishes the most balanced Pareto-optimal configuration across both environments, elevating response quality while securing substantial cost savings. 
+
+When minimizing expenditure is the primary goal, model cascading combined with prompt caching provides the most economical strategy for enterprise queries by routing routine tasks to lightweight models, whereas complex reasoning escalates costs. Furthermore, semantic re-ranking offers limited benefit on curated data, but serves as an essential noise filter in unconstrained repositories. These findings provide practical architectural guidelines for balancing latency, cost, and output quality in production enterprise systems.
+\end{abstractpage}
+
+%% The text in the \thesisabstract macro is stored in the macro \abstractext, so
+%% you can use the text metadata abstract directly as follows:
+%%
+%\begin{abstractpage}[english]
+%	\abstracttext{}
+%\end{abstractpage}
+
+%% Force a new page so that the possible Finnish or Swedish abstract does not
+%% begin on the same page
+%%
+\newpage
+%%
+%% Abstract in Finnish. Delete if you don't need it. 
+%%
+%% Respecify those fields that differ from the earlier specification or simply
+%% respecify all fields.
+\thesistitle{Context is king - Retrieval-Augmented Generation in enterprise-ready systems}
+\supervisor{Prof.\ Petri Vuorimaa}
+\advisor{DI Lauri Salminen}
+\degreeprogram{Computer, Communication and Information Sciences -koulutusohjelma}
+\major{Tietotekniikka}
+\collaborativepartner{Nordea Bank Oyj}
+\date{13.11.2026}
+%% The keywords need not be separated by \spc now.
+\keywords{hakuavusteinen generointi, RAG, Small-to-Big-haku, kehotevälimuisti, mallireititys, semanttinen uudelleenjärjestäminen, yritysjärjestelmät}
+%% Abstract text
+\begin{abstractpage}[finnish]
+Hakuavusteinen generointi (RAG) on vakiintunut arkkitehtuurimalli, jolla generatiivista tekoälyä rikastetaan ulkoisella yritysdokumentaatiolla. Tuotantokäyttöä rajoittavat kuitenkin kustannusten, suoritusviiveen ja hallusinaatioriskin väliset ristiriidat.
+
+Tämä diplomityö tutkii RAG-putken modulaarisia optimointeja -- kehotevälimuistia, semanttista uudelleenjärjestämistä, Small-to-Big-hakua ja mallireititystä -- sekä yksittäin että yhdistelminä. Ratkaisut toteutettiin Javalla ja Spring AI -kehyksellä kaupallisia pilvikielimalleja hyödyntäen. Menetelmiä arvioidaan moniulotteisilla laatu- ja tarkkuusmittareilla sekä akateemisella monivaiheisen päättelyn aineistolla että kuratoidulla asiakastuen yritysaineistolla.
+
+Tulokset osoittavat, että kehotevälimuisti tuo suurimmat kustannussäästöt, kun taas muut optimoinnit kasvattavat laskentakuormaa lyhentämättä mediaaniviivettä. Small-to-Big-haun ja kehotevälimuistin yhdistelmä muodostaa molemmissa ympäristöissä tasapainoisimman Pareto-optimaalisen kokonaisuuden, joka parantaa vastausten laatua ja tuo merkittäviä säästöjä.
+
+Kun tavoitteena on kulujen minimointi, mallireitityksen ja kehotevälimuistin yhdistelmä on yrityskyselyissä taloudellisin ratkaisu, sillä se ohjaa rutiinikyselyt kevyille malleille ja rajaa kalliimman päättelyn vaativiin tehtäviin. Semanttinen uudelleenjärjestäminen tuo vain vähän lisäarvoa kuratoidussa datassa, mutta toimii välttämättömänä kohinasuodattimena laajoissa tietovarannoissa. Tulokset tarjoavat käytännön suuntaviivoja viiveen, kustannusten ja laadun tasapainottamiseen yritysjärjestelmissä.
+\end{abstractpage}

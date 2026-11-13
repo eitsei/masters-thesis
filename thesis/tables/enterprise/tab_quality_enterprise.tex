@@ -1,0 +1,40 @@
+\begin{table}[htbp]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.93}
+\setlength{\tabcolsep}{2.2pt}
+\caption[Retrieval and generation quality metrics on raw Enterprise corpus]{Retrieval, generation, and out-of-domain rejection quality metrics across 16 pipeline architectures on the unconstrained raw Enterprise Knowledge Corpus ($N = 100$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline.}
+\label{tab:quality_enterprise_raw}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c c c @{}}
+\toprule
+\textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Refusal Acc. /}\\\textbf{FRR (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\
+\midrule
+\multicolumn{7}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
+Naive RAG Baseline & 0.564 & 0.744 & 0.756 & 0.620 & 100.0\% / 18.8\% & 0.5022 \\
+\midrule
+\multicolumn{7}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
+S2B & 0.687 & 0.785 & 0.856 & 0.683 & 100.0\% / 11.2\% & 0.6368\textsuperscript{ns} \\
+SR & 0.646 & 0.742 & 0.807 & 0.645 & 100.0\% / 15.0\% & 0.5479\textsuperscript{ns} \\
+PC & 0.562 & 0.744 & 0.784 & 0.624 & 100.0\% / 17.5\% & 0.5326\textsuperscript{ns} \\
+MC & 0.558 & 0.750 & 0.759 & 0.630 & 100.0\% / 18.8\% & 0.5149\textsuperscript{ns} \\
+\midrule
+\multicolumn{7}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
+S2B + SR & 0.718 & 0.794 & 0.870 & 0.720 & 100.0\% / 7.5\% & 0.6433\textsuperscript{**} \\
+S2B + PC & 0.707 & 0.792 & 0.855 & 0.695 & 100.0\% / 8.8\% & \textbf{0.6633}\textsuperscript{ns} \\
+S2B + MC & 0.703 & 0.792 & 0.834 & 0.662 & 100.0\% / 12.5\% & 0.6492\textsuperscript{ns} \\
+SR + PC & 0.656 & 0.748 & 0.853 & 0.683 & 100.0\% / 11.2\% & 0.5688\textsuperscript{ns} \\
+SR + MC & 0.631 & 0.760 & 0.817 & 0.649 & 100.0\% / 15.0\% & 0.5596\textsuperscript{ns} \\
+PC + MC & 0.566 & 0.744 & 0.832 & 0.648 & 100.0\% / 15.0\% & 0.5634\textsuperscript{ns} \\
+\midrule
+\multicolumn{7}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
+S2B + SR + PC & 0.708 & 0.787 & 0.890 & 0.716 & 100.0\% / 7.5\% & 0.6466\textsuperscript{**} \\
+S2B + SR + MC & 0.682 & 0.781 & 0.849 & 0.665 & 100.0\% / 12.5\% & 0.6162\textsuperscript{*} \\
+S2B + PC + MC & 0.688 & 0.798 & 0.804 & 0.650 & 95.0\% / 15.0\% & 0.6268\textsuperscript{ns} \\
+SR + PC + MC & 0.654 & 0.742 & 0.782 & 0.633 & 100.0\% / 16.2\% & 0.5434\textsuperscript{ns} \\
+S2B + SR + PC + MC & 0.680 & 0.785 & 0.833 & 0.677 & 100.0\% / 12.5\% & 0.6028\textsuperscript{ns} \\
+\bottomrule
+\end{tabular*}
+\vspace{0.25em}
+\parbox{\linewidth}{\scriptsize
+\textbf{Notes:} Evaluated via RAGAS~\citep{es2024ragas} on answerable queries. Refusal Acc. denotes abstention on unanswerable out-of-domain (OOD) queries; FRR measures false refusals on answerable queries. Composite Quality $Q \in [0, 1]$ represents regularized harmonic mean (Eq.~\ref{eq:composite_quality}). Best $Q$ in bold. $^{*} p < 0.05, ^{**} p < 0.01, ^{***} p < 0.001$, $^{\mathrm{ns}} p \ge 0.05$ (paired Wilcoxon with Holm-Bonferroni correction vs. naive baseline).}
+\end{table}

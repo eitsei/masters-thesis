@@ -1,0 +1,6 @@
+data/
+.env
+.env*
+!.env.example
+target_cp.txt
+*_cp.txt

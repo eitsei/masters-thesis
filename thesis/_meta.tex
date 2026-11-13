@@ -1,0 +1,93 @@
+%% Edit to conform to your degree programme
+%% Capitalise the words in the name of the degree programme: it's a name
+\degreeprogram{Computer, Communication and Information Sciences}
+%%
+
+%% Your major
+%%
+\major{Computer Science}
+%%
+
+%% Choose one of the three below
+%%
+%\univdegree{BSc}
+\univdegree{MSc}
+%\univdegree{Lic}
+%%
+
+%% Your name (self explanatory...)
+%%
+\thesisauthor{Antti-Jussi Asunmaa}
+%%
+
+%% Your thesis title and possible subtitle comes here and possibly, again,
+%% together with the Finnish or Swedish abstract. Do not hyphenate the title
+%% (and subtitle), and avoid writing too long a title. Should LaTeX typeset a
+%% long title (and/or subtitle) unsatisfactorily, you might have to force a
+%% linebreak using the \\ control characters. In this case...
+%% * Remember, the title should not be hyphenated!
+%% * A possible 'and' in the title should not be the last word in the line; it
+%%   begins the next line.
+%% * Specify the title (and/or subtitle) again without the linebreak characters
+%%   in the optional argument in box brackets. This is done because the title
+%%   is part of the metadata in the pdf/a file, and the metadata cannot contain
+%%   linebreaks.
+%%
+\thesistitle{Context is king - Retrieval-Augmented Generation in enterprise-ready systems}
+%\thesistitle[Title of the thesis]{Title of\\ the thesis}
+%%
+%% Either remove or leave \thesissubtitle{} empty if you don't use it
+%%
+%\thesissubtitle{A possible subtitle}
+%\thesissubtitle[Subtitle of the thesis]{Subtitle of\\ the thesis}
+%\thesissubtitle{}
+
+%%
+\place{Helsinki}
+%%
+
+%% The date for the bachelor's thesis is the day it is presented
+%%
+\date{13 November 2026}
+%%
+
+%% Thesis supervisor
+%% Note the "\" character in the title after the period and before the space
+%% and the following character string.
+%% This is because the period is not the end of a sentence after which a
+%% slightly longer space follows, but what is desired is a regular interword
+%% space.
+%%
+\supervisor{Prof.\ Petri Vuorimaa}
+%%
+
+%% Advisor(s)---two at the most---of the thesis. Check with your supervisor how
+%% many official advisors you can have.
+%%
+\advisor{Lauri Salminen (M.Sc. (Tech.))}
+%\advisor{Ms Elsa Expert (MSc)}
+%%
+
+%% If you do your thesis work in a company of other institute, give the name of
+%% the company or instution here. Otherwise, leave the macro empty, comment it
+%% out, or remove it. This will remove this field from the abstract page.
+%%
+\collaborativepartner{Nordea Bank Oyj}
+%%
+
+%% Aaltologo: syntax:
+%% \uselogo{?|!|'|aalto?|aalto!|aalto'|<empty>}
+%% The logo language is set to be the same as the thesis language.
+%%
+\uselogo{?}
+%\uselogo{!}
+%\uselogo{}
+%\uselogo{aalto?}
+%\uselogo{aalto!}
+%\uselogo{aalto'}
+%\uselogo{}
+%%
+
+\thesisabstract{Retrieval-Augmented Generation (RAG) is an established architectural paradigm for enriching generative artificial intelligence with external enterprise documentation, yet production deployments remain constrained by systemic trade-offs between operational costs, execution latency, and hallucination risks. This thesis investigates modular pipeline optimizations, specifically prompt caching, semantic re-ranking, Small-to-Big retrieval, and model cascading, benchmarking their effects both in isolation and in combination. The pipelines are implemented using enterprise frameworks with Java and Spring AI connected to commercial cloud foundation models, and evaluated on an academic multi-hop benchmark alongside a curated enterprise customer support corpus, with generation quality and contextual precision systematically assessed using multi-dimensional RAG evaluation metrics. Empirical findings demonstrate that prompt caching is the primary driver of cost reduction, whereas modular optimizations generally introduce computational overhead rather than reducing median latency. Small-to-Big retrieval combined with prompt caching establishes the most balanced Pareto-optimal configuration across both environments, elevating response quality while securing substantial cost savings. When minimizing expenditure is the primary goal, model cascading combined with prompt caching provides the most economical strategy for enterprise queries by routing routine tasks to lightweight models, whereas complex reasoning escalates costs. Furthermore, semantic re-ranking offers limited benefit on curated data, but serves as an essential noise filter in unconstrained repositories. These findings provide practical architectural guidelines for balancing latency, cost, and output quality in production enterprise systems.}
+
+\keywords{Retrieval-Augmented Generation\spc RAG\spc Small-to-Big retrieval\spc prompt caching\spc model cascading\spc semantic re-ranking\spc enterprise systems}

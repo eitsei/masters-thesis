@@ -1,0 +1,136 @@
+spring:
+  application:
+    name: rag-benchmark
+  ai:
+    model:
+      chat: ${SPRING_AI_MODEL_CHAT:ollama}
+      embedding: ${SPRING_AI_MODEL_EMBEDDING:ollama}
+      embedding.text: ${SPRING_AI_MODEL_EMBEDDING:ollama}
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      chat:
+        model: ${OLLAMA_CHAT_MODEL:gemma4:e2b}
+      embedding:
+        model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+    google:
+      genai:
+        api-key: ${GOOGLE_AI_API_KEY:}
+        project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
+        location: ${GOOGLE_CLOUD_LOCATION:global}
+        chat:
+          model: ${GOOGLE_GENAI_CHAT_MODEL:${rag.models.google-genai.flash}}
+          options:
+            temperature: 0.0
+            thinking-budget: ${RAG_GENERATION_THINKING_BUDGET:0}
+            include-extended-usage-metadata: true
+        embedding:
+          project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
+          location: ${GOOGLE_CLOUD_LOCATION:global}
+          text:
+            model: ${GOOGLE_GENAI_EMBEDDING_MODEL:gemini-embedding-001}
+            dimensions: 768
+    vectorstore:
+      pgvector:
+        table-name: ${SPRING_AI_VECTORSTORE_PGVECTOR_TABLE_NAME:vector_store_musique}
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 768
+        initialize-schema: true
+ingest:
+  enterprise:
+    enabled: false
+    mode: ${INGEST_ENTERPRISE_MODE:s2b}
+    base-url: ${INGEST_ENTERPRISE_BASE_URL:https://example.com/}
+    max-pages: ${INGEST_ENTERPRISE_MAX_PAGES:250}
+    max-pdfs: ${INGEST_ENTERPRISE_MAX_PDFS:50}
+    max-pdf-size-bytes: 20000000
+    request-delay-millis: 400
+    user-agent: "RagBenchmarkThesisCrawler/1.0 (+mailto:research@example.com; academic research, single crawl run)"
+    markdown-export-dir: ${INGEST_ENTERPRISE_MD_DIR:data/enterprise/md}
+  musique:
+    enabled: false
+    mode: ${INGEST_MUSIQUE_MODE:s2b}
+    sample-only: true
+    sample-size: 100
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+
+logging:
+  level:
+    root: INFO
+    com.google.genai: DEBUG
+    org.springframework.ai.google.genai: DEBUG
+    java.net.http: DEBUG
+    org.apache.http: DEBUG
+    org.springframework.ai: DEBUG
+    org.springframework.web.client.RestClient: DEBUG
+    org.apache.hc.client5.http.wire: DEBUG
+    reactor.netty.http.client: DEBUG
+    io.grpc: DEBUG
+    com.google.api.gax: DEBUG
+rag:
+  generation:
+    thinking-budget: ${RAG_GENERATION_THINKING_BUDGET:0}
+    temperature: ${RAG_GENERATION_TEMPERATURE:0.0}
+    retry-max-attempts: ${RAG_GENERATION_RETRY_MAX_ATTEMPTS:3}
+    retry-backoff-ms: ${RAG_GENERATION_RETRY_BACKOFF_MS:5000}
+  query:
+    snippet-length-chars: 200
+    top-k: 5
+  reranker:
+    provider: ${RAG_RERANKER_PROVIDER:noop}
+    candidate-pool-size: ${RAG_RERANKER_CANDIDATE_POOL_SIZE:50}
+    model: ${RAG_RERANKER_MODEL:${rag.models.reranker.vertex-default}}
+    vertex:
+      project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
+      location: ${RAG_RERANKER_VERTEX_LOCATION:global}
+      ranking-config: ${RAG_RERANKER_VERTEX_RANKING_CONFIG:default_ranking_config}
+  prompt-cache:
+    provider: ${RAG_PROMPT_CACHE_PROVIDER:noop}
+    min-tokens: ${RAG_PROMPT_CACHE_MIN_TOKENS:4096}
+    ttl: ${RAG_PROMPT_CACHE_TTL:3600s}
+    chars-per-token-estimate: 3.5
+    display-name-prefix: "rag-benchmark-"
+  router:
+    provider: ${RAG_ROUTER_PROVIDER:classifier}
+    classifier-model: ${RAG_ROUTER_CLASSIFIER_MODEL:${rag.models.google-genai.flash-lite}}
+    fallback-model: ${RAG_ROUTER_FALLBACK_MODEL:${rag.models.google-genai.flash}}
+    temperature: 0.0
+    timeout-ms: 5000
+  models:
+    google-genai:
+      flash-lite: gemini-3.5-flash-lite
+      flash: gemini-3.5-flash
+      pro: ${GOOGLE_GENAI_PRO_MODEL:gemini-3.1-pro-preview}
+    reranker:
+      vertex-default: semantic-ranker-default-004
+      vertex-fast: semantic-ranker-fast-004
+      local-fallback-options:
+        - deberta-v3-large
+        - jina-reranker-v2
+  dataset:
+    musique:
+      file-path: ${MUSIQUE_DATASET_PATH:data/musique/musique_full_v1.0_dev.jsonl}
+      sample-size: 100
+      two-hop-ratio: 0.40
+      three-hop-ratio: 0.20
+      four-hop-ratio: 0.20
+      unanswerable-ratio: 0.20
+      random-seed: 42
+      batch-size: 100
+      include-title-in-chunk-text: true
+    enterprise-closed:
+      file-path: ${ENTERPRISE_CLOSED_DATASET_PATH:data/enterprise/enterprise_100_final.jsonl}
+      batch-size: 100
+      parent-batch-size: 10
+      child-batch-size: 25
+      baseline-chunk-size: 512
+      parent-chunk-size: 1024
+      child-chunk-size: 128
+      include-title-in-chunk-text: true
+
+

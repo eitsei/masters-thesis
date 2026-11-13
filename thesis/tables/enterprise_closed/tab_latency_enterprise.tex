@@ -1,0 +1,40 @@
+\begin{table}[htbp]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{0.93}
+\setlength{\tabcolsep}{3.5pt}
+\caption[Execution latency and TTFT profiles on Enterprise Closed]{End-to-end execution latency and Time-to-First-Token (TTFT) across 16 pipeline architectures on Enterprise Closed. Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline.}
+\label{tab:latency_enterprise}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l r r r r r @{}}
+\toprule
+\textbf{Pipeline} & \makecell{\textbf{TTFT $P_{50}$}\\\scriptsize{(ms)}} & \makecell{\textbf{TTFT $P_{95}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$T_{\text{total}} P_{95}$}\\\scriptsize{(ms)}} & \makecell{\textbf{$\Delta T_{\text{total}}$}\\\scriptsize{(\%)}} \\
+\midrule
+\multicolumn{6}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
+Naive RAG Baseline & 1135.0 & 1827.2 & 1407.0 & 2492.9 & -- \\
+\midrule
+\multicolumn{6}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
+S2B & 1117.0 & 1493.2 & 1347.0 & 2163.0 & -4.3\%\textsuperscript{ns} \\
+SR & 1200.0 & 1551.2 & 1389.5 & 2228.2 & -1.2\%\textsuperscript{ns} \\
+PC & 1562.5 & 1887.3 & 1714.0 & 2615.6 & +21.8\%\textsuperscript{***} \\
+MC & 1715.0 & 3670.5 & 1943.5 & 4804.3 & +38.1\%\textsuperscript{***} \\
+\midrule
+\multicolumn{6}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
+S2B + SR & 1219.5 & 1698.4 & 1446.5 & 2240.7 & +2.8\%\textsuperscript{ns} \\
+S2B + PC & 1523.5 & 2232.6 & 1735.0 & 2686.5 & +23.3\%\textsuperscript{***} \\
+S2B + MC & 1787.0 & 4339.8 & 2054.0 & 5956.2 & +46.0\%\textsuperscript{***} \\
+SR + PC & 1672.0 & 2011.1 & 1836.5 & 2654.8 & +30.5\%\textsuperscript{***} \\
+SR + MC & 1881.0 & 3764.3 & 2105.5 & 4606.1 & +49.6\%\textsuperscript{***} \\
+PC + MC & 1974.0 & 4713.1 & 2150.5 & 4742.9 & +52.8\%\textsuperscript{***} \\
+\midrule
+\multicolumn{6}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
+S2B + SR + PC & 1593.5 & 4083.6 & 1720.0 & 4510.3 & +22.2\%\textsuperscript{***} \\
+S2B + SR + MC & 1927.5 & 3888.6 & 2127.5 & 5151.5 & +51.2\%\textsuperscript{***} \\
+S2B + PC + MC & 2059.5 & 3163.5 & 2332.5 & 3849.2 & +65.8\%\textsuperscript{***} \\
+SR + PC + MC & 1980.0 & 3299.7 & 2095.0 & 4057.1 & +48.9\%\textsuperscript{***} \\
+S2B + SR + PC + MC & 2152.0 & 6482.9 & 2532.5 & 6531.1 & +80.0\%\textsuperscript{***} \\
+\bottomrule
+\end{tabular*}
+\vspace{0.25em}
+\parbox{\linewidth}{\scriptsize
+\textbf{Notes:} $P_{50}$ and $P_{95}$ denote median and 95th percentile execution latencies. $\Delta T_{\text{total}}$ denotes percentage change relative to baseline. $^{*} p < 0.05, ^{**} p < 0.01, ^{***} p < 0.001$, $^{\mathrm{ns}} p \ge 0.05$ (paired Wilcoxon with Holm-Bonferroni correction vs. naive baseline).}
+\end{table}

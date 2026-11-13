@@ -1,0 +1,40 @@
+\begin{table}[htbp]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.93}
+\setlength{\tabcolsep}{1.2pt}
+\caption[Retrieval and generation quality metrics on MuSiQue]{Retrieval, generation, and multi-hop reasoning quality metrics across 16 pipeline architectures on the MuSiQue benchmark ($N = 100$). Statistical significance flags denote Holm-Bonferroni-adjusted paired Wilcoxon signed-rank tests against the naive baseline.}
+\label{tab:quality_musique}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c c c c @{}}
+\toprule
+\textbf{Pipeline} & \makecell{\textbf{Context}\\\textbf{Precision}} & \makecell{\textbf{Context}\\\textbf{Recall}} & \makecell{\textbf{Faithful-}\\\textbf{ness}} & \makecell{\textbf{Answer}\\\textbf{Relevancy}} & \makecell{\textbf{Exact Match /}\\\textbf{Token F1 (\%)}} & \makecell{\textbf{Refusal Acc. /}\\\textbf{FRR (\%)}} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} \\
+\midrule
+\multicolumn{8}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
+Naive RAG Baseline & 0.505 & 0.562 & 0.588 & 0.242 & 41.0\% / 45.1\% & 65.0\% / 42.5\% & \textbf{0.2104} \\
+\midrule
+\multicolumn{8}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
+S2B & 0.454 & 0.575 & 0.583 & 0.241 & 37.0\% / 44.4\% & 65.0\% / 42.5\% & 0.1851\textsuperscript{ns} \\
+SR & 0.456 & 0.463 & 0.623 & 0.221 & 37.0\% / 42.1\% & 70.0\% / 48.8\% & 0.1735\textsuperscript{ns} \\
+PC & 0.472 & 0.562 & 0.584 & 0.244 & 39.0\% / 43.8\% & 70.0\% / 45.0\% & 0.1856\textsuperscript{ns} \\
+MC & 0.485 & 0.550 & 0.581 & 0.187 & 42.0\% / 45.6\% & 90.0\% / 56.2\% & 0.1789\textsuperscript{ns} \\
+\midrule
+\multicolumn{8}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
+S2B + SR & 0.425 & 0.487 & 0.623 & 0.246 & 34.0\% / 41.8\% & 70.0\% / 46.2\% & 0.1995\textsuperscript{ns} \\
+S2B + PC & 0.486 & 0.575 & 0.560 & 0.256 & 39.0\% / 46.3\% & 65.0\% / 42.5\% & 0.2006\textsuperscript{ns} \\
+S2B + MC & 0.456 & 0.575 & 0.585 & 0.174 & 37.0\% / 41.9\% & 85.0\% / 60.0\% & 0.1566\textsuperscript{ns} \\
+SR + PC & 0.463 & 0.450 & 0.623 & 0.218 & 37.0\% / 42.2\% & 70.0\% / 51.2\% & 0.1697\textsuperscript{ns} \\
+SR + MC & 0.457 & 0.450 & 0.598 & 0.175 & 36.0\% / 40.2\% & 80.0\% / 61.3\% & 0.1575\textsuperscript{ns} \\
+PC + MC & 0.470 & 0.562 & 0.569 & 0.185 & 39.0\% / 42.7\% & 85.0\% / 57.5\% & 0.1600\textsuperscript{ns} \\
+\midrule
+\multicolumn{8}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
+S2B + SR + PC & 0.441 & 0.500 & 0.607 & 0.239 & 35.0\% / 41.2\% & 70.0\% / 45.0\% & 0.2069\textsuperscript{ns} \\
+S2B + SR + MC & 0.430 & 0.487 & 0.635 & 0.181 & 33.0\% / 38.8\% & 75.0\% / 58.8\% & 0.1834\textsuperscript{ns} \\
+S2B + PC + MC & 0.478 & 0.562 & 0.579 & 0.166 & 38.0\% / 41.6\% & 90.0\% / 62.5\% & 0.1664\textsuperscript{ns} \\
+SR + PC + MC & 0.451 & 0.463 & 0.588 & 0.141 & 35.0\% / 36.8\% & 85.0\% / 68.8\% & 0.1209\textsuperscript{ns} \\
+S2B + SR + PC + MC & 0.418 & 0.481 & 0.619 & 0.167 & 37.0\% / 41.1\% & 80.0\% / 61.3\% & 0.1486\textsuperscript{ns} \\
+\bottomrule
+\end{tabular*}
+\vspace{0.25em}
+\parbox{\linewidth}{\scriptsize
+\textbf{Notes:} Evaluated via RAGAS~\citep{es2024ragas} on answerable queries. EM and Token F1 measure lexical overlap. Refusal Acc. denotes abstention on unanswerable queries; FRR measures false refusals on answerable queries. Composite Quality $Q \in [0, 1]$ represents regularized harmonic mean (Eq.~\ref{eq:composite_quality}). Best $Q$ in bold. $^{*} p < 0.05, ^{**} p < 0.01, ^{***} p < 0.001$, $^{\mathrm{ns}} p \ge 0.05$ (paired Wilcoxon with Holm-Bonferroni correction vs. naive baseline).}
+\end{table}

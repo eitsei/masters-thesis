@@ -1,0 +1,37 @@
+Modern enterprise-grade AI systems face continuously increasing resource constraints, in addition to growing operational expenditures driven by a rapid acceleration in corporate AI integration and exponential growth in the demand for AI computing capacity \citep{StanfordAIIndex2026}. Although API providers frequently lower unit token pricing, overall costs continue to rise due to explosive token usage and the complexity of multi-step agentic workflows that use the latest foundational large language models (LLMs) \citep{chen2024frugalgpt, GoogleVertexAIPricing}. This highlights the critical need for optimization across all phases of enterprise AI systems to ensure that computing resources are utilized as efficiently as possible.
+
+This is especially true for Retrieval-Augmented Generation (RAG), which serves as a primary solution to mitigate critical limitations of modern LLMs, such as hallucination, the lack of up-to-date data, and the absence of domain-specific knowledge \citep{lewis2020rag, wu2025ragnlp}. By design, RAG inherently increases token consumption, particularly input tokens, as the core concept relies on prepending retrieved document context to user queries to generate more grounded responses. Within the retrieval module, a central challenge lies in finding the optimal balance between retrieval efficiency and the quality of the retrieved information \citep{wu2025ragnlp}. While various optimization strategies have been proposed in contemporary literature \citep{wu2025ragnlp, zhao2024ragandbeyond}, they are typically evaluated on static benchmarks and lack direct integration with industry-standard, production-grade languages and frameworks such as Java and Spring AI \citep{springai}.
+
+The primary objective of this thesis is to investigate state-of-the-art optimization strategies for RAG systems, and the main contribution is to evaluate how these strategies perform within enterprise environments. Furthermore, this work demonstrates how these optimization strategies can be systematically evaluated and integrated within an enterprise Java and Spring AI infrastructure. To establish a focused scope, four specific optimization strategies are analyzed in detail: model cascading \citep{chen2024frugalgpt}, small-to-big retrieval \citep{lumer2026rethinking}, semantic re-ranking \citep{yu2024rankrag}, and prompt caching \citep{gim2024promptcache}. 
+
+Each of these methods addresses a distinct phase of the RAG pipeline. Model cascading and small-to-big retrieval optimize the query and retrieval stages, whereas semantic re-ranking refines the retrieved results to minimize prompt size and maximize contextual relevance. Prompt caching, on the other hand, stores the precomputed key-value (KV) attention states of static prompt prefixes in memory, thereby accelerating the generator's prefill phase and reducing input token costs.
+
+Many of these optimization strategies are typically evaluated in isolation, leaving a gap in the literature regarding how they interact when combined. For example, expanding context windows via small-to-big retrieval increases the proportion of dynamic, uncached tokens relative to the static cached prefix, potentially diluting the relative latency and cost savings of prompt caching. In addition, while model cascading may increase \textit{per-query} latency for complex tasks routed to more capable models, it decreases \textit{average} latency overall by resolving simpler tasks with faster, less capable models.
+
+Evaluating and resolving these interactive conflicts is crucial for high-volume enterprise applications, such as customer support systems, where operational requirements are exceptionally rigorous. In these environments, minor delays and incremental token usage quickly compound into systemic instability, elevated latencies, and escalating operational costs. Furthermore, hallucinated or erroneous outputs present substantial risks of reputational damage and potential financial liabilities \citep{aba2024aircanada}. Because enterprise systems must strictly navigate these critical constraints, cost, latency, and output quality are established as the primary evaluation metrics for this thesis. To guide this investigation, this study addresses the four primary research questions summarized in Table~\ref{tab:research_questions}.
+
+\begin{table}[htbp]
+    \centering
+    \caption[Primary research questions]{Primary research questions addressed in this thesis.}
+    \label{tab:research_questions}
+    \begin{tabularx}{\textwidth}{l X}
+    \toprule
+    \textbf{} & \textbf{Research Question} \\
+    \midrule
+    \textbf{RQ1} & \textbf{Latency:} How do small-to-big retrieval, semantic re-ranking, prompt caching, and model
+  cascading affect the latency profile (specifically Time to First Token [TTFT] and overall end-to-end execution
+  latency) of a RAG system? \\
+    \addlinespace
+    \textbf{RQ2} & \textbf{Cost:} To what extent do these optimization methods reduce the operational cost of the
+  system, accounting for token pricing tiers, prompt caching discounts, and model cascading? \\
+    \addlinespace
+    \textbf{RQ3} & \textbf{Quality:} How do these optimizations impact retrieval and generation quality (measured by
+  Context Precision, Context Recall, Faithfulness, and Answer Relevancy) compared to a naive RAG baseline? \\
+    \addlinespace
+    \textbf{RQ4} & \textbf{Interaction:} How do these optimization methods interact when combined, and what is the
+  optimal equilibrium between latency, cost, and quality in an enterprise customer support system? \\
+    \bottomrule
+    \end{tabularx}
+\end{table}
+
+The rest of the thesis is structured as follows: Chapter~\ref{sec:technical_bg} provides the technical background on large language models and naive retrieval-augmented generation architectures, while Chapter~\ref{sec:literature-review} examines the current literature on modular RAG optimization methods. Research methods are introduced in Chapter~\ref{sec:methods}, and the empirical results are presented in Chapter~\ref{sec:results}. Finally, the findings and systemic trade-offs are discussed in Chapter~\ref{sec:discussion}, and concluding remarks are provided in Chapter~\ref{sec:conclusion}.

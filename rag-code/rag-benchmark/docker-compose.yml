@@ -1,0 +1,26 @@
+# Local PostgreSQL + pgvector container (auto-managed by spring-boot-docker-compose)
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg16
+    container_name: rag-benchmark-postgres
+    labels:
+      # Required so Spring Boot recognizes the pgvector image as a Postgres service connection
+      org.springframework.boot.service-connection: postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ragbenchmark}
+      POSTGRES_USER: ${POSTGRES_USER:-ragbenchmark}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ragbenchmark}
+    ports:
+      # Mapped to 5433 to avoid conflicting with a local PostgreSQL instance on 5432
+      - "5433:5432"
+    volumes:
+      - rag-benchmark-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ragbenchmark} -d ${POSTGRES_DB:-ragbenchmark}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  rag-benchmark-pgdata:

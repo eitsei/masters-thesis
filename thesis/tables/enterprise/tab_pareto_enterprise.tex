@@ -1,0 +1,40 @@
+\begin{table}[htbp]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{0.93}
+\setlength{\tabcolsep}{3.5pt}
+\caption[Multi-objective Pareto efficiency metrics on raw Enterprise corpus]{Multi-objective Pareto efficiency and 3D non-domination trade-off metrics across 16 pipeline architectures on the unconstrained raw Enterprise corpus ($N = 100$).}
+\label{tab:pareto_enterprise_raw}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c r r r r c @{}}
+\toprule
+\textbf{Pipeline} & \makecell{\textbf{Composite}\\\textbf{Quality $Q$}} & \makecell{\textbf{Cost / 1k}\\\scriptsize{(\$)}} & \makecell{\textbf{$T_{\text{total}} P_{50}$}\\\scriptsize{(s)}} & \textbf{QPD} & \textbf{QPS} & \makecell{\textbf{Pareto}\\\textbf{Optimal}} \\
+\midrule
+\multicolumn{7}{@{}l@{}}{\textbf{Baseline ($k=0$)}} \\
+Naive RAG Baseline & 0.5022 & \$14.785 & 1.66 & 34 & 0.30 & \textbf{Yes} \\
+\midrule
+\multicolumn{7}{@{}l@{}}{\textbf{Single-Factor Isolated ($k=1$)}} \\
+S2B & 0.6368 & \$16.690 & 1.62 & 38 & 0.39 & \textbf{Yes} \\
+SR & 0.5479 & \$19.866 & 1.80 & 28 & 0.30 & No \\
+PC & 0.5326 & \$5.147 & 1.97 & 103 & 0.27 & \textbf{Yes} \\
+MC & 0.5149 & \$9.465 & 2.21 & 54 & 0.23 & No \\
+\midrule
+\multicolumn{7}{@{}l@{}}{\textbf{Pairwise Combinations ($k=2$)}} \\
+S2B + SR & 0.6433 & \$22.101 & 2.02 & 29 & 0.32 & No \\
+S2B + PC & 0.6633 & \$7.048 & 1.68 & 94 & 0.39 & \textbf{Yes} \\
+S2B + MC & 0.6492 & \$11.200 & 2.11 & 58 & 0.31 & No \\
+SR + PC & 0.5688 & \$10.311 & 1.76 & 55 & 0.32 & No \\
+SR + MC & 0.5596 & \$14.413 & 2.34 & 39 & 0.24 & No \\
+PC + MC & 0.5634 & \$3.463 & 2.16 & 163 & 0.26 & \textbf{Yes} \\
+\midrule
+\multicolumn{7}{@{}l@{}}{\textbf{Higher-Order Combinations ($k \ge 3$)}} \\
+S2B + SR + PC & 0.6466 & \$12.461 & 2.16 & 52 & 0.30 & No \\
+S2B + SR + MC & 0.6162 & \$15.976 & 2.44 & 39 & 0.25 & No \\
+S2B + PC + MC & 0.6268 & \$4.582 & 2.30 & 137 & 0.27 & \textbf{Yes} \\
+SR + PC + MC & 0.5434 & \$8.375 & 2.52 & 65 & 0.22 & No \\
+S2B + SR + PC + MC & 0.6028 & \$9.802 & 2.51 & 61 & 0.24 & No \\
+\bottomrule
+\end{tabular*}
+\vspace{0.25em}
+\parbox{\linewidth}{\scriptsize
+\textbf{Notes:} Composite Quality $Q \in [0, 1]$ (Eq.~\ref{eq:composite_quality}). $\text{QPD} = Q / \text{Cost}_{1\text{k}}$ and $\text{QPS} = Q / T_{\text{total}}$ represent resource efficiency ratios. Pareto optimality denotes 3D non-domination ($\max Q, \min \text{Cost}, \min T_{\text{total}}$). Bold indicates Pareto-optimal configuration.}
+\end{table}
