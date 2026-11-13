@@ -1,6 +1,6 @@
-package com.dippa.ragbenchmark.ingest.nordea;
+package com.dippa.ragbenchmark.ingest.enterprise;
 
-import com.dippa.ragbenchmark.api.NordeaIngestController;
+import com.dippa.ragbenchmark.api.EnterpriseIngestController;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,20 +20,20 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class NordeaIngestionServiceTest {
+class EnterpriseIngestionServiceTest {
 
     @TempDir
     Path tempDir;
 
     @Test
     void ingestOriginalExportsMarkdownAndChunksDocuments() throws IOException {
-        NordeaCrawler crawler = mock(NordeaCrawler.class);
-        NordeaPdfExtractor pdfExtractor = mock(NordeaPdfExtractor.class);
+        EnterpriseCrawler crawler = mock(EnterpriseCrawler.class);
+        EnterprisePdfExtractor pdfExtractor = mock(EnterprisePdfExtractor.class);
         VectorStore vectorStore = mock(VectorStore.class);
 
-        NordeaIngestionProperties properties = new NordeaIngestionProperties(
+        EnterpriseIngestionProperties properties = new EnterpriseIngestionProperties(
                 true,
-                "https://www.nordea.fi/private-banking/",
+                "https://example.com/private-banking/",
                 10,
                 5,
                 10_000_000,
@@ -60,16 +60,16 @@ class NordeaIngestionServiceTest {
                 Salkunhoidon peruspalkkio on 0.50 prosenttia.
                 """;
 
-        when(crawler.crawl()).thenReturn(new NordeaCrawler.CrawlResult(
-                List.of(new NordeaCrawler.CrawledPage("https://www.nordea.fi/pb/page1", "Page 1 Title", sampleHtmlMarkdown)),
-                List.of("https://www.nordea.fi/pb/doc1.pdf")
+        when(crawler.crawl()).thenReturn(new EnterpriseCrawler.CrawlResult(
+                List.of(new EnterpriseCrawler.CrawledPage("https://example.com/pb/page1", "Page 1 Title", sampleHtmlMarkdown)),
+                List.of("https://example.com/pb/doc1.pdf")
         ));
 
-        when(pdfExtractor.extract("https://www.nordea.fi/pb/doc1.pdf")).thenReturn(Optional.of(
-                new NordeaPdfExtractor.CrawledPdf("https://www.nordea.fi/pb/doc1.pdf", "Doc 1 Title", samplePdfMarkdown)
+        when(pdfExtractor.extract("https://example.com/pb/doc1.pdf")).thenReturn(Optional.of(
+                new EnterprisePdfExtractor.CrawledPdf("https://example.com/pb/doc1.pdf", "Doc 1 Title", samplePdfMarkdown)
         ));
 
-        NordeaIngestionService service = new NordeaIngestionService(
+        EnterpriseIngestionService service = new EnterpriseIngestionService(
                 crawler,
                 pdfExtractor,
                 vectorStore,
@@ -78,7 +78,7 @@ class NordeaIngestionServiceTest {
                 properties
         );
 
-        NordeaIngestionService.NordeaIngestionSummary summary = service.ingestOriginal();
+        EnterpriseIngestionService.EnterpriseIngestionSummary summary = service.ingestOriginal();
 
         assertThat(summary.pagesCrawled()).isEqualTo(1);
         assertThat(summary.pdfsExtracted()).isEqualTo(1);
@@ -96,12 +96,12 @@ class NordeaIngestionServiceTest {
         assertThat(exportedPdfs).hasSize(1);
 
         String pageContent = Files.readString(exportedPages.getFirst());
-        assertThat(pageContent).contains("url: \"https://www.nordea.fi/pb/page1\"");
+        assertThat(pageContent).contains("url: \"https://example.com/pb/page1\"");
         assertThat(pageContent).contains("type: \"html\"");
         assertThat(pageContent).contains("# Private Banking lyhyesti");
 
         String pdfContent = Files.readString(exportedPdfs.getFirst());
-        assertThat(pdfContent).contains("url: \"https://www.nordea.fi/pb/doc1.pdf\"");
+        assertThat(pdfContent).contains("url: \"https://example.com/pb/doc1.pdf\"");
         assertThat(pdfContent).contains("type: \"pdf\"");
         assertThat(pdfContent).contains("# Hinnasto ja ehdot");
 
@@ -119,13 +119,13 @@ class NordeaIngestionServiceTest {
 
     @Test
     void ingestSmallToBigProducesLinkedParentAndChildChunks() throws IOException {
-        NordeaCrawler crawler = mock(NordeaCrawler.class);
-        NordeaPdfExtractor pdfExtractor = mock(NordeaPdfExtractor.class);
+        EnterpriseCrawler crawler = mock(EnterpriseCrawler.class);
+        EnterprisePdfExtractor pdfExtractor = mock(EnterprisePdfExtractor.class);
         VectorStore vectorStore = mock(VectorStore.class);
 
-        NordeaIngestionProperties properties = new NordeaIngestionProperties(
+        EnterpriseIngestionProperties properties = new EnterpriseIngestionProperties(
                 true,
-                "https://www.nordea.fi/private-banking/",
+                "https://example.com/private-banking/",
                 10,
                 5,
                 10_000_000,
@@ -136,12 +136,12 @@ class NordeaIngestionServiceTest {
 
         String sampleHtmlMarkdown = "# Otsikko\n\n" + "Tämä on pitkä tekstikappale varallisuudenhoidosta. ".repeat(30);
 
-        when(crawler.crawl()).thenReturn(new NordeaCrawler.CrawlResult(
-                List.of(new NordeaCrawler.CrawledPage("https://www.nordea.fi/pb/s2b", "S2B Page", sampleHtmlMarkdown)),
+        when(crawler.crawl()).thenReturn(new EnterpriseCrawler.CrawlResult(
+                List.of(new EnterpriseCrawler.CrawledPage("https://example.com/pb/s2b", "S2B Page", sampleHtmlMarkdown)),
                 List.of()
         ));
 
-        NordeaIngestionService service = new NordeaIngestionService(
+        EnterpriseIngestionService service = new EnterpriseIngestionService(
                 crawler,
                 pdfExtractor,
                 vectorStore,
@@ -150,7 +150,7 @@ class NordeaIngestionServiceTest {
                 properties
         );
 
-        NordeaIngestionService.NordeaIngestionSummary summary = service.ingestSmallToBig();
+        EnterpriseIngestionService.EnterpriseIngestionSummary summary = service.ingestSmallToBig();
 
         assertThat(summary.pagesCrawled()).isEqualTo(1);
         assertThat(summary.parentChunksWritten()).isGreaterThan(0);
@@ -168,7 +168,7 @@ class NordeaIngestionServiceTest {
 
         String rawMarkdown = """
                 ---
-                url: "https://www.nordea.fi/fi/palvelut/laina.html"
+                url: "https://example.com/fi/palvelut/laina.html"
                 title: "Asuntolainat"
                 type: "html"
                 crawled_at: "2026-09-25T05:59:02Z"
@@ -176,7 +176,7 @@ class NordeaIngestionServiceTest {
 
                 # Asuntolainat (Avautuu uuteen ikkunaan)
 
-                Hups! Jos haluat nähdä tällaista sisältöä, hyväksy ensin Nordean markkinointievästeet
+                Hups! Jos haluat nähdä tällaista sisältöä, hyväksy ensin markkinointievästeet
 
                 Hae asuntolainaa helposti ja nopeasti verkossa.
 
@@ -187,30 +187,30 @@ class NordeaIngestionServiceTest {
                 - Kysy heti chatissa
                 - Usein kysytyt
                 - Soita meille 0200 3000
-                - Nordea Omaposti
+                - Enterprise Portal
                 """;
         Files.writeString(testFile, rawMarkdown);
 
-        NordeaIngestionProperties properties = new NordeaIngestionProperties(
-                true, "https://www.nordea.fi/", 10, 5, 10_000_000, 0, "TestCrawler/1.0", tempDir.toString()
+        EnterpriseIngestionProperties properties = new EnterpriseIngestionProperties(
+                true, "https://example.com/", 10, 5, 10_000_000, 0, "TestCrawler/1.0", tempDir.toString()
         );
 
-        NordeaIngestionService service = new NordeaIngestionService(
+        EnterpriseIngestionService service = new EnterpriseIngestionService(
                 null, null, null, null, null, properties
         );
 
-        NordeaIngestController.NordeaIngestRequest request = new NordeaIngestController.NordeaIngestRequest(
+        EnterpriseIngestController.EnterpriseIngestRequest request = new EnterpriseIngestController.EnterpriseIngestRequest(
                 "s2b", "clean", false, false
         );
 
-        NordeaIngestionService.NordeaIngestionSummary summary = service.executePipeline(request);
+        EnterpriseIngestionService.EnterpriseIngestionSummary summary = service.executePipeline(request);
 
         assertThat(summary.pagesCrawled()).isEqualTo(1);
         assertThat(summary.mode()).isEqualTo("clean");
 
         String cleaned = Files.readString(testFile);
         // Frontmatter preserved
-        assertThat(cleaned).contains("url: \"https://www.nordea.fi/fi/palvelut/laina.html\"");
+        assertThat(cleaned).contains("url: \"https://example.com/fi/palvelut/laina.html\"");
         assertThat(cleaned).contains("title: \"Asuntolainat\"");
         assertThat(cleaned).contains("type: \"html\"");
 
@@ -237,7 +237,7 @@ class NordeaIngestionServiceTest {
         Path pageFile = pagesDir.resolve("001-page.md");
         String pageContent = """
                 ---
-                url: "https://www.nordea.fi/pb/page1"
+                url: "https://example.com/pb/page1"
                 title: "PB Palvelut"
                 type: "html"
                 ---
@@ -251,7 +251,7 @@ class NordeaIngestionServiceTest {
         Path pdfFile = pdfsDir.resolve("002-doc.md");
         String pdfContent = """
                 ---
-                url: "https://www.nordea.fi/pb/ehdot.pdf"
+                url: "https://example.com/pb/ehdot.pdf"
                 title: "Palveluehdot"
                 type: "pdf"
                 ---
@@ -263,20 +263,20 @@ class NordeaIngestionServiceTest {
         Files.writeString(pdfFile, pdfContent);
 
         VectorStore vectorStore = mock(VectorStore.class);
-        NordeaIngestionProperties properties = new NordeaIngestionProperties(
-                true, "https://www.nordea.fi/", 10, 5, 10_000_000, 0, "TestCrawler/1.0", tempDir.toString()
+        EnterpriseIngestionProperties properties = new EnterpriseIngestionProperties(
+                true, "https://example.com/", 10, 5, 10_000_000, 0, "TestCrawler/1.0", tempDir.toString()
         );
 
-        NordeaIngestionService service = new NordeaIngestionService(
+        EnterpriseIngestionService service = new EnterpriseIngestionService(
                 null, null, vectorStore, null, null, properties
         );
 
         // Test S2B ingest
-        NordeaIngestController.NordeaIngestRequest request = new NordeaIngestController.NordeaIngestRequest(
+        EnterpriseIngestController.EnterpriseIngestRequest request = new EnterpriseIngestController.EnterpriseIngestRequest(
                 "s2b", "ingest", false, false
         );
 
-        NordeaIngestionService.NordeaIngestionSummary summary = service.executePipeline(request);
+        EnterpriseIngestionService.EnterpriseIngestionSummary summary = service.executePipeline(request);
 
         assertThat(summary.pagesCrawled()).isEqualTo(1);
         assertThat(summary.pdfsExtracted()).isEqualTo(1);
@@ -295,7 +295,7 @@ class NordeaIngestionServiceTest {
         Path pageFile = pagesDir.resolve("001-baseline.md");
         String pageContent = """
                 ---
-                url: "https://www.nordea.fi/pb/page1"
+                url: "https://example.com/pb/page1"
                 title: "PB Baseline"
                 type: "html"
                 ---
@@ -307,19 +307,19 @@ class NordeaIngestionServiceTest {
         Files.writeString(pageFile, pageContent);
 
         VectorStore vectorStore = mock(VectorStore.class);
-        NordeaIngestionProperties properties = new NordeaIngestionProperties(
-                true, "https://www.nordea.fi/", 10, 5, 10_000_000, 0, "TestCrawler/1.0", tempDir.toString()
+        EnterpriseIngestionProperties properties = new EnterpriseIngestionProperties(
+                true, "https://example.com/", 10, 5, 10_000_000, 0, "TestCrawler/1.0", tempDir.toString()
         );
 
-        NordeaIngestionService service = new NordeaIngestionService(
+        EnterpriseIngestionService service = new EnterpriseIngestionService(
                 null, null, vectorStore, null, null, properties
         );
 
-        NordeaIngestController.NordeaIngestRequest request = new NordeaIngestController.NordeaIngestRequest(
+        EnterpriseIngestController.EnterpriseIngestRequest request = new EnterpriseIngestController.EnterpriseIngestRequest(
                 "original", "ingest", false, false
         );
 
-        NordeaIngestionService.NordeaIngestionSummary summary = service.executePipeline(request);
+        EnterpriseIngestionService.EnterpriseIngestionSummary summary = service.executePipeline(request);
 
         assertThat(summary.pagesCrawled()).isEqualTo(1);
         assertThat(summary.childChunksWritten()).isGreaterThan(0);
@@ -341,11 +341,11 @@ class NordeaIngestionServiceTest {
         Path pdfMd = Files.writeString(pdfsDir.resolve("doc1.md"), "content");
         Path keepOther = Files.writeString(pagesDir.resolve("keep.txt"), "keep me");
 
-        NordeaIngestionProperties properties = new NordeaIngestionProperties(
-                true, "https://www.nordea.fi/", 10, 5, 10_000_000, 0, "TestCrawler/1.0", tempDir.toString()
+        EnterpriseIngestionProperties properties = new EnterpriseIngestionProperties(
+                true, "https://example.com/", 10, 5, 10_000_000, 0, "TestCrawler/1.0", tempDir.toString()
         );
 
-        NordeaIngestionService service = new NordeaIngestionService(
+        EnterpriseIngestionService service = new EnterpriseIngestionService(
                 null, null, null, null, null, properties
         );
 
@@ -361,31 +361,31 @@ class NordeaIngestionServiceTest {
     @Test
     void clearDatabaseTruncatesTargetTablesPerMode() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
-        NordeaIngestionProperties properties = new NordeaIngestionProperties(
-                true, "https://www.nordea.fi/", 10, 5, 10_000_000, 0, "TestCrawler/1.0", tempDir.toString()
+        EnterpriseIngestionProperties properties = new EnterpriseIngestionProperties(
+                true, "https://example.com/", 10, 5, 10_000_000, 0, "TestCrawler/1.0", tempDir.toString()
         );
 
-        NordeaIngestionService service = new NordeaIngestionService(
+        EnterpriseIngestionService service = new EnterpriseIngestionService(
                 null, null, null, jdbcTemplate, properties
         );
 
         // s2b mode truncates large and small tables
         int s2bCleared = service.clearDatabase("s2b");
         assertThat(s2bCleared).isEqualTo(2);
-        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_nordea_large");
-        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_nordea_small");
+        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_enterprise_large");
+        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_enterprise_small");
 
         // original mode truncates baseline table
         int origCleared = service.clearDatabase("original");
         assertThat(origCleared).isEqualTo(1);
-        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_nordea");
+        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_enterprise");
 
         // all mode truncates all 3 tables
         int allCleared = service.clearDatabase("all");
         assertThat(allCleared).isEqualTo(3);
 
         // null jdbcTemplate safely returns 0
-        NordeaIngestionService noDbService = new NordeaIngestionService(
+        EnterpriseIngestionService noDbService = new EnterpriseIngestionService(
                 null, null, null, (JdbcTemplate) null, properties
         );
         assertThat(noDbService.clearDatabase("all")).isEqualTo(0);
@@ -399,26 +399,26 @@ class NordeaIngestionServiceTest {
 
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         VectorStore vectorStore = mock(VectorStore.class);
-        NordeaCrawler crawler = mock(NordeaCrawler.class);
-        when(crawler.crawl()).thenReturn(new NordeaCrawler.CrawlResult(List.of(), List.of()));
+        EnterpriseCrawler crawler = mock(EnterpriseCrawler.class);
+        when(crawler.crawl()).thenReturn(new EnterpriseCrawler.CrawlResult(List.of(), List.of()));
 
-        NordeaIngestionProperties properties = new NordeaIngestionProperties(
-                true, "https://www.nordea.fi/", 10, 5, 10_000_000, 0, "TestCrawler/1.0", tempDir.toString()
+        EnterpriseIngestionProperties properties = new EnterpriseIngestionProperties(
+                true, "https://example.com/", 10, 5, 10_000_000, 0, "TestCrawler/1.0", tempDir.toString()
         );
 
-        NordeaIngestionService service = new NordeaIngestionService(
+        EnterpriseIngestionService service = new EnterpriseIngestionService(
                 crawler, null, vectorStore, jdbcTemplate, properties
         );
 
-        NordeaIngestController.NordeaIngestRequest request = new NordeaIngestController.NordeaIngestRequest(
+        EnterpriseIngestController.EnterpriseIngestRequest request = new EnterpriseIngestController.EnterpriseIngestRequest(
                 "s2b", "crawl", true, true
         );
 
-        NordeaIngestionService.NordeaIngestionSummary summary = service.executePipeline(request);
+        EnterpriseIngestionService.EnterpriseIngestionSummary summary = service.executePipeline(request);
 
         assertThat(summary.mode()).isEqualTo("crawl");
         assertThat(Files.exists(pageMd)).isFalse();
-        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_nordea_large");
-        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_nordea_small");
+        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_enterprise_large");
+        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_enterprise_small");
     }
 }

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Enterprise Closed (Nordea) Benchmark Query Runner: Multi-Module Sample Suite (N=10)
+# Enterprise Closed Benchmark Query Runner: Multi-Module Sample Suite (N=10)
 #
-# Evaluates key optimization configurations against vector_store_nordea_closed using
-# data/nordea/nordea_10_sample.jsonl (stratified across 1-hop, 2-hop & out-of-domain unanswerable):
+# Evaluates key optimization configurations against vector_store_enterprise_closed using
+# data/enterprise/enterprise_10_sample.jsonl (stratified across 1-hop, 2-hop & out-of-domain unanswerable):
 #   - C0:  Naive RAG Baseline
 #   - C1:  Small-to-Big Retrieval (M1)
 #   - C3:  Prompt Caching (M3)
@@ -18,14 +18,14 @@
 # - Invalidation/clearing of application & remote prompt caches between configs
 #
 # Usage:
-#   ./scripts/run_nordea_sample10.sh [OPTIONS]
+#   ./scripts/run_enterprise_sample10.sh [OPTIONS]
 #
 # Options:
 #   -l, --limit <N>         Number of questions to evaluate (default: 10)
 #   -j, --judge <PROVIDER>  Judge provider: none, gemini, claude, vllm (default: none)
 #   -m, --judge-model <MDL> Judge model identifier
 #   -u, --url <URL>         Target Spring Boot service URL (default: http://localhost:8080)
-#   -o, --run-dir <DIR>     Output directory (default: runs/raw/nordea_sample10)
+#   -o, --run-dir <DIR>     Output directory (default: runs/raw/enterprise_sample10)
 #   --skip-baseline         Skip baseline C0 run
 #   --eval                  Evaluate runs offline after query collection
 #   -h, --help              Show this help message
@@ -46,11 +46,11 @@ cd "$PROJECT_DIR"
 PYTHON="${PYTHON:-venv/bin/python}"
 URL="${RAG_APP_URL:-http://localhost:8080}"
 LIMIT="${LIMIT:-10}"
-TABLE_NAME="${TABLE_NAME:-vector_store_nordea_closed}"
-DEFAULT_QUESTIONS="data/nordea/nordea_10_sample.jsonl"
+TABLE_NAME="${TABLE_NAME:-vector_store_enterprise_closed}"
+DEFAULT_QUESTIONS="data/enterprise/enterprise_10_sample.jsonl"
 TIMEOUT="${TIMEOUT:-300}"
 QUESTIONS_FILE="${QUESTIONS_FILE:-$DEFAULT_QUESTIONS}"
-RUN_DIR="${RUN_DIR:-runs/raw/nordea_sample10}"
+RUN_DIR="${RUN_DIR:-runs/raw/enterprise_sample10}"
 JUDGE="${JUDGE:-none}"
 JUDGE_MODEL="${JUDGE_MODEL:-}"
 RUN_BASELINE=true
@@ -99,7 +99,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "========================================================================"
-echo " Starting Nordea Enterprise Benchmark Sample Suite (N=${LIMIT})"
+echo " Starting Enterprise Benchmark Sample Suite (N=${LIMIT})"
 echo " Target Service:    $URL"
 echo " Vector Store:      $TABLE_NAME"
 echo " Questions File:    $QUESTIONS_FILE"
@@ -260,7 +260,7 @@ prewarm_cache
 clear_cache
 
 echo -e "\n========================================================================"
-echo " Nordea sample benchmark runs completed successfully!"
+echo " Enterprise sample benchmark runs completed successfully!"
 echo " Results saved to: $RUN_DIR"
 echo "========================================================================"
 

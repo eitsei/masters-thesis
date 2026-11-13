@@ -1,4 +1,4 @@
-package com.dippa.ragbenchmark.ingest.nordea;
+package com.dippa.ragbenchmark.ingest.enterprise;
 
 import java.io.IOException;
 import java.net.URI;
@@ -11,35 +11,34 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Component;
 
 /**
  * Downloads a single PDF fully into memory (never written to disk — see {@link
- * NordeaIngestionRunner} for where the *extracted text* is staged instead) and extracts its text
- * via Apache PDFBox. Oversized downloads ({@code >} {@link NordeaIngestionProperties#maxPdfSizeBytes()})
+ * EnterpriseIngestionRunner} for where the *extracted text* is staged instead) and extracts its text
+ * via Apache PDFBox. Oversized downloads ({@code >} {@link EnterpriseIngestionProperties#maxPdfSizeBytes()})
  * and fetch/parse failures are skipped and logged rather than aborting the whole ingestion run.
  */
 @Component
-public class NordeaPdfExtractor {
+public class EnterprisePdfExtractor {
 
-    private static final Log logger = LogFactory.getLog(NordeaPdfExtractor.class);
+    private static final Log logger = LogFactory.getLog(EnterprisePdfExtractor.class);
     private static final int MAX_DOWNLOAD_RETRIES = 3;
     private static final long[] DOWNLOAD_RETRY_BACKOFFS_MS = {1000L, 2000L, 4000L};
 
-    private final NordeaIngestionProperties properties;
+    private final EnterpriseIngestionProperties properties;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
-    public NordeaPdfExtractor(NordeaIngestionProperties properties) {
+    public EnterprisePdfExtractor(EnterpriseIngestionProperties properties) {
         this.properties = properties;
     }
 
     public Optional<CrawledPdf> extract(String url) {
         try {
-            // Some real-world links (e.g. Nordea's own "Yleiset ehdot.pdf") come back from
+            // Some real-world links (e.g. "General terms.pdf") come back from
             // jsoup's absUrl() with unencoded spaces, which URI.create() rejects outright.
             // Percent-encoding just the space is enough to fix the observed case without
             // reimplementing a full URI sanitizer for a link that's otherwise well-formed.
@@ -91,10 +90,10 @@ public class NordeaPdfExtractor {
 
             try (PDDocument document = Loader.loadPDF(body)) {
                 String title = Optional.ofNullable(document.getDocumentInformation().getTitle())
-                        .map(String::strip)
-                        .filter(t -> !t.isEmpty())
-                        .orElseGet(() -> filenameFrom(url));
-                String markdown = NordeaPdfToMarkdownConverter.convert(document, title);
+                    .map(String::strip)
+                    .filter(t -> !t.isEmpty())
+                    .orElseGet(() -> filenameFrom(url));
+                String markdown = EnterprisePdfToMarkdownConverter.convert(document, title);
                 return Optional.of(new CrawledPdf(url, title, markdown));
             }
         } catch (IOException ex) {

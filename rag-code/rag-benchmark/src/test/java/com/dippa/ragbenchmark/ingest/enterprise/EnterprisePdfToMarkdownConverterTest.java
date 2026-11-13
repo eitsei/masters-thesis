@@ -1,4 +1,4 @@
-package com.dippa.ragbenchmark.ingest.nordea;
+package com.dippa.ragbenchmark.ingest.enterprise;
 
 import java.io.IOException;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class NordeaPdfToMarkdownConverterTest {
+class EnterprisePdfToMarkdownConverterTest {
 
     @Test
     void convertsPdfToCleanMarkdownStrippingHeadersAndFooters() throws IOException {
@@ -26,7 +26,7 @@ class NordeaPdfToMarkdownConverterTest {
                 cs.setLeading(14.5f);
                 cs.newLineAtOffset(50, 700);
 
-                cs.showText("Nordea Bank Oyj");
+                cs.showText("Enterprise Corp");
                 cs.newLine();
                 cs.newLine();
                 cs.showText("1. Yleiset ehdot");
@@ -55,7 +55,7 @@ class NordeaPdfToMarkdownConverterTest {
                 cs.setLeading(14.5f);
                 cs.newLineAtOffset(50, 700);
 
-                cs.showText("Nordea Bank Oyj");
+                cs.showText("Enterprise Corp");
                 cs.newLine();
                 cs.newLine();
                 cs.showText("2. Varallisuudenhoito");
@@ -70,7 +70,7 @@ class NordeaPdfToMarkdownConverterTest {
                 cs.endText();
             }
 
-            String markdown = NordeaPdfToMarkdownConverter.convert(document, "Private Banking Ehdot");
+            String markdown = EnterprisePdfToMarkdownConverter.convert(document, "Private Banking Ehdot");
 
             assertThat(markdown).contains("# Private Banking Ehdot");
             assertThat(markdown).contains("## 1. Yleiset ehdot");
@@ -81,7 +81,7 @@ class NordeaPdfToMarkdownConverterTest {
             assertThat(markdown).contains("Pankki hoitaa asiakkaan varallisuutta sovittujen periaatteiden mukaisesti.");
 
             // Running headers and footers should be stripped
-            assertThat(markdown).doesNotContain("Nordea Bank Oyj");
+            assertThat(markdown).doesNotContain("Enterprise Corp");
             assertThat(markdown).doesNotContain("Sivu 1 / 2");
             assertThat(markdown).doesNotContain("Sivu 2 / 2");
         }

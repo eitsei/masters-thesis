@@ -4,7 +4,7 @@
 #
 # Executes all 2^4 = 16 factorial pipeline configurations (C0 - C15)
 # against local Spring Boot RAG service (http://localhost:8080) and
-# vector_store_nordea (unconstrained corpus) using data/nordea/nordea_100_final.jsonl (N=100).
+# vector_store_enterprise (unconstrained corpus) using data/enterprise/enterprise_100_final.jsonl (N=100).
 #
 # Pure query collection mode:
 # - Disables online LLM judge (--judge none) for maximum speed and zero cloud drift.
@@ -22,8 +22,8 @@ cd "$PROJECT_DIR"
 PYTHON="${PYTHON:-venv/bin/python}"
 URL="${RAG_APP_URL:-http://localhost:8080}"
 LIMIT="${LIMIT:-100}"
-TABLE_NAME="${TABLE_NAME:-vector_store_nordea}"
-DEFAULT_QUESTIONS="data/nordea/nordea_100_final.jsonl"
+TABLE_NAME="${TABLE_NAME:-vector_store_enterprise}"
+DEFAULT_QUESTIONS="data/enterprise/enterprise_100_final.jsonl"
 TIMEOUT="${TIMEOUT:-300}"
 
 QUESTIONS_FILE="${QUESTIONS_FILE:-$DEFAULT_QUESTIONS}"

@@ -39,8 +39,8 @@ These scripts execute the full $2^4 = 16$ factorial pipeline matrix ($C_0$ to $C
 | Script | Dataset ($N=100$) | Vector Table | Output Run Directory |
 | :--- | :--- | :--- | :--- |
 | [`run_musique_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/benchmarks/run_musique_all16.sh) | `data/musique/musique_100_final.jsonl` | `vector_store_musique` | `runs/raw/musique` |
-| [`run_enterprise_closed_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/benchmarks/run_enterprise_closed_all16.sh) | `data/nordea/nordea_100_final.jsonl` | `vector_store_nordea_closed` | `runs/raw/enterprise_closed` |
-| [`run_enterprise_raw_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/benchmarks/run_enterprise_raw_all16.sh) | `data/nordea/nordea_100_final.jsonl` | `vector_store_nordea` | `runs/raw/enterprise_raw` |
+| [`run_enterprise_closed_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/benchmarks/run_enterprise_closed_all16.sh) | `data/enterprise/enterprise_100_final.jsonl` | `vector_store_enterprise_closed` | `runs/raw/enterprise_closed` |
+| [`run_enterprise_raw_all16.sh`](file:///home/eitsei/dippa/rag-code/rag-evaluator/scripts/benchmarks/run_enterprise_raw_all16.sh) | `data/enterprise/enterprise_100_final.jsonl` | `vector_store_enterprise` | `runs/raw/enterprise_raw` |
 
 ### Running Local Benchmarks
 ```bash
@@ -124,13 +124,10 @@ tail -f logs/eval_musique_<job_id>.out
 
 ## 📦 Dataset Generation (Reference)
 
-All evaluation datasets (`musique_100_final.jsonl`, `nordea_100_final.jsonl`, etc.) are pre-generated, verified, and committed under `data/`.
+All evaluation datasets (`musique_100_final.jsonl`, `enterprise_100_final.jsonl`, etc.) are pre-generated, verified, and committed under `data/`.
 
 If you ever need to regenerate datasets from raw source materials, run the CLI commands directly rather than through shell wrappers:
 ```bash
-# Regenerate Nordea synthetic testset:
-python src/cli.py generate-nordea-testset --docs-dir ../rag-benchmark/data/nordea --output data/nordea/nordea_benchmark_100.jsonl --limit 100
-
-# Rebuild combined Nordea-MuSiQue evaluation set:
-python src/cli.py build-nordea-musique-dataset --nordea data/nordea/nordea_100_final.jsonl --musique data/musique/musique_100_final.jsonl --output data/combined/
+# Rebuild Enterprise-MuSiQue evaluation dataset:
+python src/cli.py build-enterprise-musique-dataset --csv-file data/enterprise/qs_fi.csv --corpus-dir ../rag-benchmark/data/enterprise/md --output data/enterprise/enterprise_ans_v1.0_dev.jsonl
 ```

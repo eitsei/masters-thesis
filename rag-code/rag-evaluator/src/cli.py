@@ -1103,7 +1103,7 @@ def export_thesis(
         None,
         "--subfolder",
         "-s",
-        help="Optional subfolder inside tables-dir and figures-dir to isolate run outputs (e.g., 'sample_runs', 'musique', 'nordea', 'enterprise', 'comparisons', 'runs/<run_name>')",
+        help="Optional subfolder inside tables-dir and figures-dir to isolate run outputs (e.g., 'sample_runs', 'musique', 'enterprise_closed', 'enterprise', 'comparisons', 'runs/<run_name>')",
     ),
     dataset_name: Optional[str] = typer.Option(
         None,
@@ -1506,7 +1506,7 @@ def export_thesis(
 @app.command("query")
 def query_cmd(
     query_text: str = typer.Argument(..., help="Query or question to ask the RAG pipeline"),
-    table_name: str = typer.Option("vector_store_nordea", "--table-name", "-t", help="Target vector store table"),
+    table_name: str = typer.Option("vector_store_enterprise", "--table-name", "-t", help="Target vector store table"),
     modules: str = typer.Option("", "--modules", "-m", help="Comma-separated optimization modules"),
     judge: str = typer.Option("claude", "--judge", "-j", envvar="JUDGE_PROVIDER", help="Judge provider: claude, gemini, vertex, ollama, vllm, none"),
     judge_model: Optional[str] = typer.Option(None, "--judge-model", envvar="JUDGE_MODEL", help="Judge model identifier"),
@@ -1601,7 +1601,7 @@ def query_cmd(
 @app.command("run-questions")
 def run_questions(
     input_file: Path = typer.Option(..., "--input", "-i", help="JSON or JSONL file containing questions"),
-    table_name: str = typer.Option("vector_store_nordea", "--table-name", "-t", help="Target vector store table"),
+    table_name: str = typer.Option("vector_store_enterprise", "--table-name", "-t", help="Target vector store table"),
     modules: str = typer.Option("", "--modules", "-m", help="Comma-separated optimization modules"),
     limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of questions to evaluate"),
     judge: str = typer.Option("none", "--judge", "-j", help="Judge provider: claude, gemini, vertex, ollama, vllm, none (default: none)"),
@@ -1845,77 +1845,22 @@ def run_questions(
         console.print("[yellow]No questions were successfully evaluated.[/yellow]")
 
 
-@app.command("generate-nordea-testset")
-def generate_nordea_testset(
-    md_dir: Path = typer.Option(
-        Path("../rag-benchmark/data/nordea/md"),
-        "--md-dir",
-        "-d",
-        help="Path to directory containing crawled Nordea markdown documents (pages/ and pdfs/)",
-    ),
-    output: Path = typer.Option(
-        Path("data/nordea/nordea_benchmark_100.jsonl"),
-        "--output",
-        "-o",
-        help="Target JSONL file path for generated questions",
-    ),
-    size: int = typer.Option(
-        100,
-        "--size",
-        "-s",
-        help="Total number of benchmark questions to generate (Thesis §4.4: 40% single-hop, 40% multi-hop, 20% out-of-domain)",
-    ),
-    judge_model: str = typer.Option(
-        "gemini-3.8-flash",
-        "--judge-model",
-        "-m",
-        help="Generator LLM model on Vertex AI global endpoint",
-    ),
-    limit_docs: Optional[int] = typer.Option(
-        None,
-        "--limit-docs",
-        help="Limit number of canonical documents to ingest (useful for fast smoke runs)",
-    ),
-) -> None:
-    """Generates a stratified synthetic benchmark dataset (Thesis §4.4) for Nordea Private Banking."""
-    from src.generator import generate_nordea_dataset
-
-    # Resolve relative md_dir if needed
-    resolved_md = md_dir if md_dir.is_absolute() else (Path.cwd() / md_dir).resolve()
-    if not resolved_md.exists():
-        # Fallback check relative to project root
-        alt_path = Path(__file__).resolve().parent.parent.parent / "rag-benchmark" / "data" / "nordea" / "md"
-        if alt_path.exists():
-            resolved_md = alt_path
-
-    resolved_out = output if output.is_absolute() else (Path.cwd() / output).resolve()
-
-    generate_nordea_dataset(
-        md_dir=resolved_md,
-        output_file=resolved_out,
-        total_size=size,
-        judge_model=judge_model,
-        limit_docs=limit_docs,
-        console=console,
-    )
-
-
-@app.command("build-nordea-musique-dataset")
-def build_nordea_musique_dataset(
+@app.command("build-enterprise-musique-dataset")
+def build_enterprise_musique_dataset(
     csv_file: Path = typer.Option(
-        Path("data/nordea/qs_fi.csv"),
+        Path("data/enterprise/qs_fi.csv"),
         "--csv-file",
         "-c",
         help="Path to questions CSV file (e.g. qs_fi.csv)",
     ),
     corpus_dir: Path = typer.Option(
-        Path("../rag-benchmark/data/nordea/md"),
+        Path("../rag-benchmark/data/enterprise/md"),
         "--corpus-dir",
         "-d",
         help="Path to directory containing crawled personal banking markdown documents (pages/ and pdfs/)",
     ),
     output: Path = typer.Option(
-        Path("data/nordea/nordea_ans_v1.0_dev.jsonl"),
+        Path("data/enterprise/enterprise_ans_v1.0_dev.jsonl"),
         "--output",
         "-o",
         help="Target JSONL file path conforming to MuSiQue schema",
@@ -1943,7 +1888,7 @@ def build_nordea_musique_dataset(
         help="Pacing delay in seconds between Vertex AI LLM calls to prevent 429 rate limit errors (default: 2.0s)",
     ),
     multihop_csv: Path = typer.Option(
-        Path("data/nordea/qs_multihop_fi.csv"),
+        Path("data/enterprise/qs_multihop_fi.csv"),
         "--multihop-csv",
         "-mhc",
         help="Path to composite multi-hop questions CSV (composite_question,sub_question_1,sub_question_2)",
@@ -1964,10 +1909,10 @@ def build_nordea_musique_dataset(
         help="Resume incrementally if the output file already contains partially generated questions (default: True)",
     ),
 ) -> None:
-    """Builds a MuSiQue-schema enterprise benchmark dataset from Finnish questions and Nordea corpus."""
+    """Builds a MuSiQue-schema enterprise benchmark dataset from Finnish questions and enterprise corpus."""
     from src.dataset_builder import (
         CorpusIndexer,
-        NordeaMusiqueDatasetBuilder,
+        EnterpriseMusiqueDatasetBuilder,
         load_multihop_questions_from_csv,
         load_questions_from_csv,
     )
@@ -1975,19 +1920,19 @@ def build_nordea_musique_dataset(
     # Resolve paths relative to working directory / project root
     resolved_csv = csv_file if csv_file.is_absolute() else (Path.cwd() / csv_file).resolve()
     if not resolved_csv.exists():
-        alt_csv = Path(__file__).resolve().parent.parent / "data" / "nordea" / "qs_fi.csv"
+        alt_csv = Path(__file__).resolve().parent.parent / "data" / "enterprise" / "qs_fi.csv"
         if alt_csv.exists():
             resolved_csv = alt_csv
 
     resolved_corpus = corpus_dir if corpus_dir.is_absolute() else (Path.cwd() / corpus_dir).resolve()
     if not resolved_corpus.exists():
-        alt_corpus = Path(__file__).resolve().parent.parent.parent / "rag-benchmark" / "data" / "nordea" / "md"
+        alt_corpus = Path(__file__).resolve().parent.parent.parent / "rag-benchmark" / "data" / "enterprise" / "md"
         if alt_corpus.exists():
             resolved_corpus = alt_corpus
 
     resolved_mh = multihop_csv if multihop_csv.is_absolute() else (Path.cwd() / multihop_csv).resolve()
     if not resolved_mh.exists():
-        alt_mh = Path(__file__).resolve().parent.parent / "data" / "nordea" / "qs_multihop_fi.csv"
+        alt_mh = Path(__file__).resolve().parent.parent / "data" / "enterprise" / "qs_multihop_fi.csv"
         if alt_mh.exists():
             resolved_mh = alt_mh
 
@@ -2011,7 +1956,7 @@ def build_nordea_musique_dataset(
     if delay > 0:
         console.print(f"Pacing delay: [yellow]{delay:.1f}s[/yellow] between Vertex AI LLM calls to prevent 429 quota exhaustion.")
 
-    builder = NordeaMusiqueDatasetBuilder(
+    builder = EnterpriseMusiqueDatasetBuilder(
         corpus_indexer=indexer,
         judge_model=judge_model,
         delay_seconds=delay,

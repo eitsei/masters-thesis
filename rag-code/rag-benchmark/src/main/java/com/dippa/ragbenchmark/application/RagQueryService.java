@@ -385,6 +385,12 @@ public class RagQueryService {
             if (baseTable.equalsIgnoreCase("vector_store_musique")) {
                 searchTable = "vector_store_musique_small";
                 resolvedParentTable = (parentTableName != null && !parentTableName.isBlank()) ? parentTableName : "vector_store_musique_large";
+            } else if (baseTable.equalsIgnoreCase("vector_store_enterprise")) {
+                searchTable = "vector_store_enterprise_small";
+                resolvedParentTable = (parentTableName != null && !parentTableName.isBlank()) ? parentTableName : "vector_store_enterprise_large";
+            } else if (baseTable.equalsIgnoreCase("vector_store_enterprise_closed")) {
+                searchTable = "vector_store_enterprise_closed_small";
+                resolvedParentTable = (parentTableName != null && !parentTableName.isBlank()) ? parentTableName : "vector_store_enterprise_closed_large";
             } else if (baseTable.equalsIgnoreCase("vector_store_nordea")) {
                 searchTable = "vector_store_nordea_small";
                 resolvedParentTable = (parentTableName != null && !parentTableName.isBlank()) ? parentTableName : "vector_store_nordea_large";

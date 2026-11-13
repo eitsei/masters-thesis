@@ -1,13 +1,13 @@
-package com.dippa.ragbenchmark.ingest.nordea;
+package com.dippa.ragbenchmark.ingest.enterprise;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Queue;
 import java.util.Set;
-import java.util.LinkedHashSet;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jsoup.Jsoup;
@@ -16,23 +16,21 @@ import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Component;
 
 /**
- * Breadth-first crawl of pages under {@link NordeaIngestionProperties#baseUrl()}, following only
- * internal links whose absolute URL starts with that same prefix (never wanders into other
- * sections of nordea.fi), up to {@link NordeaIngestionProperties#maxPages()}. PDF links
- * discovered on in-scope pages are collected separately (they may be hosted on a different
- * path/host, e.g. an assets CDN) and capped at {@link NordeaIngestionProperties#maxPdfs()}.
+ * Breadth-first crawl of pages under {@link EnterpriseIngestionProperties#baseUrl()}, following only
+ * internal links whose absolute URL starts with that same prefix, up to {@link EnterpriseIngestionProperties#maxPages()}.
+ * PDF links discovered on in-scope pages are collected separately and capped at {@link EnterpriseIngestionProperties#maxPdfs()}.
  */
 @Component
-public class NordeaCrawler {
+public class EnterpriseCrawler {
 
-    private static final Log logger = LogFactory.getLog(NordeaCrawler.class);
+    private static final Log logger = LogFactory.getLog(EnterpriseCrawler.class);
     private static final int FETCH_TIMEOUT_MILLIS = 10_000;
     private static final int MAX_FETCH_RETRIES = 3;
     private static final long[] FETCH_RETRY_BACKOFFS_MS = {1000L, 2000L, 4000L};
 
-    private final NordeaIngestionProperties properties;
+    private final EnterpriseIngestionProperties properties;
 
-    public NordeaCrawler(NordeaIngestionProperties properties) {
+    public EnterpriseCrawler(EnterpriseIngestionProperties properties) {
         this.properties = properties;
     }
 
@@ -43,7 +41,7 @@ public class NordeaCrawler {
         Queue<String> queue = new ArrayDeque<>();
         String rawBase = properties.baseUrl();
         String normalizedBase = (rawBase != null && !rawBase.endsWith("/")) ? rawBase + "/" : (rawBase != null ? rawBase : "");
-        queue.add(normalizedBase.isBlank() ? "https://www.nordea.fi/henkiloasiakkaat/" : normalizedBase);
+        queue.add(normalizedBase.isBlank() ? "https://example.com/" : normalizedBase);
 
         while (!queue.isEmpty() && pages.size() < properties.maxPages() && !Thread.currentThread().isInterrupted()) {
             String url = queue.poll();
@@ -63,7 +61,7 @@ public class NordeaCrawler {
                 continue;
             }
 
-            String markdown = NordeaHtmlToMarkdownConverter.convert(doc);
+            String markdown = EnterpriseHtmlToMarkdownConverter.convert(doc);
             if (!markdown.isBlank()) {
                 pages.add(new CrawledPage(cleanUrl, doc.title(), markdown));
             }
@@ -109,7 +107,7 @@ public class NordeaCrawler {
         String lower = url.toLowerCase(Locale.ROOT);
         if (lower.contains("/kirjaudu") || lower.contains("/login") || lower.contains("/logout")
                 || lower.contains("/sv/") || lower.contains("/en/")
-                || lower.contains("verkkopankki.nordea.fi")) {
+                || lower.contains("login.") || lower.contains("auth.")) {
             return false;
         }
         if (lower.endsWith(".zip") || lower.endsWith(".xlsx") || lower.endsWith(".docx")

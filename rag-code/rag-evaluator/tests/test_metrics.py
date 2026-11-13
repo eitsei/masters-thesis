@@ -360,7 +360,7 @@ def test_is_refusal_answer_finnish():
     assert is_refusal_answer("Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.")
     assert is_refusal_answer("Valitettavasti annettu konteksti ei sisällä riittävästi tietoa.")
     assert is_refusal_answer("Aineisto ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.")
-    assert not is_refusal_answer("Nordea perustettiin vuonna 1820.")
+    assert not is_refusal_answer("Pankki perustettiin vuonna 1820.")
 
 
 def test_is_refusal_answer_english():
@@ -388,13 +388,13 @@ def test_is_sample_unanswerable():
 
     # Ground truth refusal
     assert is_sample_unanswerable(ground_truth="Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.")
-    assert not is_sample_unanswerable(ground_truth="Nordea Bank Oyj")
+    assert not is_sample_unanswerable(ground_truth="Esimerkkipankki Oyj")
 
 
 def test_compute_refusal_accuracy():
     preds = [
         "Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.",
-        "Nordea tarjoaa asuntolainoja.",  # failed to refuse
+        "Pankki tarjoaa asuntolainoja.",  # failed to refuse
         "The provided context does not contain sufficient information to answer this query.",
     ]
     gts = [
@@ -429,7 +429,7 @@ def test_compute_refusal_accuracy_no_unanswerable():
 
 def test_compute_false_refusal_rate():
     preds = [
-        "Nordea perustettiin vuonna 1820.",
+        "Pankki perustettiin vuonna 1820.",
         "Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi.",  # false refusal!
         "Liikevoitto kasvoi 10 %.",
         "The provided context does not contain sufficient information to answer this query.",  # false refusal!

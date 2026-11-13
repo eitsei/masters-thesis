@@ -1,6 +1,6 @@
 package com.dippa.ragbenchmark.api;
 
-import com.dippa.ragbenchmark.ingest.nordea.NordeaIngestionService;
+import com.dippa.ragbenchmark.ingest.enterprise.EnterpriseIngestionService;
 import java.io.IOException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,25 +10,25 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST controller for triggering Nordea corpus ingestion (baseline or S2B mode).
+ * REST controller for triggering enterprise corpus ingestion (baseline or S2B mode).
  */
 @RestController
-@RequestMapping("/api/ingest/nordea")
-public class NordeaIngestController {
+@RequestMapping("/api/ingest/enterprise")
+public class EnterpriseIngestController {
 
-    private final NordeaIngestionService ingestionService;
+    private final EnterpriseIngestionService ingestionService;
 
-    public NordeaIngestController(NordeaIngestionService ingestionService) {
+    public EnterpriseIngestController(EnterpriseIngestionService ingestionService) {
         this.ingestionService = ingestionService;
     }
 
-    public record NordeaIngestRequest(
+    public record EnterpriseIngestRequest(
             String mode,
             String action,
             Boolean clearDatabase,
             Boolean clearFiles
     ) {
-        public NordeaIngestRequest(String mode) {
+        public EnterpriseIngestRequest(String mode) {
             this(mode, null, null, null);
         }
 
@@ -50,8 +50,8 @@ public class NordeaIngestController {
     }
 
     @PostMapping
-    public ResponseEntity<NordeaIngestionService.NordeaIngestionSummary> ingest(
-            @RequestBody(required = false) NordeaIngestRequest request,
+    public ResponseEntity<EnterpriseIngestionService.EnterpriseIngestionSummary> ingest(
+            @RequestBody(required = false) EnterpriseIngestRequest request,
             @RequestParam(required = false) String mode) throws IOException {
         String effectiveMode = (request != null && request.mode() != null && !request.mode().isBlank())
                 ? request.mode()
@@ -62,14 +62,14 @@ public class NordeaIngestController {
         Boolean effectiveClearDb = request != null ? request.clearDatabase() : null;
         Boolean effectiveClearFiles = request != null ? request.clearFiles() : null;
 
-        NordeaIngestRequest effectiveRequest = new NordeaIngestRequest(
+        EnterpriseIngestRequest effectiveRequest = new EnterpriseIngestRequest(
                 effectiveMode,
                 effectiveAction,
                 effectiveClearDb,
                 effectiveClearFiles
         );
 
-        NordeaIngestionService.NordeaIngestionSummary summary = ingestionService.executePipeline(effectiveRequest);
+        EnterpriseIngestionService.EnterpriseIngestionSummary summary = ingestionService.executePipeline(effectiveRequest);
         return ResponseEntity.ok(summary);
     }
 }

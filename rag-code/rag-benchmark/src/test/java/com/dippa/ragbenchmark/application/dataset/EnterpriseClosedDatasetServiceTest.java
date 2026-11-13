@@ -12,8 +12,8 @@ import static org.mockito.Mockito.when;
 import com.dippa.ragbenchmark.domain.dataset.MusiqueParagraph;
 import com.dippa.ragbenchmark.domain.dataset.MusiqueQuestion;
 import com.dippa.ragbenchmark.infrastructure.PgVectorStoreFactory;
-import com.dippa.ragbenchmark.infrastructure.dataset.NordeaClosedDatasetProperties;
-import com.dippa.ragbenchmark.infrastructure.dataset.NordeaClosedDatasetReader;
+import com.dippa.ragbenchmark.infrastructure.dataset.EnterpriseClosedDatasetProperties;
+import com.dippa.ragbenchmark.infrastructure.dataset.EnterpriseClosedDatasetReader;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,20 +23,20 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-class NordeaClosedDatasetServiceTest {
+class EnterpriseClosedDatasetServiceTest {
 
-    private NordeaClosedDatasetReader reader;
-    private NordeaClosedDatasetProperties properties;
+    private EnterpriseClosedDatasetReader reader;
+    private EnterpriseClosedDatasetProperties properties;
     private VectorStore defaultVectorStore;
     private PgVectorStoreFactory vectorStoreFactory;
     private JdbcTemplate jdbcTemplate;
-    private NordeaClosedDatasetService service;
+    private EnterpriseClosedDatasetService service;
 
     @BeforeEach
     void setUp() {
-        reader = mock(NordeaClosedDatasetReader.class);
-        properties = new NordeaClosedDatasetProperties(
-                "data/nordea/nordea_100_final.jsonl",
+        reader = mock(EnterpriseClosedDatasetReader.class);
+        properties = new EnterpriseClosedDatasetProperties(
+                "data/enterprise/enterprise_100_final.jsonl",
                 10,
                 5,
                 10,
@@ -59,7 +59,7 @@ class NordeaClosedDatasetServiceTest {
 
         when(vectorStoreFactory.getStore(any())).thenReturn(defaultVectorStore);
 
-        service = new NordeaClosedDatasetService(
+        service = new EnterpriseClosedDatasetService(
                 reader,
                 properties,
                 defaultVectorStore,
@@ -80,7 +80,7 @@ class NordeaClosedDatasetServiceTest {
 
         when(reader.loadAll()).thenReturn(List.of(q1, q2));
 
-        NordeaClosedDatasetService.NordeaClosedIngestionSummary summary = service.ingest("original", false);
+        EnterpriseClosedDatasetService.EnterpriseClosedIngestionSummary summary = service.ingest("original", false);
 
         assertThat(summary.questionsCount()).isEqualTo(2);
         assertThat(summary.uniqueParagraphsCount()).isEqualTo(2); // Deduplicated 3 -> 2
@@ -88,7 +88,7 @@ class NordeaClosedDatasetServiceTest {
         assertThat(summary.parentChunksWritten()).isEqualTo(0);
         assertThat(summary.childChunksWritten()).isEqualTo(0);
 
-        verify(vectorStoreFactory).getStore("vector_store_nordea_closed");
+        verify(vectorStoreFactory).getStore("vector_store_enterprise_closed");
         verify(defaultVectorStore, atLeastOnce()).add(anyList());
     }
 
@@ -103,7 +103,7 @@ class NordeaClosedDatasetServiceTest {
 
         when(reader.loadAll()).thenReturn(List.of(q));
 
-        NordeaClosedDatasetService.NordeaClosedIngestionSummary summary = service.ingest("original", false);
+        EnterpriseClosedDatasetService.EnterpriseClosedIngestionSummary summary = service.ingest("original", false);
 
         assertThat(summary.questionsCount()).isEqualTo(1);
         assertThat(summary.uniqueParagraphsCount()).isEqualTo(1);
@@ -117,7 +117,7 @@ class NordeaClosedDatasetServiceTest {
         List<Document> addedDocs = captor.getValue();
         assertThat(addedDocs).isNotEmpty();
         Document firstDoc = addedDocs.get(0);
-        assertThat(firstDoc.getMetadata().get("dataset")).isEqualTo("nordea");
+        assertThat(firstDoc.getMetadata().get("dataset")).isEqualTo("enterprise");
         assertThat(firstDoc.getMetadata().get("corpus_mode")).isEqualTo("closed");
         assertThat(firstDoc.getMetadata().get("chunk_index")).isEqualTo(0);
     }
@@ -132,10 +132,10 @@ class NordeaClosedDatasetServiceTest {
 
         VectorStore largeStore = mock(VectorStore.class);
         VectorStore smallStore = mock(VectorStore.class);
-        when(vectorStoreFactory.getStore("vector_store_nordea_closed_large")).thenReturn(largeStore);
-        when(vectorStoreFactory.getStore("vector_store_nordea_closed_small")).thenReturn(smallStore);
+        when(vectorStoreFactory.getStore("vector_store_enterprise_closed_large")).thenReturn(largeStore);
+        when(vectorStoreFactory.getStore("vector_store_enterprise_closed_small")).thenReturn(smallStore);
 
-        NordeaClosedDatasetService.NordeaClosedIngestionSummary summary = service.ingest("s2b", false);
+        EnterpriseClosedDatasetService.EnterpriseClosedIngestionSummary summary = service.ingest("s2b", false);
 
         assertThat(summary.questionsCount()).isEqualTo(1);
         assertThat(summary.uniqueParagraphsCount()).isEqualTo(2);
@@ -150,7 +150,7 @@ class NordeaClosedDatasetServiceTest {
         assertThat(addedChildren).isNotEmpty();
         Document firstChild = addedChildren.get(0);
         assertThat(firstChild.getMetadata()).containsKey("parent_id");
-        assertThat(firstChild.getMetadata().get("parent_table")).isEqualTo("vector_store_nordea_closed_large");
+        assertThat(firstChild.getMetadata().get("parent_table")).isEqualTo("vector_store_enterprise_closed_large");
         assertThat(firstChild.getMetadata().get("chunk_type")).isEqualTo("child");
     }
 
@@ -158,8 +158,8 @@ class NordeaClosedDatasetServiceTest {
     void clearTables_truncatesAppropriateTables() {
         int count = service.clearTables("both");
         assertThat(count).isEqualTo(3);
-        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_nordea_closed");
-        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_nordea_closed_large");
-        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_nordea_closed_small");
+        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_enterprise_closed");
+        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_enterprise_closed_large");
+        verify(jdbcTemplate).execute("TRUNCATE TABLE vector_store_enterprise_closed_small");
     }
 }

@@ -240,7 +240,7 @@ class RagClient:
         Args:
             query: The user query or question text.
             modules: Optional list of optimization modules to apply.
-            table_name: Optional override for the target vector store table (e.g. 'vector_store_nordea').
+            table_name: Optional override for the target vector store table (e.g. 'vector_store_enterprise').
 
         Returns:
             JSON response conforming to `QueryResponse` (answer, retrievedChunks, timingsMs, tokenUsage, totalLatencyMs).

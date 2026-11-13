@@ -222,11 +222,11 @@ class TestUnanswerableAndAbstentionHandling:
                 "answerable": True,
             },
             {
-                "questionId": "ood__nordea_001",
+                "questionId": "ood__enterprise_001",
                 "question": "How do I build a rocket to Mars?",
                 "generatedAnswer": "The provided context does not contain sufficient information to answer this query.",
                 "groundTruthAnswer": "The provided context does not contain sufficient information to answer this query.",
-                "retrievedChunks": [{"id": "c3", "text": "Nordea banking information."}],
+                "retrievedChunks": [{"id": "c3", "text": "Enterprise banking information."}],
                 "totalLatencyMs": 80,
                 "answerable": False,
             },
@@ -286,7 +286,7 @@ class TestUnanswerableAndAbstentionHandling:
         assert scores["composite_quality"] > 0.0
 
         # Abstention quality metrics:
-        # unanswerable count = 2. 1 refused ("ood__nordea_001"), 1 hallucinated ("musique_unans_002") => 50%
+        # unanswerable count = 2. 1 refused ("ood__enterprise_001"), 1 hallucinated ("musique_unans_002") => 50%
         assert scores["refusal_accuracy"] == 0.5
         # answerable count = 2. Neither refused => 0%
         assert scores["false_refusal_rate"] == 0.0

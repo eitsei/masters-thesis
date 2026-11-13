@@ -12,6 +12,9 @@ rag-code/rag-evaluator/data/*
 !rag-code/rag-evaluator/data/musique/
 rag-code/rag-evaluator/data/musique/*
 !rag-code/rag-evaluator/data/musique/musique_100_final.jsonl
+!rag-code/rag-evaluator/data/enterprise/
+rag-code/rag-evaluator/data/enterprise/*
+!rag-code/rag-evaluator/data/enterprise/enterprise_100_final.jsonl
 rag-code/rag-evaluator/logs/
 
 # Figure testing sandbox (not tracked in git; only thesis/figures/ is canonical)

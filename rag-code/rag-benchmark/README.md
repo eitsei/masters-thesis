@@ -106,43 +106,43 @@ rag:
     top-k: 10
 ```
 
-## Local test data: Nordea site ingestion
+## Local test data: Enterprise site ingestion
 
-For local benchmarking you need realistic banking content in the vector store (`vector_store_nordea` or `vector_store_nordea_large`/`small`).
-The package `com.dippa.ragbenchmark.ingest.nordea` provides a comprehensive pipeline that crawls [nordea.fi/henkiloasiakkaat/](https://www.nordea.fi/henkiloasiakkaat/), extracts text from discovered PDFs, exports clean Markdown to disk (`data/nordea/md/`), strips boilerplate noise, and writes chunks to PgVector (either 512-token baseline chunks or S2B 1024-token parent / 128-token child pairs).
+For local benchmarking you need realistic banking content in the vector store (`vector_store_enterprise` or `vector_store_enterprise_large`/`small`).
+The package `com.dippa.ragbenchmark.ingest.enterprise` provides a comprehensive pipeline that crawls an enterprise website, extracts text from discovered PDFs, exports clean Markdown to disk (`data/enterprise/md/`), strips boilerplate noise, and writes chunks to PgVector (either 512-token baseline chunks or S2B 1024-token parent / 128-token child pairs).
 
 It is disabled by default so a normal `mvn spring-boot:run` never triggers an automatic crawl. You can control the pipeline via the REST API or run the crawler on startup.
 
-### 1. Triggering via REST API (`POST /api/ingest/nordea`)
+### 1. Triggering via REST API (`POST /api/ingest/enterprise`)
 
 Once the app is running (`mvn spring-boot:run`), you can execute any stage of the pipeline dynamically:
 
 ```bash
 # Ingest already downloaded & cleaned files directly from disk into S2B tables (fastest, no web crawling):
-curl -X POST http://localhost:8080/api/ingest/nordea \
+curl -X POST http://localhost:8080/api/ingest/enterprise \
   -H "Content-Type: application/json" \
   -d '{"action": "ingest", "mode": "s2b", "clearDatabase": true}'
 
 # Clean existing markdown files on disk without crawling or re-indexing:
-curl -X POST http://localhost:8080/api/ingest/nordea \
+curl -X POST http://localhost:8080/api/ingest/enterprise \
   -H "Content-Type: application/json" \
   -d '{"action": "clean"}'
 
 # Full end-to-end pipeline from a clean slate (crawl -> clean -> ingest):
-curl -X POST http://localhost:8080/api/ingest/nordea \
+curl -X POST http://localhost:8080/api/ingest/enterprise \
   -H "Content-Type: application/json" \
   -d '{"action": "all", "clearDatabase": true, "clearFiles": true, "mode": "s2b"}'
 ```
 
-**Request Payload Options (`NordeaIngestRequest`):**
-* `mode` (default `"s2b"`): `"s2b"` (stores to `vector_store_nordea_large` and `_small`) or `"original"` (stores to `vector_store_nordea`).
+**Request Payload Options (`EnterpriseIngestRequest`):**
+* `mode` (default `"s2b"`): `"s2b"` (stores to `vector_store_enterprise_large` and `_small`) or `"original"` (stores to `vector_store_enterprise`).
 * `action` (default `"all"`):
-  * `"ingest"`: Chunks and writes existing Markdown files from `data/nordea/md/` to PgVector without fetching from the web.
+  * `"ingest"`: Chunks and writes existing Markdown files from `data/enterprise/md/` to PgVector without fetching from the web.
   * `"clean"`: Cleans noise from Markdown files on disk.
   * `"crawl"`: Crawls pages and PDFs, converting to Markdown on disk without database writes.
   * `"all"`: Runs full pipeline in sequence.
 * `clearDatabase` (default `false`): Truncates target vector store tables before ingestion.
-* `clearFiles` (default `false`): Deletes existing `.md` files in `data/nordea/md/pages` and `pdfs` before a new crawl.
+* `clearFiles` (default `false`): Deletes existing `.md` files in `data/enterprise/md/pages` and `pdfs` before a new crawl.
 
 ### 2. Standalone Python Cleaning Script
 
@@ -150,25 +150,25 @@ You can also inspect or clean the Markdown corpus directly from the terminal wit
 
 ```bash
 # Preview modifications (dry-run, shows affected files, metrics, and diff preview):
-python3 data/nordea/clean_nordea_markdown.py --dry-run
+python3 data/enterprise/clean_enterprise_markdown.py --dry-run
 
 # Clean files in-place with automatic .bak backups:
-python3 data/nordea/clean_nordea_markdown.py --in-place --backup
+python3 data/enterprise/clean_enterprise_markdown.py --in-place --backup
 ```
 
 **Automated Noise Filtering:**
-* Strips video/marketing cookie placeholders (`Hups! Jos haluat nähdä tällaista sisältöä, hyväksy ensin Nordean markkinointievästeet`).
+* Strips video/marketing cookie placeholders (`Hups! Jos haluat nähdä tällaista sisältöä, hyväksy ensin markkinointievästeet`).
 * Removes screen reader artifacts (`Avautuu uuteen ikkunaan`) from headings and link prose.
-* Strips the repeated contact footer (`## Apua asiointiin ... - Nordea Omaposti`) across pages while preserving actual contact information on the dedicated contact page.
+* Strips the repeated contact footer (`## Apua asiointiin ... - Enterprise Portal`) across pages while preserving actual contact information on the dedicated contact page.
 * Strictly preserves YAML frontmatter (`url`, `title`, `type`) and document structure.
 
 ### 3. Resilience & Retries
-Both `NordeaCrawler` and `NordeaPdfExtractor` feature automatic 3x retries with exponential backoff (1s, 2s, 4s) to survive transient network or HTTP 5xx errors during live crawls.
+Both `EnterpriseCrawler` and `EnterprisePdfExtractor` feature automatic 3x retries with exponential backoff (1s, 2s, 4s) to survive transient network or HTTP 5xx errors during live crawls.
 
 ### 4. Running on Startup (Alternative)
 
 ```bash
-mvn spring-boot:run -Dspring-boot.run.arguments=--ingest.nordea.enabled=true
+mvn spring-boot:run -Dspring-boot.run.arguments=--ingest.enterprise.enabled=true
 ```
 
 ## Multi-hop benchmark dataset: MuSiQue

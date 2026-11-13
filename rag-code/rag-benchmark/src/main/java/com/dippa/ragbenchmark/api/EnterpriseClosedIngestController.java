@@ -1,6 +1,6 @@
 package com.dippa.ragbenchmark.api;
 
-import com.dippa.ragbenchmark.application.dataset.NordeaClosedDatasetService;
+import com.dippa.ragbenchmark.application.dataset.EnterpriseClosedDatasetService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -9,27 +9,27 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST controller for triggering Nordea closed-corpus ingestion into pgvector.
+ * REST controller for triggering Enterprise closed-corpus ingestion into pgvector.
  *
  * <p>Supports modes:
  * <ul>
- *   <li>{@code both} (default): ingests both baseline (vector_store_nordea_closed) and S2B (large/small)</li>
+ *   <li>{@code both} (default): ingests both baseline (vector_store_enterprise_closed) and S2B (large/small)</li>
  *   <li>{@code original} or {@code baseline}: ingests only baseline table</li>
  *   <li>{@code s2b} or {@code small-to-big}: ingests only S2B large/small tables</li>
  * </ul>
  * </p>
  */
 @RestController
-@RequestMapping({"/api/ingest/nordea-closed", "/api/ingest/nordea/closed"})
-public class NordeaClosedIngestController {
+@RequestMapping({"/api/ingest/enterprise-closed", "/api/ingest/nordea-closed", "/api/ingest/nordea/closed"})
+public class EnterpriseClosedIngestController {
 
-    private final NordeaClosedDatasetService closedDatasetService;
+    private final EnterpriseClosedDatasetService closedDatasetService;
 
-    public NordeaClosedIngestController(NordeaClosedDatasetService closedDatasetService) {
+    public EnterpriseClosedIngestController(EnterpriseClosedDatasetService closedDatasetService) {
         this.closedDatasetService = closedDatasetService;
     }
 
-    public record NordeaClosedIngestRequest(
+    public record EnterpriseClosedIngestRequest(
             String mode,
             Boolean clearDatabase
     ) {
@@ -43,8 +43,8 @@ public class NordeaClosedIngestController {
     }
 
     @PostMapping
-    public ResponseEntity<NordeaClosedDatasetService.NordeaClosedIngestionSummary> ingest(
-            @RequestBody(required = false) NordeaClosedIngestRequest request,
+    public ResponseEntity<EnterpriseClosedDatasetService.EnterpriseClosedIngestionSummary> ingest(
+            @RequestBody(required = false) EnterpriseClosedIngestRequest request,
             @RequestParam(required = false) String mode,
             @RequestParam(required = false, defaultValue = "false") boolean clearDatabase) {
         String effectiveMode = (request != null && request.mode() != null && !request.mode().isBlank())
@@ -60,7 +60,7 @@ public class NordeaClosedIngestController {
                 ? request.shouldClearDatabase()
                 : clearDatabase;
 
-        NordeaClosedDatasetService.NordeaClosedIngestionSummary summary =
+        EnterpriseClosedDatasetService.EnterpriseClosedIngestionSummary summary =
                 closedDatasetService.ingest(effectiveMode, effectiveClearDb);
         return ResponseEntity.ok(summary);
     }

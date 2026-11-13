@@ -38,16 +38,16 @@ spring:
         dimensions: 768
         initialize-schema: true
 ingest:
-  nordea:
+  enterprise:
     enabled: false
-    mode: ${INGEST_NORDEA_MODE:s2b}
-    base-url: ${INGEST_NORDEA_BASE_URL:https://www.nordea.fi/henkiloasiakkaat/}
-    max-pages: ${INGEST_NORDEA_MAX_PAGES:250}
-    max-pdfs: ${INGEST_NORDEA_MAX_PDFS:50}
+    mode: ${INGEST_ENTERPRISE_MODE:s2b}
+    base-url: ${INGEST_ENTERPRISE_BASE_URL:https://example.com/}
+    max-pages: ${INGEST_ENTERPRISE_MAX_PAGES:250}
+    max-pdfs: ${INGEST_ENTERPRISE_MAX_PDFS:50}
     max-pdf-size-bytes: 20000000
     request-delay-millis: 400
-    user-agent: "RagBenchmarkThesisCrawler/1.0 (+mailto:aj.asunmaa@gmail.com; academic research, single crawl run)"
-    markdown-export-dir: ${INGEST_NORDEA_MD_DIR:data/nordea/md}
+    user-agent: "RagBenchmarkThesisCrawler/1.0 (+mailto:research@example.com; academic research, single crawl run)"
+    markdown-export-dir: ${INGEST_ENTERPRISE_MD_DIR:data/enterprise/md}
   musique:
     enabled: false
     mode: ${INGEST_MUSIQUE_MODE:s2b}
@@ -124,8 +124,8 @@ rag:
       random-seed: 42
       batch-size: 100
       include-title-in-chunk-text: true
-    nordea-closed:
-      file-path: ${NORDEA_CLOSED_DATASET_PATH:data/nordea/nordea_100_final.jsonl}
+    enterprise-closed:
+      file-path: ${ENTERPRISE_CLOSED_DATASET_PATH:${NORDEA_CLOSED_DATASET_PATH:data/enterprise/enterprise_100_final.jsonl}}
       batch-size: 100
       parent-batch-size: 10
       child-batch-size: 25

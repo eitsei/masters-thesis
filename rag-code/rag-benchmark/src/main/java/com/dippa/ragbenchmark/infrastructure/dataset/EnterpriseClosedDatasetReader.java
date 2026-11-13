@@ -27,14 +27,14 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 
 /**
- * Reads and parses the Nordea closed-corpus JSONL dataset (conforming to the MuSiQue JSON schema).
+ * Reads and parses the Enterprise closed-corpus JSONL dataset (conforming to the MuSiQue JSON schema).
  */
 @Component
-public class NordeaClosedDatasetReader {
+public class EnterpriseClosedDatasetReader {
 
-    private static final Logger logger = LoggerFactory.getLogger(NordeaClosedDatasetReader.class);
+    private static final Logger logger = LoggerFactory.getLogger(EnterpriseClosedDatasetReader.class);
 
-    private final NordeaClosedDatasetProperties properties;
+    private final EnterpriseClosedDatasetProperties properties;
     private final ObjectMapper objectMapper;
     private final ResourceLoader resourceLoader;
 
@@ -42,17 +42,17 @@ public class NordeaClosedDatasetReader {
     private volatile List<MusiqueQuestion> cachedQuestions;
     private final Map<String, MusiqueQuestion> questionIndex = new ConcurrentHashMap<>();
 
-    public NordeaClosedDatasetReader(NordeaClosedDatasetProperties properties) {
+    public EnterpriseClosedDatasetReader(EnterpriseClosedDatasetProperties properties) {
         this(properties, new ObjectMapper(), new DefaultResourceLoader());
     }
 
-    public NordeaClosedDatasetReader(NordeaClosedDatasetProperties properties, ObjectMapper objectMapper) {
+    public EnterpriseClosedDatasetReader(EnterpriseClosedDatasetProperties properties, ObjectMapper objectMapper) {
         this(properties, objectMapper, new DefaultResourceLoader());
     }
 
     @Autowired
-    public NordeaClosedDatasetReader(
-            NordeaClosedDatasetProperties properties,
+    public EnterpriseClosedDatasetReader(
+            EnterpriseClosedDatasetProperties properties,
             @Autowired(required = false) ObjectMapper objectMapper,
             @Autowired(required = false) ResourceLoader resourceLoader) {
         this.properties = properties;
@@ -76,7 +76,7 @@ public class NordeaClosedDatasetReader {
                 questionIndex.put(q.id(), q);
             }
             cachedQuestions = Collections.unmodifiableList(questions);
-            logger.info("Loaded {} Nordea closed-corpus questions from {}", cachedQuestions.size(), properties.filePath());
+            logger.info("Loaded {} Enterprise closed-corpus questions from {}", cachedQuestions.size(), properties.filePath());
             return cachedQuestions;
         }
     }
@@ -108,13 +108,13 @@ public class NordeaClosedDatasetReader {
             }
             return list;
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to read Nordea closed-corpus dataset from: " + location, e);
+            throw new IllegalStateException("Failed to read Enterprise closed-corpus dataset from: " + location, e);
         }
     }
 
     private BufferedReader openReader(String location) throws IOException {
         if (location == null || location.isBlank()) {
-            throw new IllegalArgumentException("Nordea closed-corpus dataset file path must not be null or blank");
+            throw new IllegalArgumentException("Enterprise closed-corpus dataset file path must not be null or blank");
         }
         Path path = Path.of(location);
         if (Files.exists(path)) {
@@ -127,13 +127,16 @@ public class NordeaClosedDatasetReader {
                 Path.of("rag-benchmark", location),
                 Path.of("rag-code", "rag-evaluator", location),
                 Path.of("..", "rag-evaluator", location),
+                Path.of("data", "enterprise", "enterprise_100_final.jsonl"),
+                Path.of("..", "rag-evaluator", "data", "enterprise", "enterprise_100_final.jsonl"),
+                Path.of("rag-code", "rag-evaluator", "data", "enterprise", "enterprise_100_final.jsonl"),
                 Path.of("data", "nordea", "nordea_100_final.jsonl"),
                 Path.of("rag-code", "rag-evaluator", "data", "nordea", "nordea_100_final.jsonl")
         );
 
         for (Path candidate : candidatePaths) {
             if (Files.exists(candidate)) {
-                logger.info("Resolved Nordea closed-corpus file at: {}", candidate.toAbsolutePath());
+                logger.info("Resolved Enterprise closed-corpus file at: {}", candidate.toAbsolutePath());
                 return Files.newBufferedReader(candidate, StandardCharsets.UTF_8);
             }
         }
@@ -145,7 +148,7 @@ public class NordeaClosedDatasetReader {
             return new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
         }
 
-        throw new IOException("Nordea closed-corpus dataset file not found at: " + location
+        throw new IOException("Enterprise closed-corpus dataset file not found at: " + location
                 + " (checked candidates: " + candidatePaths + ")");
     }
 
@@ -197,7 +200,7 @@ public class NordeaClosedDatasetReader {
 
             return new MusiqueQuestion(id, question, answer, aliases, hopCount, answerable, paragraphs, decomposition);
         } catch (Exception e) {
-            logger.warn("Failed to parse Nordea question line: {}", e.getMessage());
+            logger.warn("Failed to parse Enterprise question line: {}", e.getMessage());
             return null;
         }
     }

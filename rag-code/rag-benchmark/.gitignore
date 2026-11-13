@@ -1,5 +1,2 @@
-data/**
-!data/
-!data/nordea/
-!data/nordea/*.py
+data/
 .env

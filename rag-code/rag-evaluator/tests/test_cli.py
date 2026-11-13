@@ -344,9 +344,9 @@ def test_cli_query_mocked(mock_client_cls, tmp_path: Path):
     mock_instance = MagicMock()
     mock_client_cls.return_value = mock_instance
     mock_instance.query.return_value = {
-        "answer": "Nordea Platinum offers lounge access.",
+        "answer": "Enterprise Platinum offers lounge access.",
         "modulesApplied": [],
-        "retrievedChunks": [{"id": "c1", "snippet": "Nordea Platinum lounge"}],
+        "retrievedChunks": [{"id": "c1", "snippet": "Enterprise Platinum lounge"}],
         "timingsMs": {"retrievalMs": 10.0, "generationMs": 20.0},
         "tokenUsage": {"promptTokens": 100, "completionTokens": 20, "cachedTokens": 0},
         "totalLatencyMs": 30.0,
@@ -363,13 +363,13 @@ def test_cli_query_mocked(mock_client_cls, tmp_path: Path):
     ])
 
     assert res.exit_code == 0
-    assert "Nordea Platinum offers lounge access" in res.stdout
+    assert "Enterprise Platinum offers lounge access" in res.stdout
     assert "vector_store_nordea" in res.stdout
     assert mock_instance.query.called
     assert out_file.exists()
     saved = json.loads(out_file.read_text(encoding="utf-8").strip())
     assert saved["question"] == "Mitä etuja Platinum tarjoaa?"
-    assert saved["generatedAnswer"] == "Nordea Platinum offers lounge access."
+    assert saved["generatedAnswer"] == "Enterprise Platinum offers lounge access."
 
 
 @patch("src.cli.RagBenchmarkClient")

@@ -14,7 +14,7 @@ As shown in Table~\ref{tab:latency_musique}, the primary latency benefits of pro
 
 Notably, S2B + PC was the only architectural configuration that achieved a statistically significant latency reduction relative to the naive baseline ($p < 0.001$), decreasing median execution time by 8.0\% (from 1,359.0\,ms to 1,250.0\,ms) while nearly halving tail latency ($P_{95}$ falling from 3,397.2\,ms to 1,745.1\,ms). Furthermore, across all evaluated pipelines, the gap between median TTFT and median total latency remained minimal (diverging by less than 90\,ms). This narrow delta is attributable to the concise nature of the generated answers (averaging 9--11 output tokens, as reported in Table~\ref{tab:cost_musique}), indicating that end-to-end execution duration is dominated almost entirely by the retrieval and prompt prefill phases rather than auto-regressive token generation.
 
-Detailed component-wise execution latency breakdowns are provided in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_musique}).
+To complement the tabular percentiles, detailed component-wise mean execution latency breakdowns are provided in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_musique}).
 
 \subsubsection{Enterprise Production Corpus}
 \label{subsubsec:latency_enterprise}
@@ -27,7 +27,7 @@ Crucially, the severe tail latency spikes observed on the academic benchmark (wh
 
 The substantially longer responses generated on the enterprise closed corpus (averaging 62--86 output tokens, representing a $7\text{--}9\times$ increase over MuSiQue as reported in Tables~\ref{tab:cost_musique} and~\ref{tab:cost_enterprise}) explain the wider divergence between median TTFT and total latency. While the gap on MuSiQue was restricted to tens of milliseconds (under 90\,ms), the enterprise benchmark exhibits deltas on the order of 115--380\,ms. This reflects a proportionally expanded auto-regressive token streaming phase ($T_{\text{stream}}$), demonstrating that generative synthesis accounts for a non-trivial fraction of total execution duration when generating detailed enterprise summaries.
 
-The corresponding fine-grained phase-wise latency distributions for the enterprise closed corpus are illustrated in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_enterprise}).
+The corresponding fine-grained phase-wise mean latency breakdowns for the enterprise closed corpus are illustrated in Appendix~\ref{sec:appendix_breakdowns} (Figure~\ref{fig:latency_breakdown_enterprise}).
 
 \FloatBarrier
 \subsection{Operational Expenditure and Token Dynamics}

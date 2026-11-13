@@ -3,8 +3,8 @@ package com.dippa.ragbenchmark.application.dataset;
 import com.dippa.ragbenchmark.domain.dataset.MusiqueParagraph;
 import com.dippa.ragbenchmark.domain.dataset.MusiqueQuestion;
 import com.dippa.ragbenchmark.infrastructure.PgVectorStoreFactory;
-import com.dippa.ragbenchmark.infrastructure.dataset.NordeaClosedDatasetProperties;
-import com.dippa.ragbenchmark.infrastructure.dataset.NordeaClosedDatasetReader;
+import com.dippa.ragbenchmark.infrastructure.dataset.EnterpriseClosedDatasetProperties;
+import com.dippa.ragbenchmark.infrastructure.dataset.EnterpriseClosedDatasetReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,32 +24,32 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /**
- * Service orchestrating the closed-corpus Nordea dataset ingestion into pgvector.
+ * Service orchestrating the closed-corpus Enterprise dataset ingestion into pgvector.
  *
  * <p>Populates three dedicated tables matching the MuSiQue closed-corpus methodology:
  * <ul>
- *   <li>{@code vector_store_nordea_closed} - 1,333 deduplicated paragraphs for Baseline/C0, C2, C3, C4</li>
- *   <li>{@code vector_store_nordea_closed_large} - 1024-token parent context chunks for S2B/M1</li>
- *   <li>{@code vector_store_nordea_closed_small} - 128-token child retrieval index chunks for S2B/M1</li>
+ *   <li>{@code vector_store_enterprise_closed} - deduplicated paragraphs for Baseline/C0, C2, C3, C4</li>
+ *   <li>{@code vector_store_enterprise_closed_large} - 1024-token parent context chunks for S2B/M1</li>
+ *   <li>{@code vector_store_enterprise_closed_small} - 128-token child retrieval index chunks for S2B/M1</li>
  * </ul>
  * </p>
  */
 @Service
-public class NordeaClosedDatasetService {
+public class EnterpriseClosedDatasetService {
 
-    private static final Logger logger = LoggerFactory.getLogger(NordeaClosedDatasetService.class);
+    private static final Logger logger = LoggerFactory.getLogger(EnterpriseClosedDatasetService.class);
 
-    private final NordeaClosedDatasetReader reader;
-    private final NordeaClosedDatasetProperties properties;
+    private final EnterpriseClosedDatasetReader reader;
+    private final EnterpriseClosedDatasetProperties properties;
     private final VectorStore defaultVectorStore;
     private final PgVectorStoreFactory vectorStoreFactory;
     private final JdbcTemplate jdbcTemplate;
     private final java.util.concurrent.atomic.AtomicBoolean ingestionInProgress = new java.util.concurrent.atomic.AtomicBoolean(false);
 
     @Autowired
-    public NordeaClosedDatasetService(
-            NordeaClosedDatasetReader reader,
-            NordeaClosedDatasetProperties properties,
+    public EnterpriseClosedDatasetService(
+            EnterpriseClosedDatasetReader reader,
+            EnterpriseClosedDatasetProperties properties,
             VectorStore defaultVectorStore,
             ObjectProvider<PgVectorStoreFactory> vectorStoreFactoryProvider,
             ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
@@ -60,7 +60,7 @@ public class NordeaClosedDatasetService {
         this.jdbcTemplate = jdbcTemplateProvider != null ? jdbcTemplateProvider.getIfAvailable() : null;
     }
 
-    public record NordeaClosedIngestionSummary(
+    public record EnterpriseClosedIngestionSummary(
             int questionsCount,
             int uniqueParagraphsCount,
             int baselineChunksWritten,
@@ -74,7 +74,7 @@ public class NordeaClosedDatasetService {
     /**
      * Executes closed-corpus ingestion according to the requested mode ("original", "s2b", or "both").
      */
-    public NordeaClosedIngestionSummary ingest(String mode, boolean clearDatabase) {
+    public EnterpriseClosedIngestionSummary ingest(String mode, boolean clearDatabase) {
         String effectiveMode = (mode != null && !mode.isBlank()) ? mode.toLowerCase(Locale.ROOT) : "both";
 
         if (!ingestionInProgress.compareAndSet(false, true)) {
@@ -95,14 +95,14 @@ public class NordeaClosedDatasetService {
             int totalBatches = 0;
 
             if ("original".equals(effectiveMode) || "baseline".equals(effectiveMode) || "both".equals(effectiveMode) || "all".equals(effectiveMode)) {
-                logger.info("Ingesting Nordea closed-corpus baseline chunks ({} unique paragraphs)...", uniqueParagraphs.size());
+                logger.info("Ingesting Enterprise closed-corpus baseline chunks ({} unique paragraphs)...", uniqueParagraphs.size());
                 BaselineIngestResult baselineResult = ingestOriginal(uniqueParagraphs);
                 baselineChunks = baselineResult.documentCount();
                 totalBatches += baselineResult.batchCount();
             }
 
             if ("s2b".equals(effectiveMode) || "small-to-big".equals(effectiveMode) || "both".equals(effectiveMode) || "all".equals(effectiveMode)) {
-                logger.info("Ingesting Nordea closed-corpus Small-to-Big chunks...");
+                logger.info("Ingesting Enterprise closed-corpus Small-to-Big chunks...");
                 S2bIngestResult s2bResult = ingestSmallToBig(uniqueParagraphs);
                 parentChunks = s2bResult.parentCount();
                 childChunks = s2bResult.childCount();
@@ -110,10 +110,10 @@ public class NordeaClosedDatasetService {
             }
 
             long durationMs = System.currentTimeMillis() - startTime;
-            logger.info("Completed Nordea closed-corpus ingestion in {} ms (mode={}, questions={}, uniqueParas={}, baseline={}, parents={}, children={})",
+            logger.info("Completed Enterprise closed-corpus ingestion in {} ms (mode={}, questions={}, uniqueParas={}, baseline={}, parents={}, children={})",
                     durationMs, effectiveMode, questions.size(), uniqueParagraphs.size(), baselineChunks, parentChunks, childChunks);
 
-            return new NordeaClosedIngestionSummary(
+            return new EnterpriseClosedIngestionSummary(
                     questions.size(),
                     uniqueParagraphs.size(),
                     baselineChunks,
@@ -160,14 +160,14 @@ public class NordeaClosedDatasetService {
             for (int i = 0; i < chunks.size(); i++) {
                 Document chunk = chunks.get(i);
                 String deterministicId = UUID.nameUUIDFromBytes(
-                        ("nordea_closed:baseline:" + p.title() + "\n" + p.paragraphText() + "#" + i).getBytes(StandardCharsets.UTF_8)
+                        ("enterprise_closed:baseline:" + p.title() + "\n" + p.paragraphText() + "#" + i).getBytes(StandardCharsets.UTF_8)
                 ).toString();
 
                 Map<String, Object> metadata = new HashMap<>();
-                metadata.put("dataset", "nordea");
+                metadata.put("dataset", "enterprise");
                 metadata.put("corpus_mode", "closed");
                 metadata.put("title", p.title());
-                metadata.put("source", "nordea_100_final.jsonl");
+                metadata.put("source", "enterprise_100_final.jsonl");
                 metadata.put("chunk_index", i);
                 metadata.put("total_chunks", chunks.size());
 
@@ -176,11 +176,11 @@ public class NordeaClosedDatasetService {
         }
 
         VectorStore targetStore = (vectorStoreFactory != null)
-                ? vectorStoreFactory.getStore("vector_store_nordea_closed")
+                ? vectorStoreFactory.getStore("vector_store_enterprise_closed")
                 : defaultVectorStore;
 
         int batchSize = properties.batchSize() > 0 ? properties.batchSize() : 100;
-        logger.info("Writing {} baseline documents to vector_store_nordea_closed in batches of {}", documents.size(), batchSize);
+        logger.info("Writing {} baseline documents to vector_store_enterprise_closed in batches of {}", documents.size(), batchSize);
         int batches = addInBatches(targetStore, documents, batchSize);
         return new BaselineIngestResult(documents.size(), batches);
     }
@@ -223,14 +223,14 @@ public class NordeaClosedDatasetService {
             for (int parentIdx = 0; parentIdx < parentChunks.size(); parentIdx++) {
                 Document parentChunk = parentChunks.get(parentIdx);
                 String parentId = UUID.nameUUIDFromBytes(
-                        ("nordea_closed:parent:" + title + "#" + parentIdx).getBytes(StandardCharsets.UTF_8)
+                        ("enterprise_closed:parent:" + title + "#" + parentIdx).getBytes(StandardCharsets.UTF_8)
                 ).toString();
 
                 Map<String, Object> parentMeta = new HashMap<>();
-                parentMeta.put("dataset", "nordea");
+                parentMeta.put("dataset", "enterprise");
                 parentMeta.put("corpus_mode", "closed");
                 parentMeta.put("title", title);
-                parentMeta.put("source", "nordea_100_final.jsonl");
+                parentMeta.put("source", "enterprise_100_final.jsonl");
                 parentMeta.put("chunk_type", "parent");
                 parentMeta.put("chunk_index", parentIdx);
                 parentMeta.put("total_parent_chunks", parentChunks.size());
@@ -241,17 +241,17 @@ public class NordeaClosedDatasetService {
                 for (int childIdx = 0; childIdx < childChunks.size(); childIdx++) {
                     Document childChunk = childChunks.get(childIdx);
                     String childId = UUID.nameUUIDFromBytes(
-                            ("nordea_closed:child:" + parentId + "#" + childIdx).getBytes(StandardCharsets.UTF_8)
+                            ("enterprise_closed:child:" + parentId + "#" + childIdx).getBytes(StandardCharsets.UTF_8)
                     ).toString();
 
                     Map<String, Object> childMeta = new HashMap<>();
-                    childMeta.put("dataset", "nordea");
+                    childMeta.put("dataset", "enterprise");
                     childMeta.put("corpus_mode", "closed");
                     childMeta.put("title", title);
-                    childMeta.put("source", "nordea_100_final.jsonl");
+                    childMeta.put("source", "enterprise_100_final.jsonl");
                     childMeta.put("chunk_type", "child");
                     childMeta.put("parent_id", parentId);
-                    childMeta.put("parent_table", "vector_store_nordea_closed_large");
+                    childMeta.put("parent_table", "vector_store_enterprise_closed_large");
                     childMeta.put("chunk_index", childIdx);
                     childMeta.put("total_child_chunks", childChunks.size());
 
@@ -261,19 +261,19 @@ public class NordeaClosedDatasetService {
         }
 
         VectorStore largeStore = (vectorStoreFactory != null)
-                ? vectorStoreFactory.getStore("vector_store_nordea_closed_large")
+                ? vectorStoreFactory.getStore("vector_store_enterprise_closed_large")
                 : defaultVectorStore;
         VectorStore smallStore = (vectorStoreFactory != null)
-                ? vectorStoreFactory.getStore("vector_store_nordea_closed_small")
+                ? vectorStoreFactory.getStore("vector_store_enterprise_closed_small")
                 : defaultVectorStore;
 
         int parentBatchSize = properties.parentBatchSize() > 0 ? properties.parentBatchSize() : 10;
         int childBatchSize = properties.childBatchSize() > 0 ? properties.childBatchSize() : 25;
 
-        logger.info("Writing {} parent chunks to vector_store_nordea_closed_large (batchSize={})", parentDocuments.size(), parentBatchSize);
+        logger.info("Writing {} parent chunks to vector_store_enterprise_closed_large (batchSize={})", parentDocuments.size(), parentBatchSize);
         int parentBatches = addInBatches(largeStore, parentDocuments, parentBatchSize);
 
-        logger.info("Writing {} child chunks to vector_store_nordea_closed_small (batchSize={})", childDocuments.size(), childBatchSize);
+        logger.info("Writing {} child chunks to vector_store_enterprise_closed_small (batchSize={})", childDocuments.size(), childBatchSize);
         int childBatches = addInBatches(smallStore, childDocuments, childBatchSize);
 
         return new S2bIngestResult(parentDocuments.size(), childDocuments.size(), parentBatches + childBatches);
@@ -322,11 +322,11 @@ public class NordeaClosedDatasetService {
         List<String> tables;
         String normalized = mode != null ? mode.trim().toLowerCase(Locale.ROOT) : "all";
         if ("s2b".equals(normalized) || "small-to-big".equals(normalized)) {
-            tables = List.of("vector_store_nordea_closed_large", "vector_store_nordea_closed_small");
+            tables = List.of("vector_store_enterprise_closed_large", "vector_store_enterprise_closed_small");
         } else if ("original".equals(normalized) || "baseline".equals(normalized)) {
-            tables = List.of("vector_store_nordea_closed");
+            tables = List.of("vector_store_enterprise_closed");
         } else {
-            tables = List.of("vector_store_nordea_closed", "vector_store_nordea_closed_large", "vector_store_nordea_closed_small");
+            tables = List.of("vector_store_enterprise_closed", "vector_store_enterprise_closed_large", "vector_store_enterprise_closed_small");
         }
 
         int count = 0;

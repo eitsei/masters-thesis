@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.dippa.ragbenchmark.ingest.nordea.NordeaIngestionService;
+import com.dippa.ragbenchmark.ingest.enterprise.EnterpriseIngestionService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,22 +17,22 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(NordeaIngestController.class)
-class NordeaIngestControllerTest {
+@WebMvcTest(EnterpriseIngestController.class)
+class EnterpriseIngestControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockitoBean
-    private NordeaIngestionService ingestionService;
+    private EnterpriseIngestionService ingestionService;
 
     @Test
     void postWithoutBodyDefaultsToS2bAndAll() throws Exception {
         when(ingestionService.executePipeline(any())).thenReturn(
-                new NordeaIngestionService.NordeaIngestionSummary(10, 2, 5, 20, 1500L, "s2b")
+                new EnterpriseIngestionService.EnterpriseIngestionSummary(10, 2, 5, 20, 1500L, "s2b")
         );
 
-        mockMvc.perform(post("/api/ingest/nordea"))
+        mockMvc.perform(post("/api/ingest/enterprise"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pagesCrawled").value(10))
                 .andExpect(jsonPath("$.pdfsExtracted").value(2))
@@ -41,11 +41,11 @@ class NordeaIngestControllerTest {
                 .andExpect(jsonPath("$.durationMs").value(1500))
                 .andExpect(jsonPath("$.mode").value("s2b"));
 
-        ArgumentCaptor<NordeaIngestController.NordeaIngestRequest> captor =
-                ArgumentCaptor.forClass(NordeaIngestController.NordeaIngestRequest.class);
+        ArgumentCaptor<EnterpriseIngestController.EnterpriseIngestRequest> captor =
+                ArgumentCaptor.forClass(EnterpriseIngestController.EnterpriseIngestRequest.class);
         verify(ingestionService).executePipeline(captor.capture());
 
-        NordeaIngestController.NordeaIngestRequest request = captor.getValue();
+        EnterpriseIngestController.EnterpriseIngestRequest request = captor.getValue();
         assertThat(request.resolvedMode()).isEqualTo("s2b");
         assertThat(request.resolvedAction()).isEqualTo("all");
         assertThat(request.shouldClearDatabase()).isFalse();
@@ -55,18 +55,18 @@ class NordeaIngestControllerTest {
     @Test
     void postWithQueryParamModePreservesBackwardsCompatibility() throws Exception {
         when(ingestionService.executePipeline(any())).thenReturn(
-                new NordeaIngestionService.NordeaIngestionSummary(5, 0, 0, 10, 500L, "original")
+                new EnterpriseIngestionService.EnterpriseIngestionSummary(5, 0, 0, 10, 500L, "original")
         );
 
-        mockMvc.perform(post("/api/ingest/nordea?mode=original"))
+        mockMvc.perform(post("/api/ingest/enterprise?mode=original"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mode").value("original"));
 
-        ArgumentCaptor<NordeaIngestController.NordeaIngestRequest> captor =
-                ArgumentCaptor.forClass(NordeaIngestController.NordeaIngestRequest.class);
+        ArgumentCaptor<EnterpriseIngestController.EnterpriseIngestRequest> captor =
+                ArgumentCaptor.forClass(EnterpriseIngestController.EnterpriseIngestRequest.class);
         verify(ingestionService).executePipeline(captor.capture());
 
-        NordeaIngestController.NordeaIngestRequest request = captor.getValue();
+        EnterpriseIngestController.EnterpriseIngestRequest request = captor.getValue();
         assertThat(request.resolvedMode()).isEqualTo("original");
         assertThat(request.resolvedAction()).isEqualTo("all");
     }
@@ -74,7 +74,7 @@ class NordeaIngestControllerTest {
     @Test
     void postWithFullJsonBodyDelegatesCorrectly() throws Exception {
         when(ingestionService.executePipeline(any())).thenReturn(
-                new NordeaIngestionService.NordeaIngestionSummary(12, 0, 0, 0, 300L, "clean")
+                new EnterpriseIngestionService.EnterpriseIngestionSummary(12, 0, 0, 0, 300L, "clean")
         );
 
         String jsonBody = """
@@ -86,18 +86,18 @@ class NordeaIngestControllerTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/ingest/nordea")
+        mockMvc.perform(post("/api/ingest/enterprise")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pagesCrawled").value(12))
                 .andExpect(jsonPath("$.mode").value("clean"));
 
-        ArgumentCaptor<NordeaIngestController.NordeaIngestRequest> captor =
-                ArgumentCaptor.forClass(NordeaIngestController.NordeaIngestRequest.class);
+        ArgumentCaptor<EnterpriseIngestController.EnterpriseIngestRequest> captor =
+                ArgumentCaptor.forClass(EnterpriseIngestController.EnterpriseIngestRequest.class);
         verify(ingestionService).executePipeline(captor.capture());
 
-        NordeaIngestController.NordeaIngestRequest request = captor.getValue();
+        EnterpriseIngestController.EnterpriseIngestRequest request = captor.getValue();
         assertThat(request.resolvedMode()).isEqualTo("s2b");
         assertThat(request.resolvedAction()).isEqualTo("clean");
         assertThat(request.shouldClearDatabase()).isTrue();
@@ -107,18 +107,18 @@ class NordeaIngestControllerTest {
     @Test
     void postWithQueryParamModeS2bBaselineDefaultsToS2bBaselineAction() throws Exception {
         when(ingestionService.executePipeline(any())).thenReturn(
-                new NordeaIngestionService.NordeaIngestionSummary(50, 0, 50, 200, 800L, "s2b-baseline")
+                new EnterpriseIngestionService.EnterpriseIngestionSummary(50, 0, 50, 200, 800L, "s2b-baseline")
         );
 
-        mockMvc.perform(post("/api/ingest/nordea?mode=s2b-baseline"))
+        mockMvc.perform(post("/api/ingest/enterprise?mode=s2b-baseline"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mode").value("s2b-baseline"));
 
-        ArgumentCaptor<NordeaIngestController.NordeaIngestRequest> captor =
-                ArgumentCaptor.forClass(NordeaIngestController.NordeaIngestRequest.class);
+        ArgumentCaptor<EnterpriseIngestController.EnterpriseIngestRequest> captor =
+                ArgumentCaptor.forClass(EnterpriseIngestController.EnterpriseIngestRequest.class);
         verify(ingestionService).executePipeline(captor.capture());
 
-        NordeaIngestController.NordeaIngestRequest request = captor.getValue();
+        EnterpriseIngestController.EnterpriseIngestRequest request = captor.getValue();
         assertThat(request.resolvedMode()).isEqualTo("s2b-baseline");
         assertThat(request.resolvedAction()).isEqualTo("s2b-baseline");
     }

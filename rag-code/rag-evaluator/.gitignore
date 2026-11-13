@@ -13,5 +13,8 @@ data/*
 !data/musique/
 data/musique/*
 !data/musique/musique_100_final.jsonl
+!data/enterprise/
+data/enterprise/*
+!data/enterprise/enterprise_100_final.jsonl
 logs/
 figure_testing/

@@ -1,4 +1,4 @@
-package com.dippa.ragbenchmark.ingest.nordea;
+package com.dippa.ragbenchmark.ingest.enterprise;
 
 import java.util.HashSet;
 import java.util.List;
@@ -10,14 +10,14 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 /**
- * Converts crawled HTML documents from Nordea's website into clean, structured Markdown.
+ * Converts crawled HTML documents from enterprise websites into clean, structured Markdown.
  *
  * <p>Performs aggressive boilerplate removal: strips navigation bars, headers, footers,
  * cookie banners, social share links, and repetitive call-to-action (CTA) buttons
  * (e.g. "Lue lisää", "Jätä yhteydenottopyyntö"), while preserving substantive body prose,
  * hierarchical headings, lists, tables, and official contact details.</p>
  */
-public final class NordeaHtmlToMarkdownConverter {
+public final class EnterpriseHtmlToMarkdownConverter {
 
     private static final Set<String> NOISE_HEADINGS = Set.of(
             "kirjaudu",
@@ -25,7 +25,7 @@ public final class NordeaHtmlToMarkdownConverter {
             "jaa tämä sivu",
             "tuki ja usein kysytyt",
             "palvelumme",
-            "tietoa nordeasta"
+            "about enterprise"
     );
 
     private static final List<String> CTA_PATTERNS = List.of(
@@ -48,11 +48,11 @@ public final class NordeaHtmlToMarkdownConverter {
             "(?m)^.*Hups! Jos haluat nähdä tällaista sisältöä.*$\\R?"
     );
     private static final Pattern STANDARD_HELP_BLOCK_PATTERN = Pattern.compile(
-            "##\\s*Apua asiointiin\\s*\\R+###\\s*Henkilöasiakkaat\\s*\\R+-\\s*Kysy heti chatissa\\s*\\R+-\\s*Usein kysytyt\\s*\\R+-\\s*Soita meille.*?\\R+-\\s*Nordea Omaposti[^\r\n]*",
+            "##\\s*Apua asiointiin\\s*\\R+###\\s*Henkilöasiakkaat\\s*\\R+-\\s*Kysy heti chatissa\\s*\\R+-\\s*Usein kysytyt\\s*\\R+-\\s*Soita meille.*?\\R+-\\s*Enterprise Portal[^\r\n]*",
             Pattern.CASE_INSENSITIVE
     );
     private static final Pattern HELP_SUB_LIST_PATTERN = Pattern.compile(
-            "###\\s*Henkilöasiakkaat\\s*\\R+-\\s*Kysy heti chatissa\\s*\\R+-\\s*Usein kysytyt\\s*\\R+-\\s*Soita meille.*?\\R+-\\s*Nordea Omaposti[^\r\n]*",
+            "###\\s*Henkilöasiakkaat\\s*\\R+-\\s*Kysy heti chatissa\\s*\\R+-\\s*Usein kysytyt\\s*\\R+-\\s*Soita meille.*?\\R+-\\s*Enterprise Portal[^\r\n]*",
             Pattern.CASE_INSENSITIVE
     );
     private static final Pattern APUA_HEADING_PATTERN = Pattern.compile(
@@ -68,7 +68,7 @@ public final class NordeaHtmlToMarkdownConverter {
             "\\n{3,}"
     );
 
-    private NordeaHtmlToMarkdownConverter() {
+    private EnterpriseHtmlToMarkdownConverter() {
     }
 
     /**
@@ -132,7 +132,7 @@ public final class NordeaHtmlToMarkdownConverter {
                         && !parent.tagName().equalsIgnoreCase("main")
                         && !parent.tagName().equalsIgnoreCase("article")) {
                     String parentText = parent.text();
-                    if (parentText.contains("Henkilöasiakkaat") || parentText.contains("chatissa") || parentText.contains("Omaposti")) {
+                    if (parentText.contains("Henkilöasiakkaat") || parentText.contains("chatissa") || parentText.contains("Enterprise Portal")) {
                         parent.remove();
                         continue;
                     }
@@ -142,7 +142,7 @@ public final class NordeaHtmlToMarkdownConverter {
                     Element list = next.nextElementSibling();
                     if (list != null && ("ul".equalsIgnoreCase(list.tagName()) || "ol".equalsIgnoreCase(list.tagName())
                             || list.text().toLowerCase(Locale.ROOT).contains("chatissa")
-                            || list.text().toLowerCase(Locale.ROOT).contains("omaposti"))) {
+                            || list.text().toLowerCase(Locale.ROOT).contains("enterprise portal"))) {
                         list.remove();
                     }
                     next.remove();

@@ -8,17 +8,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-class NordeaClosedDatasetReaderTest {
+class EnterpriseClosedDatasetReaderTest {
 
     private ObjectMapper objectMapper;
-    private NordeaClosedDatasetProperties properties;
-    private NordeaClosedDatasetReader reader;
+    private EnterpriseClosedDatasetProperties properties;
+    private EnterpriseClosedDatasetReader reader;
 
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        properties = new NordeaClosedDatasetProperties(
-                "data/nordea/nordea_100_final.jsonl",
+        properties = new EnterpriseClosedDatasetProperties(
+                "data/enterprise/enterprise_100_final.jsonl",
                 100,
                 10,
                 25,
@@ -27,7 +27,7 @@ class NordeaClosedDatasetReaderTest {
                 128,
                 true
         );
-        reader = new NordeaClosedDatasetReader(properties, objectMapper);
+        reader = new EnterpriseClosedDatasetReader(properties, objectMapper);
     }
 
     @Test
@@ -70,14 +70,13 @@ class NordeaClosedDatasetReaderTest {
 
     @Test
     void loadAll_throwsOnNullOrBlankPath() {
-        NordeaClosedDatasetProperties badProps = new NordeaClosedDatasetProperties(
+        EnterpriseClosedDatasetProperties badProps = new EnterpriseClosedDatasetProperties(
                 "",
                 100, 10, 25, 512, 1024, 128, true
         );
-        NordeaClosedDatasetReader badReader = new NordeaClosedDatasetReader(badProps, objectMapper);
+        EnterpriseClosedDatasetReader badReader = new EnterpriseClosedDatasetReader(badProps, objectMapper);
         assertThatThrownBy(badReader::loadAll)
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Nordea closed-corpus dataset file path must not be null or blank");
+                .hasMessageContaining("Enterprise closed-corpus dataset file path must not be null or blank");
     }
 }
-

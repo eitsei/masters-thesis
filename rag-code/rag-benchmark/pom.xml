@@ -78,7 +78,7 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- One-off Nordea site ingestion tool (com.dippa.ragbenchmark.ingest.nordea):
+        <!-- One-off enterprise site ingestion tool (com.dippa.ragbenchmark.ingest.enterprise):
              HTML fetch/parse/link-extraction and PDF text extraction. Not part of the
              benchmarked RAG pipeline itself, so no BOM manages these; versions pinned
              directly against Maven Central's current releases. -->

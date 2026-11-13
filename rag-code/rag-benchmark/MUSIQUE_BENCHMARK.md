@@ -159,7 +159,7 @@ curl -X POST http://localhost:8080/api/query \
 | `GET` | `/api/benchmark/musique/questions` | List questions with query parameters (`offset`, `limit`, `hops`, `sample`). |
 | `GET` | `/api/benchmark/musique/questions/{id}` | Full detail for a single question including decomposition steps and paragraphs. |
 | `POST` | `/api/benchmark/musique/ingest` | Ingest corpus into pgvector (`mode`: `original`/`baseline`/`s2b`, `clearDatabase`: `true`/`false`). |
-| `POST` | `/api/ingest/musique` | Alias endpoint matching `/api/ingest/nordea-closed` convention. |
+| `POST` | `/api/ingest/musique` | Alias endpoint matching `/api/ingest/enterprise-closed` convention. |
 | `POST` | `/api/benchmark/musique/questions/{id}/query` | Evaluate pipeline on question `{id}`, comparing generated answer to ground truth. |
 | `POST` | `/api/query` | Standard RAG pipeline execution for arbitrary text queries. |
 

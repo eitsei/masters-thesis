@@ -1,4 +1,4 @@
-package com.dippa.ragbenchmark.ingest.nordea;
+package com.dippa.ragbenchmark.ingest.enterprise;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -19,7 +19,7 @@ import org.apache.pdfbox.text.PDFTextStripper;
  * reconstructs hard-wrapped lines into coherent paragraphs, formats bullet points,
  * and detects section headings.</p>
  */
-public final class NordeaPdfToMarkdownConverter {
+public final class EnterprisePdfToMarkdownConverter {
 
     private static final Pattern PAGE_NUMBER_PATTERN = Pattern.compile(
             "^\\s*(sivu|page)?\\s*\\d+\\s*([/(]\\s*\\d+\\s*[)]?)?\\s*$",
@@ -31,7 +31,7 @@ public final class NordeaPdfToMarkdownConverter {
     private static final Pattern BULLET_PATTERN = Pattern.compile(
             "^\\s*[•·\\*\\-]\\s+(.*)");
 
-    private NordeaPdfToMarkdownConverter() {
+    private EnterprisePdfToMarkdownConverter() {
     }
 
     /**
