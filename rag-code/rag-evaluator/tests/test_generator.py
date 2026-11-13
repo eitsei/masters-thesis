@@ -11,19 +11,19 @@ from langchain_core.documents import Document
 from langchain_core.messages import AIMessage
 
 from src.generator import (
-    NORDEA_LLM_CONTEXT,
+    ENTERPRISE_LLM_CONTEXT,
     STANDARD_REFUSAL_EN,
     STANDARD_REFUSAL_FI,
-    generate_nordea_dataset,
+    generate_enterprise_dataset,
     generate_out_of_domain_samples,
-    get_nordea_personas,
-    load_and_deduplicate_nordea_docs,
+    get_enterprise_personas,
+    load_and_deduplicate_enterprise_docs,
 )
 
 
-def test_get_nordea_personas() -> None:
+def test_get_enterprise_personas() -> None:
     """Verifies that the Finnish customer personas are defined with appropriate roles."""
-    personas = get_nordea_personas()
+    personas = get_enterprise_personas()
     assert len(personas) == 4
     names = [p.name for p in personas]
     assert "Yrittäjä ja Holdingyhtiö-omistaja" in names
@@ -36,7 +36,7 @@ def test_get_nordea_personas() -> None:
         assert "suomalainen" in p.role_description.lower() or "asiakas" in p.role_description.lower() or "sijoittaja" in p.role_description.lower()
 
 
-def test_load_and_deduplicate_nordea_docs(tmp_path: Path) -> None:
+def test_load_and_deduplicate_enterprise_docs(tmp_path: Path) -> None:
     """Verifies frontmatter parsing, URL deduplication, and size filtering."""
     pages_dir = tmp_path / "pages"
     pages_dir.mkdir()
@@ -61,7 +61,7 @@ def test_load_and_deduplicate_nordea_docs(tmp_path: Path) -> None:
     doc2 = pages_dir / "003-doc.md"
     doc2.write_text(
         "---\nurl: \"https://example.com/page2\"\ntitle: \"Page 2\"\ntype: \"html\"\n---\n"
-        + "Tämä on toinen erillinen sivu Nordea Platinum -korteista ja eduista." * 8,
+        + "Tämä on toinen erillinen sivu Platinum-korteista ja eduista." * 8,
         encoding="utf-8",
     )
 
@@ -72,7 +72,7 @@ def test_load_and_deduplicate_nordea_docs(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    docs = load_and_deduplicate_nordea_docs(tmp_path, min_chars=150)
+    docs = load_and_deduplicate_enterprise_docs(tmp_path, min_chars=150)
     assert len(docs) == 2
 
     urls = [d.metadata["source"] for d in docs]
@@ -97,7 +97,7 @@ def test_load_and_deduplicate_max_docs(tmp_path: Path) -> None:
             encoding="utf-8",
         )
 
-    docs = load_and_deduplicate_nordea_docs(tmp_path, min_chars=50, max_docs=3)
+    docs = load_and_deduplicate_enterprise_docs(tmp_path, min_chars=50, max_docs=3)
     assert len(docs) == 3
 
 
@@ -124,19 +124,19 @@ def test_generate_out_of_domain_samples() -> None:
     assert q1["source_urls"] == []
 
 
-def test_generate_nordea_dataset_end_to_end(tmp_path: Path) -> None:
+def test_generate_enterprise_dataset_end_to_end(tmp_path: Path) -> None:
     """Verifies complete orchestration with mocked JudgeFactory and Ragas TestsetGenerator."""
     # Create sample docs in tmp_path
     md_dir = tmp_path / "md"
     md_dir.mkdir()
     doc_path = md_dir / "sample.md"
     doc_path.write_text(
-        "---\nurl: \"https://www.nordea.fi/pb\"\ntitle: \"Private Banking\"\n---\n"
-        + "Tämä on Nordea Private Bankingin kattava palvelukuvaus ja sijoitusstrategia." * 10,
+        "---\nurl: \"https://example.com/pb\"\ntitle: \"Private Banking\"\n---\n"
+        + "Tämä on Private Bankingin kattava palvelukuvaus ja sijoitusstrategia." * 10,
         encoding="utf-8",
     )
 
-    out_file = tmp_path / "nordea_testset.jsonl"
+    out_file = tmp_path / "enterprise_testset.jsonl"
 
     # Mock JudgeFactory
     mock_llm = MagicMock()
@@ -149,15 +149,15 @@ def test_generate_nordea_dataset_end_to_end(tmp_path: Path) -> None:
     mock_testset = MagicMock()
     mock_testset.to_list.return_value = [
         {
-            "user_input": "Mitä palveluita Nordea Private Banking tarjoaa?",
-            "reference": "Nordea Private Banking tarjoaa varainhoitoa ja sijoitusneuvontaa.",
-            "reference_contexts": ['url: "https://www.nordea.fi/pb"\nNordea Private Banking tarjoaa...'],
+            "user_input": "Mitä palveluita Private Banking tarjoaa?",
+            "reference": "Private Banking tarjoaa varainhoitoa ja sijoitusneuvontaa.",
+            "reference_contexts": ['url: "https://example.com/pb"\nPrivate Banking tarjoaa...'],
             "synthesizer_name": "single_hop_specific_query_synthesizer",
         },
         {
             "user_input": "Miten holdingyhtiön osingot verotetaan sijoitustoiminnassa?",
             "reference": "Holdingyhtiön kautta osingot verotetaan yhteisöverokannan mukaisesti.",
-            "reference_contexts": ['url: "https://www.nordea.fi/pb"\nHoldingyhtiö sijoittaa...'],
+            "reference_contexts": ['url: "https://example.com/pb"\nHoldingyhtiö sijoittaa...'],
             "synthesizer_name": "multi_hop_specific_query_synthesizer",
         },
     ]
@@ -168,7 +168,7 @@ def test_generate_nordea_dataset_end_to_end(tmp_path: Path) -> None:
 
     with patch("src.generator.JudgeFactory.create_judge", return_value=(mock_llm, mock_emb)):
         with patch("src.generator.TestsetGenerator.from_langchain", return_value=mock_generator):
-            records = generate_nordea_dataset(
+            records = generate_enterprise_dataset(
                 md_dir=md_dir,
                 output_file=out_file,
                 total_size=3,  # 1 single, 1 multi, 1 OOD
@@ -184,7 +184,7 @@ def test_generate_nordea_dataset_end_to_end(tmp_path: Path) -> None:
 
     parsed = [json.loads(line) for line in lines]
     ids = [r["id"] for r in parsed]
-    assert ids == ["nordea_q001", "nordea_q002", "nordea_q003"]
+    assert ids == ["enterprise_q001", "enterprise_q002", "enterprise_q003"]
 
     categories = [r["category"] for r in parsed]
     assert "single-hop" in categories
@@ -197,4 +197,4 @@ def test_generate_nordea_dataset_end_to_end(tmp_path: Path) -> None:
 
     sh_rec = next(r for r in parsed if r["category"] == "single-hop")
     assert sh_rec["hopCount"] == 1
-    assert "https://www.nordea.fi/pb" in sh_rec["source_urls"]
+    assert "https://example.com/pb" in sh_rec["source_urls"]

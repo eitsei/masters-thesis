@@ -1,8 +1,8 @@
-"""Nordea Personal Banking Benchmark Dataset Builder (MuSiQue Schema).
+"""Enterprise Personal Banking Benchmark Dataset Builder (MuSiQue Schema).
 
 Constructs an enterprise benchmark dataset adhering 100% to the MuSiQue JSONL schema:
 - Ingests Finnish personal banking questions from CSV (e.g. qs_fi.csv)
-- Segments and indexes crawled personal banking Markdown corpus (nordea.fi/henkiloasiakkaat)
+- Segments and indexes crawled personal banking Markdown corpus
 - Matches questions with candidate corpus passages via lexical and semantic retrieval
 - Verifies ground-truth support, formulates canonical answers, and constructs reasoning
   hops via Gemini 3.8 Flash (Vertex AI global endpoint)
@@ -67,7 +67,7 @@ FINNISH_STOPWORDS = {
     "nämä", "nuo", "kun", "jos", "niin", "kuin", "vaan", "eli", "sekä", "hei",
 }
 
-# Canonical Out-of-Domain financial / non-Nordea questions
+# Canonical Out-of-Domain financial / non-enterprise questions
 OUT_OF_DOMAIN_QUERIES = [
     "Miten S-Pankin S-Etukortilla kerrytettävä bonus siirretään osuuskaupan jäsentilille?",
     "Kuinka OP-bonuksia käytetään Pohjola Vakuutuksen vakuutusmaksujen kuittaamiseen?",
@@ -94,7 +94,7 @@ OUT_OF_DOMAIN_QUERIES = [
 
 @dataclass
 class CorpusParagraph:
-    """Represents a clean, indexed paragraph/section from the Nordea corpus."""
+    """Represents a clean, indexed paragraph/section from the enterprise corpus."""
 
     doc_id: str
     title: str
@@ -302,8 +302,8 @@ def load_multihop_questions_from_csv(csv_path: Path | str) -> list[dict[str, str
     return records
 
 
-class NordeaMusiqueDatasetBuilder:
-    """Builds a stratified 100-question MuSiQue benchmark dataset from Nordea corpus and FAQs."""
+class EnterpriseMusiqueDatasetBuilder:
+    """Builds a stratified 100-question MuSiQue benchmark dataset from enterprise corpus and FAQs."""
 
     def __init__(
         self,
@@ -368,7 +368,7 @@ class NordeaMusiqueDatasetBuilder:
 
         system_prompt = (
             "Olet suomalaisen finanssialan ja pankkipalveluiden RAG-benchmark-asiantuntija.\n"
-            "Tehtäväsi on analysoida asiakaskysymys ja annetut Nordean henkilöasiakassivuston tekstikappaleet.\n"
+            "Tehtäväsi on analysoida asiakaskysymys ja annetut yrityksen henkilöasiakassivuston tekstikappaleet.\n"
             "Noudata ehdottomia sääntöjä:\n"
             "1. Vastaa kysymykseen AINOASTAAN ja YKSINOMAAN annettujen tekstikappaleiden sisältämien faktojen perusteella.\n"
             "2. Jos teksti ei vastaa kysymykseen suoraan ja luotettavasti:\n"
@@ -608,7 +608,7 @@ class NordeaMusiqueDatasetBuilder:
         target_multi_needed = max(0, target_multi - len(existing_multi))
         target_ood_needed = max(0, target_ood - len(existing_ood))
 
-        self.console.print(f"[bold cyan]Building Nordea MuSiQue Benchmark Dataset (Target: {target_size})[/bold cyan]")
+        self.console.print(f"[bold cyan]Building Enterprise MuSiQue Benchmark Dataset (Target: {target_size})[/bold cyan]")
         if existing_samples:
             self.console.print(
                 f"[bold cyan]Jatketaan aiemmasta tiedostosta: {out_path}[/bold cyan]\n"
@@ -696,7 +696,7 @@ class NordeaMusiqueDatasetBuilder:
                 ans = synth_data.get("answer", "")
                 aliases = synth_data.get("answer_aliases", [])
 
-                sample_id = f"1hop__nordea_{len(single_hop_samples) + 1:04d}"
+                sample_id = f"1hop__enterprise_{len(single_hop_samples) + 1:04d}"
                 sample = self._build_musique_sample(
                     sample_id=sample_id,
                     question=q,
@@ -779,7 +779,7 @@ class NordeaMusiqueDatasetBuilder:
                 if len(supp_paras) < 2 and len(candidates) >= 2:
                     supp_paras.append(candidates[1])
 
-                sample_id = f"2hop__nordea_{len(multi_hop_samples) + 1:04d}"
+                sample_id = f"2hop__enterprise_{len(multi_hop_samples) + 1:04d}"
                 sample = self._build_musique_sample(
                     sample_id=sample_id,
                     question=comp_q,
@@ -813,7 +813,7 @@ class NordeaMusiqueDatasetBuilder:
         else:
             for i in range(target_ood_needed):
                 q_ood = OUT_OF_DOMAIN_QUERIES[(len(ood_samples) + i) % len(OUT_OF_DOMAIN_QUERIES)]
-                sample_id = f"ood__nordea_{len(ood_samples) + 1:04d}"
+                sample_id = f"ood__enterprise_{len(ood_samples) + 1:04d}"
                 # OOD has no supporting paragraphs, only distractors
                 sample = self._build_musique_sample(
                     sample_id=sample_id,
@@ -873,7 +873,7 @@ class NordeaMusiqueDatasetBuilder:
         self.console.print(f"\n[bold green]✓ Successfully generated {len(all_samples)} MuSiQue-schema questions to:[/bold green] [cyan]{out_path}[/cyan]")
 
         # Print Rich Summary Table
-        table = Table(title="Generated Nordea MuSiQue Benchmark Dataset Summary", show_header=True)
+        table = Table(title="Generated Enterprise MuSiQue Benchmark Dataset Summary", show_header=True)
         table.add_column("Category", style="cyan")
         table.add_column("Hop Count", justify="right", style="magenta")
         table.add_column("Count", justify="right", style="green")

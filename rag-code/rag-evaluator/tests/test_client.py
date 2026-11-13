@@ -163,11 +163,11 @@ class TestRagClientEndpoints:
         }
         mock_session.post.return_value = mock_resp
 
-        result = client.query("What is X?", modules=["M1"], table_name="vector_store_nordea")
+        result = client.query("What is X?", modules=["M1"], table_name="vector_store_enterprise")
         assert result["answer"] == "Test answer"
         mock_session.post.assert_called_once_with(
             "http://localhost:8080/api/query",
-            json={"query": "What is X?", "modules": ["M1"], "tableName": "vector_store_nordea"},
+            json={"query": "What is X?", "modules": ["M1"], "tableName": "vector_store_enterprise"},
             timeout=60.0,
         )
 

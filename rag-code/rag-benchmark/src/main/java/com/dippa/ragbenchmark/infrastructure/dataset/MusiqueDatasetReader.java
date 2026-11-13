@@ -317,6 +317,18 @@ public class MusiqueDatasetReader {
             return Files.newBufferedReader(subPath, StandardCharsets.UTF_8);
         }
 
+        // Fallback to git-tracked canonical benchmark sample across workspace layouts
+        List<Path> fallbackPaths = List.of(
+                Path.of("..", "rag-evaluator", "data", "musique", "musique_100_final.jsonl"),
+                Path.of("rag-code", "rag-evaluator", "data", "musique", "musique_100_final.jsonl")
+        );
+        for (Path fallbackPath : fallbackPaths) {
+            if (Files.exists(fallbackPath)) {
+                logger.info("Resolved MuSiQue dataset fallback at: {}", fallbackPath.toAbsolutePath());
+                return Files.newBufferedReader(fallbackPath, StandardCharsets.UTF_8);
+            }
+        }
+
         // Fallback to Spring ResourceLoader
         Resource resource = resourceLoader.getResource(location);
         if (resource.exists()) {

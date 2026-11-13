@@ -356,7 +356,7 @@ def test_cli_query_mocked(mock_client_cls, tmp_path: Path):
     res = runner.invoke(app, [
         "query",
         "Mitä etuja Platinum tarjoaa?",
-        "--table-name", "vector_store_nordea",
+        "--table-name", "vector_store_enterprise",
         "--judge", "none",
         "--ground-truth", "Lounge access",
         "--output", str(out_file),
@@ -364,7 +364,7 @@ def test_cli_query_mocked(mock_client_cls, tmp_path: Path):
 
     assert res.exit_code == 0
     assert "Enterprise Platinum offers lounge access" in res.stdout
-    assert "vector_store_nordea" in res.stdout
+    assert "vector_store_enterprise" in res.stdout
     assert mock_instance.query.called
     assert out_file.exists()
     saved = json.loads(out_file.read_text(encoding="utf-8").strip())
@@ -395,7 +395,7 @@ def test_cli_run_questions_mocked(mock_client_cls, tmp_path: Path):
     res = runner.invoke(app, [
         "run-questions",
         "--input", str(q_file),
-        "--table-name", "vector_store_nordea",
+        "--table-name", "vector_store_enterprise",
         "--judge", "none",
         "--output", str(out_file),
     ])
@@ -667,7 +667,7 @@ def test_cli_test_cache_success(mock_client_cls):
         "test-cache",
         "--url", "http://localhost:8080",
         "--models", "gemini-3.8-flash",
-        "--table-name", "vector_store_nordea",
+        "--table-name", "vector_store_enterprise",
     ])
 
     assert res.exit_code == 0

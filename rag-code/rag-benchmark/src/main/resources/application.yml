@@ -7,7 +7,7 @@ spring:
       embedding: ${SPRING_AI_MODEL_EMBEDDING:ollama}
       embedding.text: ${SPRING_AI_MODEL_EMBEDDING:ollama}
     ollama:
-      base-url: ${OLLAMA_BASE_URL:http://172.21.64.1:11434}
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       chat:
         model: ${OLLAMA_CHAT_MODEL:gemma4:e2b}
       embedding:
@@ -31,7 +31,6 @@ spring:
             dimensions: 768
     vectorstore:
       pgvector:
-
         table-name: ${SPRING_AI_VECTORSTORE_PGVECTOR_TABLE_NAME:vector_store_musique}
         index-type: HNSW
         distance-type: COSINE_DISTANCE
@@ -125,7 +124,7 @@ rag:
       batch-size: 100
       include-title-in-chunk-text: true
     enterprise-closed:
-      file-path: ${ENTERPRISE_CLOSED_DATASET_PATH:${NORDEA_CLOSED_DATASET_PATH:data/enterprise/enterprise_100_final.jsonl}}
+      file-path: ${ENTERPRISE_CLOSED_DATASET_PATH:data/enterprise/enterprise_100_final.jsonl}
       batch-size: 100
       parent-batch-size: 10
       child-batch-size: 25

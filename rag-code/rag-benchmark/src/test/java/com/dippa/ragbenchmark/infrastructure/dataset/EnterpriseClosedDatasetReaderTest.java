@@ -31,10 +31,10 @@ class EnterpriseClosedDatasetReaderTest {
     }
 
     @Test
-    void parseLine_parsesValidNordeaJsonLineCorrectly() {
+    void parseLine_parsesValidEnterpriseJsonLineCorrectly() {
         String json = """
                 {
-                  "id": "2hop__nordea_0005",
+                  "id": "2hop__enterprise_0005",
                   "question": "Miten rahasto-osuuksien lunastaminen toteutetaan?",
                   "answer": "Tekemällä lunastustoimeksianto mobiili- tai verkkopankissa.",
                   "answer_aliases": ["Verkkopankin kautta"],
@@ -52,7 +52,7 @@ class EnterpriseClosedDatasetReaderTest {
         MusiqueQuestion q = reader.parseLine(json);
 
         assertThat(q).isNotNull();
-        assertThat(q.id()).isEqualTo("2hop__nordea_0005");
+        assertThat(q.id()).isEqualTo("2hop__enterprise_0005");
         assertThat(q.question()).isEqualTo("Miten rahasto-osuuksien lunastaminen toteutetaan?");
         assertThat(q.answer()).isEqualTo("Tekemällä lunastustoimeksianto mobiili- tai verkkopankissa.");
         assertThat(q.answerAliases()).containsExactly("Verkkopankin kautta");

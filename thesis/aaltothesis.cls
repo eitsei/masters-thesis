@@ -349,7 +349,8 @@
   \immediate\write\@auxout{\string\setcounter{NMainTxtPages}{\thepage-1}}%
 }%
 \AtEndDocument{%
-  \immediate\write\@auxout{\string\setcounter{NAllPages}{\thepage}}%
+  \clearpage%
+  \immediate\write\@auxout{\string\setcounter{NAllPages}{\the\numexpr\value{page}-1\relax}}%
 }%
 %
 %

@@ -62,7 +62,7 @@ class GoogleGenAiModelRouterTest {
     void route_classifierOutputsDigit1_routesToFlashLite() {
         when(chatModel.call(any(Prompt.class))).thenReturn(createChatResponse("1", 20, 1));
 
-        RoutingDecision decision = router.route(new RoutingRequest("What is Nordea's contact phone?"));
+        RoutingDecision decision = router.route(new RoutingRequest("What is the enterprise contact phone?"));
 
         assertThat(decision.selectedModel()).isEqualTo("gemini-3.5-flash-lite");
         assertThat(decision.complexityTier()).isEqualTo(ComplexityTier.SINGLE_HOP);

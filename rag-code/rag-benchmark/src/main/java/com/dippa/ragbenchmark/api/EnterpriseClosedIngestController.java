@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
  * </p>
  */
 @RestController
-@RequestMapping({"/api/ingest/enterprise-closed", "/api/ingest/nordea-closed", "/api/ingest/nordea/closed"})
+@RequestMapping("/api/ingest/enterprise-closed")
 public class EnterpriseClosedIngestController {
 
     private final EnterpriseClosedDatasetService closedDatasetService;

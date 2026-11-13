@@ -1,4 +1,4 @@
-"""Unit tests for Nordea Personal Banking MuSiQue Dataset Builder."""
+"""Unit tests for Enterprise Personal Banking MuSiQue Dataset Builder."""
 
 import json
 from pathlib import Path
@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage
 from src.dataset_builder import (
     CorpusIndexer,
     CorpusParagraph,
-    NordeaMusiqueDatasetBuilder,
+    EnterpriseMusiqueDatasetBuilder,
     load_existing_musique_dataset,
     load_multihop_questions_from_csv,
     load_questions_from_csv,
@@ -41,7 +41,7 @@ def temp_corpus(tmp_path: Path) -> Path:
     page1 = corpus_dir / "kortit.md"
     page1.write_text(
         "---\n"
-        'url: "https://www.nordea.fi/henkiloasiakkaat/kortit"\n'
+        'url: "https://example.com/henkiloasiakkaat/kortit"\n'
         'title: "Maksukortit ja rinnakkaiskortti"\n'
         "---\n\n"
         "# Maksukortit\n\n"
@@ -50,7 +50,7 @@ def temp_corpus(tmp_path: Path) -> Path:
         "valitsemalla korttiasetukset ja lisäämällä alaikäisen tiedot. Kortti toimitetaan "
         "postitse kotiin kahden viikon kuluessa tilauksesta ja se aktivoidaan mobiilissa.\n\n"
         "## Kortin turvarajat\n\n"
-        "Kortin turvarajaa voi muuttaa reaaliaikaisesti Nordea Mobile -sovelluksessa tai "
+        "Kortin turvarajaa voi muuttaa reaaliaikaisesti Mobile -sovelluksessa tai "
         "verkkopankissa kohdassa Kortit ja Turvarajat. Muutos astuu voimaan heti ilman viivettä.\n",
         encoding="utf-8",
     )
@@ -58,7 +58,7 @@ def temp_corpus(tmp_path: Path) -> Path:
     page2 = corpus_dir / "tilit.md"
     page2.write_text(
         "---\n"
-        'url: "https://www.nordea.fi/henkiloasiakkaat/tilit"\n'
+        'url: "https://example.com/henkiloasiakkaat/tilit"\n'
         'title: "Tilit ja säästäminen"\n'
         "---\n\n"
         "# Pankkitilit\n\n"
@@ -91,7 +91,7 @@ def test_corpus_indexer(temp_corpus: Path) -> None:
 def test_build_musique_sample_schema(temp_corpus: Path) -> None:
     indexer = CorpusIndexer(temp_corpus)
     mock_llm = MagicMock()
-    builder = NordeaMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm)
+    builder = EnterpriseMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm)
 
     p1 = CorpusParagraph(
         doc_id="doc_001",
@@ -105,7 +105,7 @@ def test_build_musique_sample_schema(temp_corpus: Path) -> None:
     )
 
     sample = builder._build_musique_sample(
-        sample_id="2hop__nordea_0001",
+        sample_id="2hop__enterprise_0001",
         question="Miten tilaan rinnakkaiskortin ja miten sen turvarajaa muutetaan?",
         answer="Rinnakkaiskortin voi tilata verkkopankista ja sen turvarajaa voi muuttaa mobiilipankissa.",
         aliases=["Verkkopankista tilaamalla ja mobiilissa rajaa muuttamalla."],
@@ -122,7 +122,7 @@ def test_build_musique_sample_schema(temp_corpus: Path) -> None:
     # Validate exact MuSiQue keys
     expected_keys = {"id", "question", "answer", "answer_aliases", "paragraphs", "question_decomposition", "answerable", "hopCount"}
     assert set(sample.keys()) == expected_keys
-    assert sample["id"] == "2hop__nordea_0001"
+    assert sample["id"] == "2hop__enterprise_0001"
     assert sample["answerable"] is True
     assert len(sample["paragraphs"]) == 5
 
@@ -150,10 +150,10 @@ def test_build_musique_sample_schema(temp_corpus: Path) -> None:
 def test_out_of_domain_sample(temp_corpus: Path) -> None:
     indexer = CorpusIndexer(temp_corpus)
     mock_llm = MagicMock()
-    builder = NordeaMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm)
+    builder = EnterpriseMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm)
 
     sample = builder._build_musique_sample(
-        sample_id="ood__nordea_0001",
+        sample_id="ood__enterprise_0001",
         question="Miten S-Pankin bonus toimii?",
         answer=STANDARD_REFUSAL_FI,
         aliases=[STANDARD_REFUSAL_EN],
@@ -175,13 +175,13 @@ def test_builder_delay_configuration(temp_corpus: Path) -> None:
     indexer = CorpusIndexer(temp_corpus)
     mock_llm = MagicMock()
 
-    builder_default = NordeaMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm)
+    builder_default = EnterpriseMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm)
     assert builder_default.delay_seconds == 2.5
 
-    builder_custom = NordeaMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=3.5)
+    builder_custom = EnterpriseMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=3.5)
     assert builder_custom.delay_seconds == 3.5
 
-    builder_negative = NordeaMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=-1.0)
+    builder_negative = EnterpriseMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=-1.0)
     assert builder_negative.delay_seconds == 0.0
 
 
@@ -199,7 +199,7 @@ def test_builder_pacing_delay_executed(temp_corpus: Path, tmp_path: Path, monkey
         })
     )
 
-    builder = NordeaMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=2.0)
+    builder = EnterpriseMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=2.0)
 
     sleep_calls = []
     monkeypatch.setattr("time.sleep", lambda s: sleep_calls.append(s))
@@ -235,7 +235,7 @@ def test_load_multihop_questions_from_csv(tmp_path: Path) -> None:
 def test_search_multihop_candidates(temp_corpus: Path) -> None:
     indexer = CorpusIndexer(temp_corpus)
     mock_llm = MagicMock()
-    builder = NordeaMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm)
+    builder = EnterpriseMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm)
 
     cands = builder._search_multihop_candidates(
         sub_q1="Miten tilaan rinnakkaiskortin lapselle?",
@@ -280,7 +280,7 @@ def test_build_dataset_with_multihop(temp_corpus: Path, tmp_path: Path) -> None:
             }))
 
     mock_llm.invoke.side_effect = mock_side_effect
-    builder = NordeaMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=0.0)
+    builder = EnterpriseMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=0.0)
 
     out_file = tmp_path / "musique_out.jsonl"
     single_qs = ["Miten avaan lapselle tilin?"]
@@ -320,7 +320,7 @@ def test_verify_and_synthesize_error_separation(temp_corpus: Path, monkeypatch) 
     monkeypatch.setattr("time.sleep", lambda _: None)
     indexer = CorpusIndexer(temp_corpus)
     mock_llm = MagicMock()
-    builder = NordeaMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=0.0)
+    builder = EnterpriseMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=0.0)
     cands = indexer.paragraphs[:2]
 
     # 1. Test unanswerable response with reason
@@ -365,7 +365,7 @@ def test_build_dataset_shuffle_behavior(temp_corpus: Path, tmp_path: Path, monke
         )
 
     mock_llm.invoke.side_effect = mock_invoke
-    builder = NordeaMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=0.0)
+    builder = EnterpriseMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=0.0)
 
     questions = [f"Kysymys {i}" for i in range(10)]
     out_file = tmp_path / "shuffle_out.jsonl"
@@ -407,15 +407,15 @@ def test_load_existing_musique_dataset(tmp_path: Path) -> None:
 
     test_file = tmp_path / "test.jsonl"
     test_file.write_text(
-        json.dumps({"id": "1hop__nordea_0001", "question": "Kysymys 1"}) + "\n"
+        json.dumps({"id": "1hop__enterprise_0001", "question": "Kysymys 1"}) + "\n"
         "corrupt line\n"
-        + json.dumps({"id": "2hop__nordea_0001", "question": "Kysymys 2"}) + "\n",
+        + json.dumps({"id": "2hop__enterprise_0001", "question": "Kysymys 2"}) + "\n",
         encoding="utf-8",
     )
     records = load_existing_musique_dataset(test_file)
     assert len(records) == 2
-    assert records[0]["id"] == "1hop__nordea_0001"
-    assert records[1]["id"] == "2hop__nordea_0001"
+    assert records[0]["id"] == "1hop__enterprise_0001"
+    assert records[1]["id"] == "2hop__enterprise_0001"
 
 
 def test_build_dataset_resume_behavior(temp_corpus: Path, tmp_path: Path) -> None:
@@ -434,15 +434,15 @@ def test_build_dataset_resume_behavior(temp_corpus: Path, tmp_path: Path) -> Non
             ],
         })
     )
-    builder = NordeaMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=0.0)
+    builder = EnterpriseMusiqueDatasetBuilder(corpus_indexer=indexer, llm=mock_llm, delay_seconds=0.0)
 
     out_file = tmp_path / "resume_test.jsonl"
 
     # Seed with 2 single-hop and 1 multi-hop question (total 3)
     existing_items = [
-        {"id": "1hop__nordea_0001", "question": "Existing single 1", "answer": "A1", "paragraphs": []},
-        {"id": "1hop__nordea_0002", "question": "Existing single 2", "answer": "A2", "paragraphs": []},
-        {"id": "2hop__nordea_0001", "question": "Existing multi 1", "answer": "M1", "paragraphs": []},
+        {"id": "1hop__enterprise_0001", "question": "Existing single 1", "answer": "A1", "paragraphs": []},
+        {"id": "1hop__enterprise_0002", "question": "Existing single 2", "answer": "A2", "paragraphs": []},
+        {"id": "2hop__enterprise_0001", "question": "Existing multi 1", "answer": "M1", "paragraphs": []},
     ]
     with out_file.open("w", encoding="utf-8") as f:
         for it in existing_items:
@@ -475,10 +475,10 @@ def test_build_dataset_resume_behavior(temp_corpus: Path, tmp_path: Path) -> Non
     assert len(bak_records) == 3
 
     # Check IDs and content
-    assert result[0]["id"] == "1hop__nordea_0001"
-    assert result[1]["id"] == "1hop__nordea_0002"
-    assert result[2]["id"] == "2hop__nordea_0001"
-    assert result[3]["id"] == "2hop__nordea_0002"
+    assert result[0]["id"] == "1hop__enterprise_0001"
+    assert result[1]["id"] == "1hop__enterprise_0002"
+    assert result[2]["id"] == "2hop__enterprise_0001"
+    assert result[3]["id"] == "2hop__enterprise_0002"
     assert result[3]["question"] == "New multi 2"
 
     # LLM should only have been invoked ONCE (for the 1 missing multi-hop question)!

@@ -214,6 +214,18 @@ class MusiqueDatasetReaderTest {
     }
 
     @Test
+    void openReader_fallsBackToEvaluatorCanonicalDatasetWhenPrimaryPathMissing() {
+        MusiqueDatasetProperties fallbackProperties = new MusiqueDatasetProperties(
+                "data/musique/missing_dev_file.jsonl",
+                100, 0.40, 0.20, 0.20, 0.20, 42L, 100, true
+        );
+        MusiqueDatasetReader fallbackReader = new MusiqueDatasetReader(fallbackProperties, objectMapper);
+        List<MusiqueQuestion> loaded = fallbackReader.loadAll();
+        assertThat(loaded).isNotEmpty();
+        assertThat(loaded).hasSize(100);
+    }
+
+    @Test
     void exportCanonicalBenchmarkSampleToFile() throws Exception {
         List<MusiqueQuestion> sample = reader.getCanonicalBenchmarkSample();
         assertThat(sample).hasSize(100);

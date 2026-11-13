@@ -1,4 +1,4 @@
-"""RAGAS Synthetic Test Set Generator for Enterprise Nordea Private Banking.
+"""RAGAS Synthetic Test Set Generator for Enterprise Private Banking.
 
 Generates a stratified 100-question benchmark dataset conforming to Thesis §4.4:
 - 40% Single-Hop Factual Queries (SingleHopSpecificQuerySynthesizer)
@@ -113,16 +113,16 @@ def _patch_ragas_pydantic_prompt() -> None:
 STANDARD_REFUSAL_FI = "Annettu konteksti ei sisällä riittävästi tietoa kysymykseen vastaamiseksi."
 STANDARD_REFUSAL_EN = "The provided context does not contain sufficient information to answer this query."
 
-NORDEA_LLM_CONTEXT = (
-    "Toimialana on Nordea Private Banking (varallisuudenhoito, sijoituspalvelut, lakipalvelut ja eksklusiiviset maksukortit). "
+ENTERPRISE_LLM_CONTEXT = (
+    "Toimialana on yrityksen Private Banking (varallisuudenhoito, sijoituspalvelut, lakipalvelut ja eksklusiiviset maksukortit). "
     "Kaikki kysymykset ja mallivastaukset (ground truth) on laadittava sujuvalla, virheettömällä ja ammattimaisella suomen kielellä. "
     "Kysymysten tulee heijastaa aitoja suomalaisten varakkaiden yksityisasiakkaiden ja yrittäjien esittämiä asiointikysymyksiä. "
     "Mallivastauksen on perustuttava täsmällisesti ja ainoastaan annettuun lähdeaineistoon ilman ulkopuolista päättelyä."
 )
 
 
-def get_nordea_personas() -> list[Persona]:
-    """Returns domain-specific Finnish customer personas for Nordea Private Banking."""
+def get_enterprise_personas() -> list[Persona]:
+    """Returns domain-specific Finnish customer personas for Enterprise Private Banking."""
     return [
         Persona(
             name="Yrittäjä ja Holdingyhtiö-omistaja",
@@ -141,7 +141,7 @@ def get_nordea_personas() -> list[Persona]:
         Persona(
             name="Premium-kortinhaltija ja Matkustaja",
             role_description=(
-                "Paljon matkustava Private Banking -asiakas, joka hyödyntää Nordea Platinum- ja Nordea Black -korttien "
+                "Paljon matkustava Private Banking -asiakas, joka hyödyntää Platinum- ja Black -korttien "
                 "matkavakuutusta, Priority Pass -lentokenttäloungeja, Concierge-palvelua ja ostoturvaa."
             ),
         ),
@@ -155,7 +155,7 @@ def get_nordea_personas() -> list[Persona]:
     ]
 
 
-def load_and_deduplicate_nordea_docs(
+def load_and_deduplicate_enterprise_docs(
     md_dir: Path,
     min_chars: int = 150,
     max_docs: Optional[int] = None,
@@ -166,7 +166,7 @@ def load_and_deduplicate_nordea_docs(
     clean markdown body as page_content.
     """
     if not md_dir.exists():
-        raise FileNotFoundError(f"Nordea markdown directory not found: {md_dir}")
+        raise FileNotFoundError(f"Enterprise markdown directory not found: {md_dir}")
 
     # Map url -> (length, Document)
     docs_by_url: dict[str, tuple[int, Document]] = {}
@@ -241,7 +241,7 @@ def generate_out_of_domain_samples(
 
     prompt = f"""
 Sinun tehtäväsi on luoda täsmälleen {count} kappaletta realistisia suomenkielisiä asiakaspalvelukysymyksiä pankkitoiminnasta.
-NÄIDEN KYSYMYSTEN ON OLTAVA TÄYSIN ULKOPUOLISIA (Out-of-Domain) Nordea Private Banking -varainhoitotoiminnalle.
+NÄIDEN KYSYMYSTEN ON OLTAVA TÄYSIN ULKOPUOLISIA (Out-of-Domain) yrityksen Private Banking -varainhoitotoiminnalle.
 
 OHJEET:
 1. Kysymysten tulee liittyä tavalliseen vähittäispankkiin tai muuhun finanssialan toimintaan, joita EI käsitellä varakkaiden Private Banking -aineistossa:
@@ -297,7 +297,7 @@ OHJEET:
     return results
 
 
-def generate_nordea_dataset(
+def generate_enterprise_dataset(
     md_dir: Path,
     output_file: Path,
     total_size: int = 100,
@@ -305,7 +305,7 @@ def generate_nordea_dataset(
     limit_docs: Optional[int] = None,
     console: Optional[Console] = None,
 ) -> list[dict[str, Any]]:
-    """Generates the full stratified Nordea benchmark dataset (Thesis §4.4).
+    """Generates the full stratified Enterprise benchmark dataset (Thesis §4.4).
 
     Partitioning:
     - 40% single-hop factual queries
@@ -320,7 +320,7 @@ def generate_nordea_dataset(
     num_multi = num_in_domain - num_single
 
     console.print(
-        f"\n[bold magenta]=== Nordea Synthetic Test Set Generation ===[/bold magenta]\n"
+        f"\n[bold magenta]=== Enterprise Synthetic Test Set Generation ===[/bold magenta]\n"
         f"• Target Total Size:   [bold cyan]{total_size}[/bold cyan]\n"
         f"• Single-hop (40%):    [cyan]{num_single}[/cyan]\n"
         f"• Multi-hop (40%):     [cyan]{num_multi}[/cyan]\n"
@@ -331,8 +331,8 @@ def generate_nordea_dataset(
     )
 
     # 1. Load and deduplicate documents
-    with console.status("[bold green]Loading and deduplicating Nordea markdown documents...[/bold green]"):
-        canonical_docs = load_and_deduplicate_nordea_docs(
+    with console.status("[bold green]Loading and deduplicating enterprise markdown documents...[/bold green]"):
+        canonical_docs = load_and_deduplicate_enterprise_docs(
             md_dir=md_dir,
             min_chars=150,
             max_docs=limit_docs,
@@ -359,11 +359,11 @@ def generate_nordea_dataset(
     _patch_ragas_headline_splitter()
     _patch_ragas_pydantic_prompt()
 
-    personas = get_nordea_personas()
+    personas = get_enterprise_personas()
     generator = TestsetGenerator.from_langchain(
         llm=llm,
         embedding_model=emb,
-        llm_context=NORDEA_LLM_CONTEXT,
+        llm_context=ENTERPRISE_LLM_CONTEXT,
     )
     generator.persona_list = personas
 
@@ -454,7 +454,7 @@ def generate_nordea_dataset(
             item = ood_samples[ood_idx]
             ood_idx += 1
 
-        item["id"] = f"nordea_q{i:03d}"
+        item["id"] = f"enterprise_q{i:03d}"
         all_samples.append(item)
 
     # 7. Write to JSONL
@@ -466,7 +466,7 @@ def generate_nordea_dataset(
     console.print(f"\n[bold green]✓ Successfully saved {len(all_samples)} questions to:[/bold green] [cyan]{output_file}[/cyan]")
 
     # 8. Print Summary Table
-    table = Table(title="Nordea Synthetic Benchmark Dataset Summary", show_header=True)
+    table = Table(title="Enterprise Synthetic Benchmark Dataset Summary", show_header=True)
     table.add_column("Category", style="cyan")
     table.add_column("Hop Count", justify="right", style="magenta")
     table.add_column("Count", justify="right", style="green")

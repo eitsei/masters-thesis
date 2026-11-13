@@ -1133,9 +1133,9 @@ def export_thesis(
         inp_str = str(input_target).lower()
         if "musique" in sub_str or "musique" in inp_str or "sample10" in sub_str or "sample10" in inp_str:
             dataset_name = "MuSiQue"
-        elif "enterprise_closed" in sub_str or "enterprise_closed" in inp_str or "nordea_closed" in sub_str or "nordea_closed" in inp_str:
+        elif "enterprise_closed" in sub_str or "enterprise_closed" in inp_str:
             dataset_name = "Enterprise Closed"
-        elif "enterprise" in sub_str or "enterprise" in inp_str or "nordea" in sub_str or "nordea" in inp_str:
+        elif "enterprise" in sub_str or "enterprise" in inp_str:
             dataset_name = "Enterprise"
         elif subfolder:
             dataset_name = subfolder.capitalize()

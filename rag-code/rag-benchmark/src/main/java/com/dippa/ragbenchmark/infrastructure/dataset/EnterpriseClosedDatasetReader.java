@@ -129,9 +129,7 @@ public class EnterpriseClosedDatasetReader {
                 Path.of("..", "rag-evaluator", location),
                 Path.of("data", "enterprise", "enterprise_100_final.jsonl"),
                 Path.of("..", "rag-evaluator", "data", "enterprise", "enterprise_100_final.jsonl"),
-                Path.of("rag-code", "rag-evaluator", "data", "enterprise", "enterprise_100_final.jsonl"),
-                Path.of("data", "nordea", "nordea_100_final.jsonl"),
-                Path.of("rag-code", "rag-evaluator", "data", "nordea", "nordea_100_final.jsonl")
+                Path.of("rag-code", "rag-evaluator", "data", "enterprise", "enterprise_100_final.jsonl")
         );
 
         for (Path candidate : candidatePaths) {

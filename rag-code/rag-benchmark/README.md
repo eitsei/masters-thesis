@@ -115,16 +115,11 @@ curl -X POST http://localhost:8080/api/ingest/enterprise \
   -d '{"action": "all", "clearDatabase": true, "clearFiles": true, "mode": "s2b"}'
 ```
 
-`EnterpriseIngestRequest` supports `mode` (`"s2b"` default, or `"original"`), `action` (`"all"`, `"crawl"`, `"clean"`, `"ingest"`), `clearDatabase`, and `clearFiles`. Both `EnterpriseCrawler` and `EnterprisePdfExtractor` include 3x exponential-backoff retries (1s, 2s, 4s). Standalone Markdown cleaning can also be run via:
-
-```bash
-python3 data/enterprise/clean_nordea_markdown.py --dry-run
-python3 data/enterprise/clean_nordea_markdown.py --in-place --backup
-```
+`EnterpriseIngestRequest` supports `mode` (`"s2b"` default, or `"original"`), `action` (`"all"`, `"crawl"`, `"clean"`, `"ingest"`), `clearDatabase`, and `clearFiles`. Both `EnterpriseCrawler` and `EnterprisePdfExtractor` include 3x exponential-backoff retries (1s, 2s, 4s).
 
 ### MuSiQue Multi-Hop Benchmark
 
-The application includes integration with the **MuSiQue** multi-hop QA dataset (2-hop, 3-hop, 4-hop, and unanswerable splits). Paragraphs can be ingested into `vector_store_musique` (and `_large`/`_small` for S2B) via `./scripts/ingest_musique.sh` or `POST /api/ingest/musique`.
+The application includes integration with the **MuSiQue** multi-hop QA dataset (2-hop, 3-hop, 4-hop, and unanswerable splits). Paragraphs can be ingested into `vector_store_musique` (and `_large`/`_small` for S2B) via `POST /api/benchmark/musique/ingest?mode=original&clearDatabase=true`.
 
 ## Optimization Modules (M0–M4)
 

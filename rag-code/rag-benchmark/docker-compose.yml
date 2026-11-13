@@ -1,39 +1,17 @@
-# Local development infrastructure for rag-benchmark.
-#
-# This file is picked up automatically by the `spring-boot-docker-compose` module
-# (already a pom.xml dependency) whenever the app is started with `mvn spring-boot:run`
-# or from the IDE. Spring Boot starts this file's services if they aren't already
-# running, waits for the healthcheck below to pass, and then auto-configures the
-# app's datasource (spring.datasource.url/username/password) from the running
-# container -- so no manual DB_HOST/DB_USER/DB_PASSWORD env vars are needed for the
-# default local path. See README.md for details.
-#
-# The `org.springframework.boot.service-connection: postgres` label below is required:
-# Spring Boot's docker-compose support normally identifies a Postgres service by
-# checking whether the container's image name is literally "postgres". Since this
-# project uses the community pgvector/pgvector image (based on postgres, but with a
-# different image name) to get the pgvector extension pre-installed, the label tells
-# Spring Boot explicitly to treat this service as a Postgres connection.
+# Local PostgreSQL + pgvector container (auto-managed by spring-boot-docker-compose)
 services:
   postgres:
     image: pgvector/pgvector:0.8.6-pg16
     container_name: rag-benchmark-postgres
     labels:
+      # Required so Spring Boot recognizes the pgvector image as a Postgres service connection
       org.springframework.boot.service-connection: postgres
     environment:
-      # Docker Compose auto-loads a .env file from this same directory for ${...}
-      # substitution -- this is the project's own .env/.env.example, so these defaults
-      # (used when the vars aren't set) match what's documented there. Local-only
-      # credentials; not a secret worth externalizing further for a thesis dev box.
       POSTGRES_DB: ${POSTGRES_DB:-ragbenchmark}
       POSTGRES_USER: ${POSTGRES_USER:-ragbenchmark}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ragbenchmark}
     ports:
-      # Host port 5433, not 5432: this machine already runs a native (non-Docker)
-      # Postgres 14 on 5432. Spring Boot's docker-compose service-connection support
-      # reads the actual mapped port from the container at startup, so the app needs
-      # no configuration change for this -- only tools connecting from the host
-      # manually (e.g. `psql`) need to use 5433.
+      # Mapped to 5433 to avoid conflicting with a local PostgreSQL instance on 5432
       - "5433:5432"
     volumes:
       - rag-benchmark-pgdata:/var/lib/postgresql/data

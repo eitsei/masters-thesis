@@ -186,7 +186,7 @@ class EnterpriseIngestionServiceTest {
 
                 - Kysy heti chatissa
                 - Usein kysytyt
-                - Soita meille 0200 3000
+                - Soita meille 0200 0000
                 - Enterprise Portal
                 """;
         Files.writeString(testFile, rawMarkdown);
