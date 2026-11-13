@@ -703,12 +703,19 @@ public class RagQueryService {
         return dynamicStores.computeIfAbsent(tableName, tbl -> {
             logger.info("Initializing dynamic PgVectorStore for table '{}'", tbl);
             PgVectorStore pgStore = (PgVectorStore) this.vectorStore;
-            return PgVectorStore.builder(finalJdbc, this.embeddingModel)
+            PgVectorStore store = PgVectorStore.builder(finalJdbc, this.embeddingModel)
                     .vectorTableName(tbl)
-                    .initializeSchema(false)
+                    .dimensions(768)
+                    .initializeSchema(true)
                     .vectorTableValidationsEnabled(false)
                     .distanceType(pgStore.getDistanceType())
                     .build();
+            try {
+                store.afterPropertiesSet();
+            } catch (Exception ex) {
+                throw new IllegalStateException("Failed to initialize PgVectorStore schema for table '" + tbl + "'", ex);
+            }
+            return store;
         });
     }
 
